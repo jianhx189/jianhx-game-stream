@@ -1,0 +1,11 @@
+QT += widgets network
+CONFIG += c++17 release
+TEMPLATE = app
+TARGET = MiniStreamHost
+SOURCES += main.cpp
+RC_ICONS = ministream.ico
+QMAKE_TARGET_PRODUCT = MiniStream Host
+QMAKE_TARGET_DESCRIPTION = MiniStream Host Console
+LIBS += -liphlpapi -lshell32
+QMAKE_CXXFLAGS += /utf-8
+LIBS += -lws2_32

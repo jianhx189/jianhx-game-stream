@@ -522,6 +522,9 @@ struct Relay::Impl {
     bool     udpModeDecided   = false;
     uint64_t udpProbeStartMs  = 0;
     uint64_t nextUdpHelloMs   = 0;
+    uint64_t lastUdpAckMs     = 0;   // 最近一次收到 HELLO_ACK
+    int      udpRecoverHits   = 0;   // 从 TCP 兜底切回 UDP 的连续确认次数
+    int      udpProbeFails    = 0;
 
     struct HostStream {
         SOCKET up = INVALID_SOCKET;
@@ -727,6 +730,9 @@ bool Relay::Impl::client_connect_tunnel() {
     udpModeDecided = false;
     udpProbeStartMs = now_ms();
     nextUdpHelloMs = now_ms();
+    lastUdpAckMs = 0;
+    udpRecoverHits = 0;
+    udpProbeFails = 0;
     if (::getenv("MSLINK_FORCE_TCP_UDP") != nullptr) {
         udpModeDecided = true;
         udpViaTcp = true;
@@ -973,9 +979,10 @@ void Relay::Impl::client_loop() {
                     if (n <= 0) break;
                     if (n < int(kUdpHdr) || buf[0] != kUdpMagic) continue;
                     if (buf[1] == kUdpHelloAck) {
+                        lastUdpAckMs = now_ms();
                         if (!udpDirectOk.load()) {
                             udpDirectOk.store(true);
-                            logf("客户端：收到 UDP 回程应答（HELLO_ACK）");
+                            logf("客户端：收到 UDP 回程应答（HELLO_ACK），UDP 双向可用");
                         }
                         continue;
                     }
@@ -1022,24 +1029,58 @@ void Relay::Impl::client_loop() {
             }
         }
 
+        // ---- UDP 传输模式：持续探测 + 带滞后的恢复 ----
+        //
+        // 之前是「1.5 秒内收不到 HELLO_ACK 就永久回退 TCP」。
+        // 问题：FRP/防火墙的 UDP 映射有时要好几秒才建立，1.5 秒完全不够，
+        // 结果是一次误判 → 整个会话都跑 TCP，UI 上也一直显示「UDP 不通」。
+        //
+        // 现在改成：
+        //   · 探测包一直发（未确认期间 500ms 一次，确认后 3s 一次保活）
+        //   · 收到 ACK 立刻置 udpDirectOk，不需要等某个窗口结束
+        //   · 转 TCP 只是「临时兜底」，之后仍持续探测；连续几次 ACK 成功就切回 UDP
+        //   · 切换带滞后，避免在临界状态反复横跳
         if (sock_valid(tunnelTcp)) {
             const uint64_t tnow = now_ms();
-            if (!udpModeDecided) {
-                if (udpDirectOk.load()) {
-                    udpModeDecided = true;
-                    logf("UDP 回程正常：视频/控制/音频走原生 UDP 隧道");
-                } else if (tnow - udpProbeStartMs > 1500) {
-                    udpModeDecided = true;
+
+            // 定期发 HELLO（未确认时更频繁）
+            const uint64_t helloGap = udpDirectOk.load() ? 3000 : 500;
+            if (tnow >= nextUdpHelloMs) {
+                nextUdpHelloMs = tnow + helloGap;
+                send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,
+                                sessionKey, nullptr, 0);
+            }
+
+            if (udpDirectOk.load()) {
+                // 已确认可走 UDP；但长时间收不到 ACK 说明链路变了，退回去重新评估
+                if (lastUdpAckMs != 0 && tnow - lastUdpAckMs > 8000) {
+                    udpDirectOk.store(false);
+                    udpProbeFails = 0;
+                    udpRecoverHits = 0;
+                    udpProbeStartMs = tnow;
+                    logf("提示：UDP 回程应答中断，重新探测中（期间自动用 TCP 兜底）");
+                } else {
+                    udpProbeFails = 0;
+                    if (udpViaTcp) {
+                        // 之前是 TCP 兜底，现在连续收到 ACK → 切回 UDP
+                        if (++udpRecoverHits >= 3) {
+                            udpViaTcp = false;
+                            udpRecoverHits = 0;
+                            logf("UDP 回程已恢复：自动切回原生 UDP 传输");
+                        }
+                    } else {
+                        udpRecoverHits = 0;
+                    }
+                }
+            } else {
+                udpRecoverHits = 0;
+                // 还没确认通：第一次超时后先用 TCP 兜底保证能用
+                if (!udpViaTcp && tnow - udpProbeStartMs > 2500) {
                     udpViaTcp = true;
-                    logf("警告：UDP 回程不通（探测包发出后没有任何应答）");
-                    logf("      已自动改用 TCP 隧道承载 UDP 流：功能可用，实时性略降。");
-                    logf("      常见原因：穿透/映射服务只转发了 UDP 去程，回程被丢弃。");
-                } else if (tnow >= nextUdpHelloMs) {
-                    nextUdpHelloMs = tnow + 300;
-                    send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,
-                                    sessionKey, nullptr, 0);
+                    logf("提示：UDP 回程暂时没有应答，先走 TCP 兜底（仍在持续探测，通了会自动切回）");
                 }
             }
+            udpModeDecided = true;
         }
 
         if (now_ms() - lastPingMs > 5000) {

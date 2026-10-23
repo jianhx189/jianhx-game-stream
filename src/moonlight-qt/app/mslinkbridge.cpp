@@ -1,3 +1,4 @@
+#include <QStandardPaths>
 // =============================================================================
 //  mslinkbridge.cpp —— 2 端口复用通道的客户端集成
 // =============================================================================
@@ -292,7 +293,9 @@ MslinkTunnel::MslinkTunnel(QObject* parent) : QObject(parent) {
 }
 
 QString MslinkTunnel::iniPath() const {
-    return QCoreApplication::applicationDirPath() + "/mslink.ini";
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    QDir().mkpath(dir);
+    return dir + "/mslink.ini";
 }
 
 void MslinkTunnel::loadConfigFromIni() {

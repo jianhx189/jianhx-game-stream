@@ -26,7 +26,9 @@ Dialog {
     modal: true
     closePolicy: Popup.NoAutoClose
     title: qsTr("连接到被控端 · 第 %1/3 步").arg(currentStep + 1)
-    width: 520
+    width: Math.min(560, parent.width - 40)
+    x: Math.max(20, (parent.width - width) / 2)
+    y: Math.max(20, (parent.height - height) / 2)
     padding: 22
 
     Theme { id: theme }
@@ -235,7 +237,7 @@ Dialog {
                 TextField {
                     id: serverField
                     Layout.fillWidth: true
-                    placeholderText: setupDialog.connMode === 0 ? qsTr("例如 192.168.1.50") : qsTr("FRP 域名或 IP，例如 192.0.2.10")
+                    placeholderText: setupDialog.connMode === 0 ? qsTr("例如 192.168.1.100") : qsTr("FRP 域名或 IP，例如 192.0.2.10")
                     selectByMouse: true
                     onAccepted: passwordField.forceActiveFocus()
                 }

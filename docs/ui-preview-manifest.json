@@ -1,0 +1,37 @@
+{
+  "product": "MiniStream",
+  "version": "2.1.0-preview",
+  "channel": "prerelease",
+  "basedOn": "2.0.5 sanitized delivery",
+  "scope": [
+    "Custom vector branding and Windows icons",
+    "Controller home, state and setup layout",
+    "Qt Widgets host console, settings and redacted diagnostics",
+    "App-local VC143 runtime and per-user client config"
+  ],
+  "verified": [
+    "Compiled client and host GUI; inspected real windows",
+    "Both Inno Setup installers compiled successfully",
+    "Settings helper save and unrelated-field preservation in isolated fixture",
+    "Missing second configuration does not partly update first",
+    "Packaging inputs exclude runtime configurations, credentials, logs and dumps"
+  ],
+  "notVerified": [
+    "Windows 10 crash reproduction",
+    "UAC service start/restart on installed host",
+    "Long-running real cross-network gameplay and input reliability",
+    "Full installer install/uninstall in clean VM"
+  ],
+  "files": [
+    {
+      "name": "MiniStream-Client-Setup.exe",
+      "size": 30971574,
+      "sha256": "34a9b59232a2b98f008faf427719c4f9300bd1463a6c27948418db1fd14d8399"
+    },
+    {
+      "name": "MiniStream-Host-Setup.exe",
+      "size": 45152685,
+      "sha256": "126c125dceb58866eec926a8c6d7fa077f4acb9e2beb59b224980170fb387da8"
+    }
+  ]
+}

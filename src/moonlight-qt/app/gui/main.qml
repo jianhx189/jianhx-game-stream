@@ -3,6 +3,7 @@ import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.2
 import QtQuick.Controls.Material 2.2
+import Qt.labs.platform 1.1 as LabPlatform
 
 import ComputerManager 1.0
 import StreamingPreferences 1.0
@@ -19,6 +20,10 @@ import StreamMenu 1.0
 // =============================================================================
 ApplicationWindow {
     property bool pollingActive: false
+
+    // MiniStream：点关闭时默认最小化到托盘，而不是退出。
+    // forceQuit 由 C++ 托盘菜单「退出」置位后才真正关闭。
+    property bool forceQuit: false
 
     // Set by SettingsView to force the back operation to pop all
     // pages except the initial view. This is required when doing
@@ -49,6 +54,57 @@ ApplicationWindow {
     palette.buttonText: theme.text
     palette.highlight: theme.primary
     palette.highlightedText: "#ffffff"
+
+    // MiniStream：点 X 不退出，只收进托盘（真正退出走托盘右键菜单）。
+    onClosing: function(close) {
+        if (trayIcon.available && !window.forceQuit) {
+            close.accepted = false
+            window.hide()
+        }
+    }
+
+    // ---- MiniStream：系统托盘 ----
+    // 关闭主窗口后进程继续在托盘里跑，隧道和主机列表都保持；
+    // 右键托盘才有「退出 MiniStream」。
+    LabPlatform.SystemTrayIcon {
+        id: trayIcon
+        visible: true
+        icon.source: "qrc:/res/brand.svg"
+        tooltip: "MiniStream 主控端"
+
+        menu: LabPlatform.Menu {
+            LabPlatform.MenuItem {
+                text: "显示主界面"
+                onTriggered: {
+                    window.show()
+                    window.raise()
+                    window.requestActivate()
+                }
+            }
+            LabPlatform.MenuSeparator {}
+            LabPlatform.MenuItem {
+                text: "退出 MiniStream"
+                onTriggered: {
+                    window.forceQuit = true
+                    Qt.quit()
+                }
+            }
+        }
+
+        onActivated: function(reason) {
+            // Trigger = 左键单击；DoubleClick = 双击
+            if (reason === LabPlatform.SystemTrayIcon.Trigger ||
+                    reason === LabPlatform.SystemTrayIcon.DoubleClick) {
+                if (window.visible) {
+                    window.hide()
+                } else {
+                    window.show()
+                    window.raise()
+                    window.requestActivate()
+                }
+            }
+        }
+    }
 
     // ---- 隧道状态（工具栏用） ----
     readonly property bool tunnelRunning: MslinkTunnel.running
@@ -315,7 +371,7 @@ ApplicationWindow {
     // =========================================================================
     header: Rectangle {
         id: toolBar
-        height: 60
+        height: 76
         color: theme.toolbar
 
         Rectangle {
@@ -365,14 +421,14 @@ ApplicationWindow {
                     Text {
                         text: "MiniStream"
                         color: theme.text
-                        font.pixelSize: 16
+                        font.pixelSize: 20
                         font.bold: true
                         font.family: theme.fontFamily
                     }
 
                     Text {
                         visible: window.width > 980
-                        text: "jianhx · 游戏串流客户端"
+                        text: "主控端 · 连接自己的电脑"
                         color: theme.textTertiary
                         font.pixelSize: 10
                         font.family: theme.fontFamily
@@ -455,6 +511,7 @@ ApplicationWindow {
                                                    : "隧道未运行。点击填写被控端地址和连接口令。"
             }
 
+            BrandButton { label: "连接设置"; accent: !window.tunnelConnected; onClicked: mslinkSetupDialog.open() }
             BrandButton {
                 id: reconnectButton
                 label: "重新连接"
