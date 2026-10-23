@@ -1,148 +1,58 @@
-# 构建说明（Windows + MSVC）
+# 当前版本构建指南 / Current build guide
 
-## 1. 需要的东西
+本文适用于 2.1.2。仓库早期根 CMake 客户端不是当前发布主控端；本机旧 `文档/BUILD.md` 已作为历史材料保留，维护者应以本文和 DEVELOPMENT 为准。
 
-| 组件 | 说明 |
-|------|------|
-| VS2022 Build Tools | 工作负载 `使用 C++ 的桌面开发`（含 MSVC + Windows SDK） |
-| CMake ≥ 3.20 | 任意来源；VS 自带的也行 |
-| Ninja（可选） | 用 `-G Ninja` 时需要，否则用 VS 生成器 |
-| FFmpeg 预编译包 | shared 版（含 DLL + 头文件 + 导入库） |
+## Moonlight 主控端
 
-## 2. 准备 FFmpeg（一次性）
+准备 Windows x64、VS2022 C++/Windows SDK、Qt 6.9.3 msvc2022_64、Git。用 ASCII 工作路径便于 Windows 工具链处理。
 
-推荐 MSYS2 的 ucrt64 包（与本项目验证环境一致，且依赖链最干净）：
-
-```bat
-:: 安装 MSYS2 后，在其 shell 里：
-pacman -S mingw-w64-ucrt-x86_64-ffmpeg
+```powershell
+git clone --recursive https://github.com/moonlight-stream/moonlight-qt.git C:\MiniStreamBuild\moonlight-qt
+git -C C:\MiniStreamBuild\moonlight-qt checkout dc92b6d2f361064d3e9e53ce5de92f611db77220
+git -C C:\MiniStreamBuild\moonlight-qt submodule update --init --recursive
 ```
 
-然后用仓库自带脚本把「只够 MiniStream 用的那 ~81 个 DLL」收进项目，
-并生成 MSVC 可用的导入库：
+将本项目 `src/moonlight-qt/app` 覆盖到该树 `app`，将 `src/mslink` 放到其根 `mslink`。在完整树运行 `setup-deps.ps1` 获取锁定的 v19 Windows 依赖。首次从完整 `moonlight-qt.pro` 构建，保证 qmdnsengine、moonlight-common-c、h264bitstream、AntiHooking 都先生成；不要只复制最终 EXE。
+
+在 **VS x64 Native Tools 命令提示符**中（以下 qmake/windeployqt 使用实际 Qt 路径）：
 
 ```bat
-powershell -ExecutionPolicy Bypass -File scripts\collect_ffmpeg_dlls.ps1 ^
-    -Source D:\msys64\ucrt64 ^
-    -VcVars "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat"
+mkdir build
+cd build
+D:\Qt\6.9.3\msvc2022_64\bin\qmake.exe ..\moonlight-qt.pro -spec win32-msvc CONFIG+=release
+nmake /NOLOGO
 ```
 
-脚本做三件事：递归解析 `dumpbin /dependents` 依赖闭包 → 拷进
-`third_party\ffmpeg\bin` → 把 `libav*.dll.a` 同时复制成 `av*.lib`。
+本机已有静态库，因此增量构建使用 `D:\MiniStreamDev\build` 对 `..\app\app.pro` qmake 后 `nmake /f Makefile.Release`。产物 `build/release/Moonlight.exe` 在发布输入重命名为 `MiniStream.exe`。部署 Qt/QML/SDL/FFmpeg/OpenSSL 等依赖，保留许可。主控端版本来自 `app/version.txt`。
 
-> 为什么 `.dll.a` 直接改名就能给 MSVC 用：GNU ld 生成的导入库是标准 COFF
-> 归档，`link.exe` 认。所以不必非得找 gyan.dev 的 MSVC 专用包。
+## mslink 和回归
 
-## 3. 编译
+```powershell
+cmake -S src/mslink -B build/mslink -DBUILD_TESTING=ON
+cmake --build build/mslink --config Release
+ctest --test-dir build/mslink -C Release --output-on-failure
+```
+
+本地中文目录映射为 `源码/mslink`。CTest 包含源地址保持与隧道自检；额外网卡测试需传入实际可达本机地址对。不能因为同机跨接口模拟被 Windows 路由阻止就宣称远程路径不通。
+
+## 被控端控制台
 
 ```bat
-scripts\build.bat
+mkdir build-host-console
+cd build-host-console
+D:\Qt\6.9.3\msvc2022_64\bin\qmake.exe ..\src\host-console\host-console.pro
+nmake /NOLOGO
 ```
 
-这个脚本内部做的是（也可以手动执行）：
+使用 windeployqt 部署 Widgets/Network/SVG/platform 插件，复制图标。中文资源路径下自动生成 RC 需要 UTF-8 code page（`#pragma code_page(65001)`），或改用 ASCII 构建路径。运行时用 `--root` 指定真实被控端根目录。
 
-```bat
-call "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat"
-set VSLANG=1033
-cmake -S . -B build\msvc -G Ninja -DCMAKE_BUILD_TYPE=Release ^
-      -DCMAKE_MAKE_PROGRAM=<ninja路径> -DFFMPEG_ROOT=%CD%\third_party\ffmpeg
-cmake --build build\msvc
+## 安装包与发布
+
+当前 Inno 脚本的 source/output 是本机交付路径；换机需修改顶部路径，不要把私人配置补进包。Client 输入为完整运行目录；Host 输入包括 Sunshine、mslink、console 和 `_internal`，排除 Sunshine config、ini、日志、转储和运行状态。微软 redist 位于 `构建产物/prerequisites`。
+
+```powershell
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 源码/安装包脚本/MiniStream-Client.iss
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 源码/安装包脚本/MiniStream-Host.iss
 ```
 
-想用 VS 生成器（出 .sln，能用 IDE 打开）：
-
-```bat
-cmake -S . -B build\vs -G "Visual Studio 17 2022" -A x64 ^
-      -DFFMPEG_ROOT=%CD%\third_party\ffmpeg
-cmake --build build\vs --config Release
-```
-
-产物在 `build\msvc\bin\`（或 `build\vs\bin\Release\`）：
-`ministream-host.exe`、`ministream-client.exe`、`ministream-selftest.exe`、
-`ministream-videoprobe.exe`，旁边是 FFmpeg 的运行 DLL 和两个默认 ini。
-
-## 4. 自检（建议每次改完都跑）
-
-```bat
-build\msvc\bin\ministream-selftest.exe     :: 125 项协议/加密/序列化/生命周期断言
-build\msvc\bin\ministream-videoprobe 5 0 60 auto        :: 采集+编码 5 秒
-build\msvc\bin\ministream-videoprobe 5 0 60 auto 1280x720   :: 顺带验证 GPU 缩放
-```
-
-videoprobe 不联网、不开界面，是排查"黑屏/没有画面"的第一站。
-
-## 5. 单文件快速语法检查
-
-```bat
-scripts\check.bat src\host\capture.cpp
-```
-
-## 6. 本仓库的三条铁律（都是踩过坑的）
-
-1. **`.bat`/`.cmd`/`.ps1` 必须纯 ASCII。** cmd.exe 按本机代码页（这里是 GBK）读批处理，
-   PowerShell 5.1 对没有 BOM 的 `.ps1` 同样按 ANSI 解码——里面的中文字面量会被
-   当成乱码命令/乱码路径。脚本里需要中文（比如匹配日志关键字）就用
-   `[char]0xXXXX` 拼出来。
-2. **改 UTF-8 源码不要用 PowerShell 的 `Get-Content`/`Set-Content`。**
-   Windows PowerShell 5.1 对无 BOM 文件按 ANSI 解码，中文会被双重编码损坏。
-   要用 `[System.IO.File]::ReadAllText/WriteAllText`（显式 UTF-8）或编辑器。
-3. **打开文件走 `src/common/fsutil.h`。** `std::fopen`/`std::ifstream` 在 Windows
-   上按 ANSI 解释路径，安装路径里只要有中文，日志和配置就会静默创建失败。
-4. **改了头文件里类的成员/布局之后，必须删 `build\msvc` 全量重编。**
-   本项目出现过两次"增量构建残留旧 .obj → 同一个类在两个 TU 里布局不一致"的
-   诡异 bug：一次是自检随机崩溃，一次是工具栏"第一次能弹、之后完全失效"
-   （旧 obj 里 `ClientSession::Impl` 按老的 `SessionToolbar` 大小算偏移，
-   构造时把工具栏的成员内存踩了）。表现都很像业务 bug，其实是构建脏了。
-   ```bat
-   rmdir /s /q build\msvc
-   scripts\build.bat
-   ```
-
-## 7. 辅助脚本
-
-| 脚本 | 用途 |
-|------|------|
-| `scripts\build.bat` | 正常构建（Release，Ninja） |
-| `scripts\check.bat <相对路径.cpp>` | 单文件语法检查 |
-| `scripts\build-sym.bat` | 带 PDB + MAP 的构建（`build\sym`），用于事后分析 |
-| `scripts\build-map.bat` | **只加 `/MAP`** 的构建（`build\map`）。若产物与发布版一致，`.map` 就是发布版的符号表 |
-| `scripts\abtest.ps1` | A/B 回归：串流中停止服务，旧版应崩 `0xC0000409`、修复版应退 0 |
-| `scripts\regress.ps1` | 单实例守卫 + 保存配置不打断会话 |
-| `scripts\motion.ps1` | 制造屏幕动态（DXGI 只在画面变化时出帧，静止桌面只有 5~15 fps，测吞吐必须用它） |
-| `tools\minidump_info.py` | 解析 minidump：异常码、fast-fail 子码、崩溃线程栈、跨线程查看 |
-| `tools\stack_code_frames.py` | 把崩溃线程栈上落在代码区的地址全部列出来（配合 `.map`） |
-
-## 8. 构建"卡住/没输出/卡在拷贝 DLL"的排查（中文路径 + 代码页坑）
-
-工作区路径含中文（`D:\远程项目`）时，CMake/Ninja 的自定义命令会生成
-`build\msvc\CMakeFiles\xxx.bat` 辅助批处理。**这个 .bat 的编码取决于执行
-configure 时的控制台代码页**：
-
-- 代码页 936（GBK）下 configure：路径正常，构建正常；
-- 代码页 65001（UTF-8，某些编辑器/终端默认）下 configure：CMake 写出的
-  .bat 里路径是 UTF-8 字节，cmd 按 936 读成 `D:\杩滅▼椤圭洰\...` →
-  `系统找不到指定的路径`，构建在"拷贝 FFmpeg DLL"那一步 FAILED，
-  看起来就像**一直卡在编译**。
-
-已做的加固：
-
-1. 拷贝 FFmpeg DLL 改成 **configure 阶段 `file(COPY)`**（不生成 .bat，不受代码页影响）。
-   代价：换了 FFmpeg 目录/版本后要重新 configure（或删 `build\msvc` 重来）；
-2. `scripts\build.bat` 开头固定 `chcp 936`，保证以后重新 configure 时编码稳定；
-3. `build.bat` 增加并发保护：检测到已有 `ninja.exe` 在跑就直接报
-   `ANOTHER_BUILD_RUNNING`，避免两个构建抢同一个 build 目录（表现也是"卡住"）；
-4. 上次构建被强杀留下的 `build\msvc\.ninja_lock` 会让下一次构建干等，
-   `build.bat` 会在没有 ninja 进程时自动清掉它。
-
-如果仍然怀疑卡死，按这个顺序排查：
-
-```bat
-tasklist /fi "imagename eq ninja.exe"
-tasklist /fi "imagename eq cmake.exe"
-:: 有残留就结束；然后删锁重来
-del /q build\msvc\.ninja_lock
-scripts\build.bat
-```
-
-另外 `.bat` 文件必须是 **纯 ASCII + CRLF**：LF 换行 + 中文注释会让 cmd 把
-`if (...)` 块解析错（报 `'ing)' 不是内部或外部命令`，甚至空转卡住）。
+等待编译成功后才计算 SHA256。中断编译产生的 EXE 可能不完整。发布前核对包输入清单，准备 `release-manifest.json`、`SHA256SUMS.txt`、源码包和 release notes。不要从旧包或旧进程推断新包内容。

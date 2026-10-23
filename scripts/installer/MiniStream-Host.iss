@@ -7,14 +7,14 @@
 
 [Setup]
 AppId={{7F2A1C4E-9B3D-4E6A-A1F2-5A1B2C3D4E01}
-AppName=MiniStream 被控端 UI Preview
-AppVersion=2.1.1
+AppName=MiniStream 被控端
+AppVersion=2.1.2
 AppPublisher=jianhx2026
 AppCopyright=Powered by jianhx2026
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableWelcomePage=no
-DefaultDirName={autopf}\MiniStream-Host
+DefaultDirName={code:GetHostInstallDir}
 DisableDirPage=no
 PrivilegesRequired=admin
 OutputDir=D:\远程项目\构建产物\setup
@@ -48,6 +48,32 @@ var
   FrpServerEdit, FrpPortEdit, SunHttpEdit, SunHttpsEdit: TNewEdit;
   WebPassword: String;
   InstallOk: Boolean;
+  ExistingWebCredentials: Boolean;
+
+function GetHostInstallDir(Param: String): String;
+var Existing: String;
+begin
+  Result := ExpandConstant('{autopf}\MiniStream-Host');
+  if RegQueryStringValue(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7F2A1C4E-9B3D-4E6A-A1F2-5A1B2C3D4E01}_is1', 'Inno Setup: App Path', Existing) or
+     RegQueryStringValue(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7F2A1C4E-9B3D-4E6A-A1F2-5A1B2C3D4E01}_is1', 'Inno Setup: App Path', Existing) then begin
+    if FileExists(Existing + '\mslink-host.ini') then Result := Existing;
+  end else if FileExists(ExpandConstant('{pf32}\MiniStream-Host\mslink-host.ini')) then
+    Result := ExpandConstant('{pf32}\MiniStream-Host');
+end;
+
+function ReadHostSetting(Path, Key, Fallback: String): String;
+var Lines: TArrayOfString; I, P: Integer; Line: String;
+begin
+  Result := Fallback;
+  if not LoadStringsFromFile(Path, Lines) then exit;
+  for I := 0 to GetArrayLength(Lines) - 1 do begin
+    Line := Trim(Lines[I]);
+    P := Pos('=', Line);
+    if (P > 0) and (CompareText(Trim(Copy(Line, 1, P - 1)), Key) = 0) then begin
+      Result := Trim(Copy(Line, P + 1, Length(Line))); exit;
+    end;
+  end;
+end;
 
 function IsDocker172(Ip: String): Boolean;
 var
@@ -189,7 +215,7 @@ begin
     '请设置隧道监听端口和访问口令（主控端连接时要填一样的）。');
   PortPage.Add('隧道 TCP 端口：', False);
   PortPage.Add('隧道 UDP 端口：', False);
-  PortPage.Add('隧道口令（请记下来）：', False);
+  PortPage.Add('隧道口令（请记下来）：', True);
   PortPage.Values[0] := '14738';
   PortPage.Values[1] := '14739';
   PortPage.Values[2] := RandPwd(12);
@@ -295,6 +321,17 @@ var
   Ok: Boolean;
 begin
   Result := True;
+  if CurPageID = wpSelectDir then begin
+    if FileExists(ExpandConstant('{app}\mslink-host.ini')) then begin
+      PortPage.Values[0] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'tcp_port', '14738');
+      PortPage.Values[1] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'udp_port', '14739');
+      PortPage.Values[2] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'password', '');
+      PortPage.Edits[0].Enabled := False;
+      PortPage.Edits[1].Enabled := False;
+      PortPage.Edits[2].Enabled := False;
+      PortPage.SubCaptionLabel.Caption := '检测到已有配置：升级保留原端口和口令。之后可在控制台调整。';
+    end;
+  end;
   if CurPageID = PortPage.ID then begin
     T := StrToIntDef(Trim(PortPage.Values[0]), -1);
     U := StrToIntDef(Trim(PortPage.Values[1]), -1);
@@ -370,6 +407,8 @@ begin
   if CurStep <> ssPostInstall then exit;
 
   PkgDir := ExpandConstant('{tmp}\mspkg');
+  ExistingWebCredentials := DirExists(ExpandConstant('{app}\sunshine\config\credentials')) or
+    FileExists(ExpandConstant('{app}\sunshine\config\credentials'));
 
   { ---- 1. 按向导填写内容写 mslink-host.ini（覆盖包内默认配置） ---- }
   Ini := '; MiniStream host tunnel config (written by installer)' + #13#10 +
@@ -450,6 +489,12 @@ begin
     exit;
   end;
   InstallOk := True;
+  if FileExists(ExpandConstant('{app}\mslink-host.ini')) then begin
+    PortPage.Values[0] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'tcp_port', PortPage.Values[0]);
+    PortPage.Values[1] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'udp_port', PortPage.Values[1]);
+    PortPage.Values[2] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'password', PortPage.Values[2]);
+  end;
+  if ExistingWebCredentials then WebPassword := '原有管理密码保持不变，请使用原安装信息';
 
   { ---- 4. 生成 配置指南.html（纯 ASCII + 字符实体，任何系统区域设置下都显示正确） ---- }
   SaveStringToFile(ExpandConstant('{app}\配置指南.html'),

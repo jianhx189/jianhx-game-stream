@@ -7,8 +7,8 @@
 
 [Setup]
 AppId={{3C8E5A2B-1D4F-4B7C-9E2A-6D8F0A1B2C02}
-AppName=MiniStream 主控端 UI Preview
-AppVersion=2.1.1
+AppName=MiniStream 主控端
+AppVersion=2.1.2
 AppPublisher=jianhx2026
 AppCopyright=Powered by jianhx2026
 ArchitecturesAllowed=x64compatible

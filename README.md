@@ -1,135 +1,97 @@
-> **v2.0.5 已重新发布（隐私清理完成）**：此前公开的安装包与源码含私人测试地址、隧道口令等信息，现已全部脱敏并重新打包。安装包不再包含任何预填的服务器地址或口令；隧道口令在安装时随机生成。**请勿继续分发 v2.0.4 及更早的安装包。**
+<p align="center"><img src="web/assets/brand.svg" width="76" alt="MiniStream"></p>
+<h1 align="center">MiniStream</h1>
+<p align="center"><strong>让自己的 Windows 游戏主机，连接到另一块屏幕。</strong><br>Windows game & desktop streaming · Powered by jianhx2026</p>
+<p align="center">简体中文 · <a href="README_EN.md">English</a> · <a href="https://ministream.jianhx.com/">官网</a> · <a href="https://jianhx189.github.io/jianhx-game-stream/">GitHub Pages</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/releases/latest">下载正式版</a></p>
+<p align="center"><a href="https://github.com/jianhx189/jianhx-game-stream/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/jianhx189/jianhx-game-stream"></a> <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a> <img alt="Windows x64" src="https://img.shields.io/badge/platform-Windows%20x64-0078D4"></p>
 
-# MiniStream
+MiniStream 基于 **Sunshine + Moonlight-Qt**，为个人游戏与桌面串流提供连接向导、两端原生界面和 **mslink 隧道**：把多路服务复用到 **1 个 TCP + 1 个 UDP 对外端口**，适合端口受限的 FRP 部署。
 
-低延迟游戏串流工具：**Sunshine + Moonlight + mslink 两端口隧道**
+不需要 MiniStream 云账号。你管理自己的主机、凭据和网络；跨网络需自备可达的 FRP 或可信网络。项目不提供公共服务器，也不等同于自动 NAT 打洞服务。
 
-用一台电脑操作另一台电脑玩游戏。主控端是重做过界面的 Moonlight 客户端（向导式连接、自动配对、串流浮层菜单），
-被控端是便携版 Sunshine 加一层 mslink 隧道。
+## v2.1.2 正式版
 
-## 为什么需要 mslink
+- **双端应用**：主控端设备卡片、在线/配对状态、连接向导、串流菜单；被控端原生控制台、会话、服务、设置与日志。
+- **真实状态**：已认证设备、连接时长、传输模式、隧道 RTT/抖动、发送速率与趋势。串流时回传帧率、网络丢帧、解码和排队耗时；缺失或过期数据显示“—”。
+- **多网卡 UDP 修复**：通过 Windows `IP_PKTINFO` 保持回包源地址和网卡，解决入包与回包使用不同本机地址而持续回退 TCP 的问题。已在真实转发连接验证恢复 UDP。
+- **交互与部署**：原创品牌图标、小屏适配和折叠导航；随包部署 VC143 运行库，安装时按需安装微软 x64 Redistributable。
+- **可解释的诊断**：区分监听、认证、UDP 探测和媒体会话；UDP 暂不可用时使用 TCP 兼容通道，并持续探测恢复。
 
-Moonlight / Sunshine 正常要 6 个端口（3 TCP + 3 UDP）。如果你的 FRP 只给 2 个端口（1 TCP + 1 UDP），
-mslink 就把这 6 条流复用到那 2 个端口上，Sunshine 和 Moonlight 的协议一行都不用改。
+[更新记录](CHANGELOG.md) · [使用与升级](docs/USAGE.md) · [UDP 修复说明](docs/UDP多网卡回包修复说明.md)
 
-## 快速开始
+## 实际应用界面
 
-从 [Releases](https://github.com/jianhx189/jianhx-game-stream/releases) 下载：
+| 主控端 | 被控端 |
+| --- | --- |
+| ![主控端真实设备首页，未添加设备状态](web/assets/client-home.jpg) | ![被控端真实控制台，等待遥测状态](web/assets/host-overview.jpg) |
 
-| 文件 | 装在哪 |
-|---|---|
-| `MiniStream-Host-Setup.exe` | 被控端（玩游戏的那台） |
-| `MiniStream-Client-Setup.exe` | 主控端（操作的那台） |
-| `Moonlight.exe` | 主控端便携版（免安装） |
-| `mslink.exe` | 隧道命令行工具 |
+![连接向导真实窗口](web/assets/client-setup.jpg)
 
-1. 被控端双击安装，装完会显示**隧道端口 / 隧道口令 / Sunshine 管理口令**，抄下来
-2. 主控端双击安装，首次运行弹三步向导：选连接方式 → 填上面那几项 → 测试连接
-3. 主机列表出现电脑后双击 → 自动配对 → 选「桌面」开始串流
-4. 串流中按 **F12**（或 Ctrl+Alt+Shift+X）呼出菜单：断开 / 性能 / 鼠标模式 / 全屏 / 最小化
+截图为 2.1 系列真实程序窗口，拍摄于未连接/未采样状态，不作为性能承诺。
 
-## 当前版本 v2.0.5 改了什么
+## 三步开始
 
-- **隐私** 安装包与文档中不再包含任何真实服务器地址、隧道口令、Sunshine 密码与本机内网信息；
-  被控端安装包不再打包预填的 `mslink-host.ini`，隧道口令改为安装时随机生成。
-- **隐私** 仓库中移除了内嵌测试凭据的诊断脚本（`tools/ssh_*.py` 等）。
+1. 在运行游戏的电脑安装 [被控端 Host](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.2/MiniStream-Host-Setup.exe)，保存自己的隧道口令和 Sunshine 管理信息。
+2. 同一局域网填写主机局域网地址；跨网络分别配置 TCP、UDP 转发。默认本机端口为 TCP **14738**、UDP **14739**；公网端口可以不同，主控端填写实际公网端口。
+3. 在操作电脑安装 [主控端 Client](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.2/MiniStream-Client-Setup.exe)，完成连接向导和配对，打开桌面或游戏。
 
-## v2.0.4 修了什么
+Sunshine 管理密码用于可选自动配对；未提供时按提示完成手动 PIN 配对。串流中用 `F12` 或 `Ctrl+Alt+Shift+X` 打开菜单，调整鼠标模式、全屏和统计。
 
-- **P1-1** 拆分原始字节转发与隧道帧发送：`send_raw_queued()` 给本地 Moonlight / Sunshine 用，
-  `send_tcp_frame_queued()` 只在两个 mslink 之间用。修掉「发给 Sunshine 的数据多一层帧头」。
-- **P1-2** `FrameReader` 改用 offset 游标并保留剩余数据，修掉 TCP 粘包导致握手失败。
-- **P1-3** 隧道 socket 握手后显式切非阻塞；所有转发统一走各自的发送队列；队列超 4MB 或出错即关闭重建。
-- **P1-4** UDP 包加 `[type][flowId][seq]` 认证标签与序号防重放；HELLO 不再携带明文口令。
-- **P2-5** `Relay` 暴露 `udpDirectOk()` / `udpViaTcp()`，向导显示真实传输模式（UDP 直连 / TCP 兼容模式）。
-- **P2-6** 补齐交付源码缺失的 `Theme.qml`、`BrandButton.qml` 及图标，源码与二进制对齐；
-  `manifest.json` 记录各产物 SHA-256。
+用 `Get-FileHash .\MiniStream-Host-Setup.exe -Algorithm SHA256` 校验文件，与同版本 Release 的 `SHA256SUMS.txt` 对照。升级前结束当前串流，在已有安装目录覆盖升级；两端建议使用同一版本。旧式主控端配置可能需要在新向导重新填写。
 
-### 验收记录
+## 连接原理
 
-- `mslink.exe selftest`：隧道建立 / TCP 往返 / 并发 TCP×3 / UDP 往返 —— 全通过
-- 跨机（主控 → FRP → 被控）：`GET /serverinfo` 经隧道返回 576 字节 `200 OK`
-- 跨机：Sunshine 管理 API 经隧道返回 `{"pairings":[]}`
-- 主控端安装包：静默安装 → 启动 → 卸载无残留；安装后 exe 哈希与构建产物一致
-- 被控端安装包：静默安装后 14738/14739/47989/47990/48010 全部监听
-
-## 已知限制
-
-- **UDP 回程**：若 FRP 只转发 UDP 去程，隧道会自动回退到 TCP 承载音视频。
-  这是兼容模式，功能可用但实时性略降，根因在 FRP 服务端配置。
-- 会话密钥仍经外层 TCP 明文下发，认证用轻量 keyed hash 而非 HMAC-SHA256（后续加固项）。
-- 被控端 Sunshine 需在**控制台会话**运行（RDP 会话里检测不到显示器）。
-
-## 源码结构
-
-```
-src/
-  mslink/                       隧道：1 TCP + 1 UDP 复用 6 条流
-    src/relay.cpp                 多路复用实现
-    include/mslink/relay.h        协议定义
-  moonlight-qt/                 主控端（基于 Moonlight-Qt 修改）
-    app/gui/MslinkSetupDialog.qml 三步连接向导
-    app/gui/Theme.qml             深色主题令牌
-    app/gui/BrandButton.qml       工具栏按钮
-    app/mslinkbridge.cpp          mslink 隧道桥接
-    app/backend/computermanager.cpp  Sunshine 自动配对
-    app/streaming/input/input.cpp    鼠标模式实时切换
-docs/
-  manifest.json                 版本 / 构建时间 / 产物 SHA-256
-  交付说明.txt                   本轮修复与验收详情
+```mermaid
+flowchart LR
+    C[Moonlight 主控端] <-->|本机标准服务| LC[mslink 客户端]
+    LC <-->|1 TCP + 1 UDP / LAN 或 FRP| LH[mslink 被控端]
+    LH <-->|本机服务| S[Sunshine：采集、编码、输入]
+    LH -->|每秒本地状态| UI[被控端控制台]
 ```
 
-## 编译
+TCP 处理认证、信令、复用流和可选遥测；UDP 优先承载实时媒体与控制数据。UDP 暂不可用时，逻辑 UDP 数据可通过 TCP 隧道运输，因此 **UDP 字节计数不证明物理 UDP 已通**。端口复用不重新压缩视频，也不保证更低延迟。
 
-**主控端**（需要 Qt 6.9 + MSVC 2022 + 仓库自带的 `setup-deps.ps1`）
+## 适用场景
 
-```bash
-qmake app/app.pro -o build/Makefile && cd build && nmake
+| 需求 | 项目定位 |
+| --- | --- |
+| 自有 Windows 游戏主机、Sunshine/Moonlight 体验、少量 FRP 端口 | MiniStream |
+| 通用远程支持、跨平台协助和远程管理工作流 | 可参考 [RustDesk](https://github.com/rustdesk/rustdesk) |
+| Windows 远程登录、办公会话与企业管理集成 | 可参考 [Windows RDP](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/overview) |
+
+这是定位区别，不是性能排行榜。当前 mslink **只支持一个已认证隧道客户端**；配对设备列表不代表多人同时控制。
+
+## 排障入口
+
+- **面板无数据**：确认实际后台和面板来自同一安装目录，后台已经更新并重启；仅打开新窗口不会升级旧进程。
+- **持续 TCP 兼容通道**：检查有效 ACK、会话/认证拒绝和回包源地址。多网卡可导致入包正常、应答失败。[排障指南](docs/TROUBLESHOOTING.md)
+- **画面正常但鼠标异常**：记录精确时间、焦点、菜单、鼠标模式和两端版本，不能只凭传输字样判断原因。
+- **指标边界**：隧道 RTT 不是端到端操作延迟，媒体丢帧不是 IP 丢包率。
+
+## 开发与接管
+
+当前主控端是 Moonlight-Qt 覆盖层，**不是仓库早期根 CMake 自研客户端**。从 [开发交接文档](docs/DEVELOPMENT.md) 和 [当前构建指南](docs/BUILD.md) 开始。
+
+```text
+src/moonlight-qt/app/   主控端覆盖层：Qt Quick、桥接、输入、统计
+src/mslink/            Windows C++17 隧道与 CMake/CTest
+src/host-console/      Qt Widgets 被控端控制台
+scripts/host/          安装、启动、服务管理脚本
+scripts/installer/     Inno Setup 安装包
+tools/                 发布与检查工具
+docs/                  使用、排障、构建和交接
+web/                   静态站点；web/dist 为发布目录
 ```
 
-**被控端**
+Release 提供源码归档、组件来源和构建清单。GitHub 自动源码包主要包含本仓库覆盖层；完整主控端还依赖指定 Moonlight-Qt 基线与子模块。
 
-```bash
-cd src/mslink && cmake -B build -S . -G Ninja && cmake --build build
-```
+## 项目状态、贡献与许可
 
-**安装包**（Inno Setup 6）
+v2.1.2 为正式发行。已验证构建、协议自检、UDP 突发/防重放及本次真实转发回包修复；**未完成所有 Win10/Win11 驱动组合、干净系统安装和长期跨网游戏的全面验证**。体验仍取决于设备、网络与具体游戏。
 
-```bash
-ISCC.exe MiniStream-Host.iss
-ISCC.exe MiniStream-Client.iss
-```
+自定义认证和会话密钥传递尚未完成安全审计，不能视为完整的加密 VPN 或零信任接入。请在可信、受保护的网络路径部署。[安全说明](SECURITY.md)
 
-## 许可
+欢迎提交可复现的 [问题报告](https://github.com/jianhx189/jianhx-game-stream/issues/new/choose) 和改进：[贡献指南](CONTRIBUTING.md)。分享前隐藏凭据、服务器地址、设备标识与转储。
 
-GPLv3。基于 [Sunshine](https://github.com/LizardByte/Sunshine) 与
-[Moonlight-Qt](https://github.com/moonlight-stream/moonlight-qt)。
+遵循 [GPLv3](LICENSE)。感谢 [Moonlight-Qt](https://github.com/moonlight-stream/moonlight-qt)、[Sunshine](https://github.com/LizardByte/Sunshine)、Qt 与相关上游项目；本项目独立维护。[第三方组件和源码来源](THIRD_PARTY_NOTICES.md)
 
-
-## Discover MiniStream
-
-MiniStream is an open-source Windows game and desktop streaming project built on Sunshine and Moonlight, with an mslink tunnel that multiplexes services into one TCP and one UDP port for self-hosted / FRP deployments.
-
-- [Website / 官网](https://ministream.jianhx.com/)
-- [Downloads / 下载与 SHA-256](https://github.com/jianhx189/jianhx-game-stream/releases/latest)
-- [Issues / 问题反馈](https://github.com/jianhx189/jianhx-game-stream/issues)
-
-适用方向：个人 Windows 游戏串流、远程桌面、自部署 FRP 连接。项目仍在完善传输可靠性与认证；请阅读发布说明中的已知限制。
-
-
-## 2.1.0 UI 预览版
-
-新增原创图标、主控端设备首页与被控端原生控制台，可查看本机状态、保存基础设置和导出诊断。预览版与正式版分开发行，尚未完成 Win10、UAC 服务启停和长时间跨网游戏验收。
-
-- [预览版下载与 SHA-256](https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.0-preview)
-- [真实运行截图](https://ministream.jianhx.com/#screenshots) · [使用教程](https://ministream.jianhx.com/tutorial.html)
-- [源码覆盖层、构建说明与验收范围](docs/UI改版与被控端控制台.md)
-
-
-## 2.1.1 UI 预览版
-
-新增原创图标、主控端设备首页与被控端原生控制台，可查看本机状态、保存基础设置和导出诊断。预览版与正式版分开发行，尚未完成 Win10、UAC 服务启停和长时间跨网游戏验收。
-
-- [预览版下载与 SHA-256](https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.1-preview)
-- [真实运行截图](https://ministream.jianhx.com/#screenshots) · [使用教程](https://ministream.jianhx.com/tutorial.html)
-- [源码覆盖层、构建说明与验收范围](docs/UI改版与被控端控制台.md)
+**Powered by jianhx2026**

@@ -1,0 +1,33 @@
+name: Bug report / 问题反馈
+description: Report a reproducible connection, streaming, input or UI issue.
+title: '[Bug] '
+body:
+  - type: markdown
+    attributes:
+      value: 'Please redact credentials, private addresses and device identifiers. 请勿上传完整配置、令牌、私钥或原始转储。'
+  - type: input
+    id: versions
+    attributes:
+      label: Both-end versions / 两端版本
+      placeholder: Host 2.1.2, Client 2.1.2
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: Windows version, GPU/driver, resolution/scaling, LAN or forwarding type; no private endpoint needed.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction / 复现步骤
+      description: Steps, expected/actual behavior, exact time; for input issues note whether video/audio continue and mouse mode/focus/menu state.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence / 脱敏证据
+      description: Transport, probe/ACK counters, RTT, fresh media metrics and relevant log excerpts.

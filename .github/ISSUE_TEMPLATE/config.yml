@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Usage and troubleshooting / 使用与排障
+    url: https://ministream.jianhx.com/tutorial.html
+    about: Check setup, transport and telemetry before opening an issue.

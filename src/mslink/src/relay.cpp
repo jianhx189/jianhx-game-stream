@@ -16,6 +16,7 @@
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <mswsock.h>
 #include <windows.h>
 #include <bcrypt.h>
 
@@ -438,10 +439,65 @@ struct FrameReader {
 // P1-4 新格式：[u8 magic][u8 type][u16 flowId][u32 seq][u32 sessionId][u8 tag[8]][payload...]
 static constexpr size_t kUdpHdr = 20;  // 1+1+2+4+4+8 = 20
 
+// A wildcard UDP socket must reply from the address that received the packet.
+// sendto() alone can select another local address on multi-homed Windows hosts,
+// which connected UDP forwarders then discard as an unexpected source endpoint.
+struct UdpReplyRoute {
+    IN_PKTINFO info{};
+    bool valid = false;
+};
+
+struct UdpPacketIo {
+    LPFN_WSARECVMSG receive = nullptr;
+    LPFN_WSASENDMSG send = nullptr;
+
+    bool enable(SOCKET socket) {
+        GUID receiveId = WSAID_WSARECVMSG, sendId = WSAID_WSASENDMSG;
+        DWORD size = 0, enabled = 1;
+        return WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+                        &receiveId, sizeof(receiveId), &receive, sizeof(receive),
+                        &size, nullptr, nullptr) == 0 &&
+               WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+                        &sendId, sizeof(sendId), &send, sizeof(send),
+                        &size, nullptr, nullptr) == 0 &&
+               setsockopt(socket, IPPROTO_IP, IP_PKTINFO,
+                          reinterpret_cast<const char*>(&enabled), sizeof(enabled)) == 0;
+    }
+
+    int recv(SOCKET socket, uint8_t* buffer, size_t capacity,
+             sockaddr_in& from, UdpReplyRoute& route) const {
+        WSABUF data{ULONG(capacity), reinterpret_cast<char*>(buffer)};
+        alignas(WSACMSGHDR) char control[WSA_CMSG_SPACE(sizeof(IN_PKTINFO))]{};
+        WSAMSG message{};
+        message.name = reinterpret_cast<sockaddr*>(&from);
+        message.namelen = sizeof(from);
+        message.lpBuffers = &data;
+        message.dwBufferCount = 1;
+        message.Control = {ULONG(sizeof(control)), control};
+        DWORD received = 0;
+        route = {};
+        if (receive(socket, &message, &received, nullptr, nullptr) != 0) return -1;
+        if (!(message.dwFlags & MSG_CTRUNC)) {
+            for (auto header = WSA_CMSG_FIRSTHDR(&message); header;
+                 header = WSA_CMSG_NXTHDR(&message, header)) {
+                if (header->cmsg_level == IPPROTO_IP && header->cmsg_type == IP_PKTINFO &&
+                    header->cmsg_len >= WSA_CMSG_LEN(sizeof(IN_PKTINFO))) {
+                    std::memcpy(&route.info, WSA_CMSG_DATA(header), sizeof(route.info));
+                    route.valid = route.info.ipi_addr.s_addr != INADDR_ANY;
+                    break;
+                }
+            }
+        }
+        return int(received);
+    }
+};
+
 static bool send_udp_packet(SOCKET s, const sockaddr_in& to, uint8_t type,
                             uint16_t flowId, uint32_t seq,
                             const uint8_t sessionKey[32],
-                            const void* payload, size_t payloadLen) {
+                            const void* payload, size_t payloadLen,
+                            const UdpReplyRoute* route = nullptr,
+                            LPFN_WSASENDMSG sendMessage = nullptr) {
     if (!sock_valid(s) || payloadLen > kMaxUdpPayload) return false;
     uint8_t pkt[kUdpHdr + kMaxUdpPayload];
     pkt[0] = kUdpMagic;
@@ -458,6 +514,25 @@ static bool send_udp_packet(SOCKET s, const sockaddr_in& to, uint8_t type,
     // tag = 认证标签（覆盖 type + flowId + seq + payload）
     udp_auth_tag(sessionKey, type, flowId, seq, payload, payloadLen, pkt + 12);
     if (payloadLen) std::memcpy(pkt + kUdpHdr, payload, payloadLen);
+    if (route) {
+        // Never silently fall back to a route-dependent source address.
+        if (!route->valid || !sendMessage) { WSASetLastError(WSAEADDRNOTAVAIL); return false; }
+        WSABUF data{ULONG(kUdpHdr + payloadLen), reinterpret_cast<char*>(pkt)};
+        alignas(WSACMSGHDR) char control[WSA_CMSG_SPACE(sizeof(IN_PKTINFO))]{};
+        WSAMSG message{};
+        message.name = reinterpret_cast<sockaddr*>(const_cast<sockaddr_in*>(&to));
+        message.namelen = sizeof(to);
+        message.lpBuffers = &data;
+        message.dwBufferCount = 1;
+        message.Control = {ULONG(sizeof(control)), control};
+        auto header = WSA_CMSG_FIRSTHDR(&message);
+        header->cmsg_level = IPPROTO_IP;
+        header->cmsg_type = IP_PKTINFO;
+        header->cmsg_len = WSA_CMSG_LEN(sizeof(IN_PKTINFO));
+        std::memcpy(WSA_CMSG_DATA(header), &route->info, sizeof(route->info));
+        DWORD sent = 0;
+        return sendMessage(s, &message, 0, &sent, nullptr, nullptr) == 0 && sent == data.len;
+    }
     return ::sendto(s, reinterpret_cast<const char*>(pkt), int(kUdpHdr + payloadLen), 0,
                     reinterpret_cast<const sockaddr*>(&to), sizeof(to)) > 0;
 }
@@ -491,6 +566,8 @@ struct Relay::Impl {
     std::atomic<uint64_t> lastPongMs{0}, connectedAtMs{0};
     std::atomic<uint32_t> jitterMs{0};
     std::atomic<uint64_t> udpProbeSent{0},udpProbeAck{0},udpAuthRejected{0},udpDataReceived{0};
+    std::atomic<uint64_t> udpHelloReceived{0},udpHelloAckSent{0},udpSessionRejected{0},udpReplyErrors{0};
+    std::atomic<bool> udpReplyRoutePinned{false};
     std::atomic<int> lastUdpSendError{0};
     std::atomic<uint64_t> lastAuthenticatedUdpMs{0};
     std::atomic<bool> hostFallback{false};
@@ -539,6 +616,8 @@ struct Relay::Impl {
     FrameReader hTcpIn;
     sockaddr_in clientUdpAddr{};
     bool clientUdpKnown = false;
+    UdpPacketIo hostUdpIo;
+    UdpReplyRoute clientUdpRoute;
 
     OutQueue hTunnelOutQ;
 
@@ -771,8 +850,9 @@ bool Relay::Impl::client_connect_tunnel() {
         logf("客户端：MSLINK_FORCE_TCP_UDP 已设置，强制使用 TCP 兜底通道");
     }
     // P1-4: HELLO 不再携带口令，只发空 payload（认证已由 TCP 完成）
-    send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,
-                    sessionKey, nullptr, 0);
+    udpProbeSent.fetch_add(1);
+    if (!send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,
+                         sessionKey, nullptr, 0)) lastUdpSendError.store(WSAGetLastError());
     return true;
 }
 
@@ -1164,6 +1244,12 @@ bool Relay::Impl::start_host(const HostConfig& cfg, std::string& err) {
         sock_close(hUdpListen);
         return false;
     }
+    if (!hostUdpIo.enable(hUdpListen)) {
+        err = "初始化 UDP 回包源地址控制失败 (WSA=" + std::to_string(WSAGetLastError()) + ")";
+        sock_close(hUdpListen);
+        sock_close(hTcpListen);
+        return false;
+    }
     set_nonblocking(hUdpListen);
     tune_buffers(hUdpListen, "被控端 UDP 监听");
 
@@ -1267,6 +1353,8 @@ void Relay::Impl::host_close_all() {
     for (auto& kv : hostFlows) sock_close(kv.second.up);
     hostFlows.clear();
     clientUdpKnown = false;
+    clientUdpRoute = {};
+    udpReplyRoutePinned.store(false);
     sessionValid = false;
     udpLastSeq.clear();
 }
@@ -1397,8 +1485,8 @@ void Relay::Impl::host_loop() {
                 for (;;) {
                     uint8_t buf[kUdpHdr + kMaxUdpPayload + 64];
                     sockaddr_in from{};
-                    int fl = sizeof(from);
-                    int n = ::recvfrom(hUdpListen, (char*)buf, sizeof(buf), 0, (sockaddr*)&from, &fl);
+                    UdpReplyRoute receivedRoute;
+                    int n = hostUdpIo.recv(hUdpListen, buf, sizeof(buf), from, receivedRoute);
                     if (n <= 0) break;
                     if (n < int(kUdpHdr) || buf[0] != kUdpMagic) continue;
                     const uint8_t ptype = buf[1];
@@ -1410,6 +1498,7 @@ void Relay::Impl::host_loop() {
                     }
                     if (buf[8] != sessionKey[0] || buf[9] != sessionKey[1] ||
                         buf[10] != sessionKey[2] || buf[11] != sessionKey[3]) {
+                        udpSessionRejected.fetch_add(1);
                         stat([](RelayStats& s) { s.udpDropped++; });
                         continue;
                     }
@@ -1427,15 +1516,33 @@ void Relay::Impl::host_loop() {
 
                     if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
+                    if (!receivedRoute.valid) {
+                        udpReplyErrors.fetch_add(1);
+                        lastUdpSendError.store(WSAEADDRNOTAVAIL);
+                        continue;
+                    }
+
                     clientUdpAddr = from;
+                    clientUdpRoute = receivedRoute;
                     clientUdpKnown = true;
+                    udpReplyRoutePinned.store(true);
 
                     if (ptype == kUdpHello) {
-                        logf("被控端：收到客户端 UDP HELLO（%s:%u）", inet_ntoa(from.sin_addr), ntohs(from.sin_port));
-                        send_udp_packet(hUdpListen, from, kUdpHelloAck, 0, 0, sessionKey, nullptr, 0);
+                        udpHelloReceived.fetch_add(1);
+                        if (send_udp_packet(hUdpListen, from, kUdpHelloAck, 0, 0,
+                                            sessionKey, nullptr, 0, &receivedRoute, hostUdpIo.send)) {
+                            udpHelloAckSent.fetch_add(1);
+                            lastUdpSendError.store(0);
+                            lastAuthenticatedUdpMs.store(now_ms());
+                        } else {
+                            udpReplyErrors.fetch_add(1);
+                            lastUdpSendError.store(WSAGetLastError());
+                        }
                         continue;
                     }
                     if (ptype != kUdpData) continue;
+                    udpDataReceived.fetch_add(1);
+                    lastAuthenticatedUdpMs.store(now_ms());
 
                     if (payloadLen < 2) continue;
                     const uint8_t* pl = buf + kUdpHdr;
@@ -1547,9 +1654,13 @@ void Relay::Impl::host_loop() {
                         send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpUdpDown, fid,
                                                buf, size_t(n));
                     } else if (clientUdpKnown) {
-                        send_udp_packet(hUdpListen, clientUdpAddr, kUdpData, fid,
+                        if (!send_udp_packet(hUdpListen, clientUdpAddr, kUdpData, fid,
                                         ++udpSeq, sessionKey,
-                                        buf, size_t(n));
+                                        buf, size_t(n), &clientUdpRoute, hostUdpIo.send)) {
+                            udpReplyErrors.fetch_add(1);
+                            lastUdpSendError.store(WSAGetLastError());
+                            continue;
+                        }
                     } else {
                         continue;
                     }
@@ -1590,7 +1701,7 @@ std::string Relay::Impl::telemetry_json() const {
       <<",\"role\":"<<json_quote(host?"host":"client")<<",\"device_name\":"<<json_quote(thisDevice)
       <<",\"tunnel_up\":"<<(s.tunnelUp?"true":"false")<<",\"connected_seconds\":"<<(connected?(n-connected)/1000:0)
       <<",\"rtt_ms\":"<<(lastPongMs.load() && n-lastPongMs.load()<8000?std::to_string(rttMs.load()):"null")
-      <<",\"rtt_jitter_ms\":"<<jitterMs.load()<<",\"transport\":"<<json_quote((host?hostFallback.load():udpViaTcp.load())?"tcp_fallback":(host?s.activeUdpFlows>0:udpDirectOk.load())?"udp":"probing")
+      <<",\"rtt_jitter_ms\":"<<jitterMs.load()<<",\"transport\":"<<json_quote((host?hostFallback.load():udpViaTcp.load())?"tcp_fallback":(host?(udpReplyRoutePinned.load()&&lastUdp&&n>=lastUdp&&n-lastUdp<8000):udpDirectOk.load())?"udp":"probing")
       <<",\"tcp_bytes_up\":"<<s.tcpBytesUp<<",\"tcp_bytes_down\":"<<s.tcpBytesDown
       <<",\"udp_bytes_up\":"<<udpBytesUp.load()<<",\"udp_bytes_down\":"<<udpBytesDown.load()
       <<",\"udp_local_dropped\":"<<s.udpDropped<<",\"reconnects\":"<<s.tunnelReconnects
@@ -1599,6 +1710,9 @@ std::string Relay::Impl::telemetry_json() const {
       <<",\"udp_last_success_age_ms\":"<<(lastUdp?std::to_string(n>=lastUdp?n-lastUdp:0):"null")
       <<",\"udp_probe_sent\":"<<udpProbeSent.load()<<",\"udp_probe_ack\":"<<udpProbeAck.load()
       <<",\"udp_auth_rejected\":"<<udpAuthRejected.load()<<",\"udp_data_received\":"<<udpDataReceived.load()<<",\"udp_last_send_error\":"<<lastUdpSendError.load()
+      <<",\"udp_hello_received\":"<<udpHelloReceived.load()<<",\"udp_hello_ack_sent\":"<<udpHelloAckSent.load()
+      <<",\"udp_session_rejected\":"<<udpSessionRejected.load()<<",\"udp_reply_errors\":"<<udpReplyErrors.load()
+      <<",\"udp_reply_route_pinned\":"<<(udpReplyRoutePinned.load()?"true":"false")
       <<",\"peer_report_age_ms\":"<<(peerAt?n-peerAt:UINT64_MAX)<<",\"peer_report_json\":"<<json_quote(peer)
       <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null")<<"}";
     return o.str();

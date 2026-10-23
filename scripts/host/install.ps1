@@ -399,6 +399,7 @@ try {
             }
             Log "  已设置网页账号：$WebUser（口令见安装信息.txt）"
         } else {
+            $webPasswordSaved = ''
             Log '  检测到已有 Sunshine 账号，保持不变（忘记口令可用 -ResetWebPassword 重设）'
         }
     } else {

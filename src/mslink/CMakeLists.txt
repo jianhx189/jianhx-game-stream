@@ -25,3 +25,15 @@ set_target_properties(mslink PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin")
+
+include(CTest)
+if (BUILD_TESTING)
+    # This white-box test includes relay.cpp to exercise the production packet-info
+    # helpers; do not also link mslink_core into this executable.
+    add_executable(mslink_udp_packet_info_test tests/udp_packet_info_test.cpp)
+    target_include_directories(mslink_udp_packet_info_test PRIVATE include)
+    target_compile_definitions(mslink_udp_packet_info_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_link_libraries(mslink_udp_packet_info_test PRIVATE ws2_32 bcrypt)
+    add_test(NAME udp_reply_source COMMAND mslink_udp_packet_info_test)
+    add_test(NAME relay_selftest COMMAND mslink selftest)
+endif()
