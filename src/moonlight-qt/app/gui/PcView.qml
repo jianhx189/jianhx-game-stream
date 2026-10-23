@@ -18,7 +18,7 @@ CenteredGridView {
     activeFocusOnTab: true
     topMargin: 20
     bottomMargin: 5
-    cellWidth: 340; cellHeight: 280;
+    cellWidth: Math.max(240, Math.floor(width / Math.max(1, Math.floor(width / 320)))); cellHeight: 280;
     objectName: qsTr("Computers")
 
     Component.onCompleted: {
@@ -86,6 +86,7 @@ CenteredGridView {
     Row {
         anchors.centerIn: parent
         spacing: 5
+        width: Math.max(180, pcGrid.width - 48)
         visible: pcGrid.count === 0
 
         BusyIndicator {
@@ -95,7 +96,8 @@ CenteredGridView {
         }
 
         Label {
-            height: searchSpinner.height
+            width: parent.width - (searchSpinner.visible ? searchSpinner.width : 0) - 12
+            height: Math.max(80, implicitHeight)
             elide: Label.ElideRight
             text: StreamingPreferences.enableMdns ? qsTr("Searching for compatible hosts on your local network...")
                                                   : qsTr("还没有添加电脑\n点击右上角「连接设置」填写自己的主机地址，或添加局域网电脑。")
@@ -106,17 +108,17 @@ CenteredGridView {
     }
 
     header: Item {
-        width: pcGrid.width; height: 138
-        Column { x: 24; y: 22; spacing: 10
-            Text { text: "我的电脑"; color: "#e7efe8"; font.pixelSize: 30; font.bold: true }
-            Text { text: "选择一台设备，继续你的桌面与游戏。"; color: "#acbdb0"; font.pixelSize: 13 }
-            Text { text: MslinkTunnel.tunnelUp ? "隧道已认证 · 主机在线与配对状态见设备卡片" : "尚未建立隧道 · 局域网主机也可单独添加"; color: "#8abda0"; font.pixelSize: 11 }
+        width: pcGrid.width; height: pcGrid.height < 400 ? 106 : 138
+        Column { x: 16; y: 16; width: parent.width-32; spacing: 8
+            Text { text: "我的电脑"; color: "#e7efe8"; font.pixelSize: pcGrid.width < 600 ? 24 : 30; font.bold: true }
+            Text { width: parent.width; elide: Text.ElideRight; text: "选择一台设备，继续你的桌面与游戏。"; color: "#acbdb0"; font.pixelSize: 13 }
+            Text { width: parent.width; elide: Text.ElideRight; text: MslinkTunnel.tunnelUp ? "隧道已认证 · 主机在线与配对状态见设备卡片" : "尚未建立隧道 · 局域网主机也可单独添加"; color: "#8abda0"; font.pixelSize: 11 }
         }
     }
     model: computerModel
 
     delegate: NavigableItemDelegate {
-        width: 320; height: 250;
+        width: pcGrid.cellWidth - 16; height: 250;
         Theme { id: cardTheme }
         padding: 20
         background: Rectangle { radius: 16; color: parent.hovered ? cardTheme.surfaceHover : cardTheme.surface; border.width: 1; border.color: parent.activeFocus ? cardTheme.primary : cardTheme.border }

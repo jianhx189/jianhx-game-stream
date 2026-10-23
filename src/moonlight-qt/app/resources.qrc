@@ -14,6 +14,11 @@
         <file>res/refresh.svg</file>
         <file>res/plus.svg</file>
         <file>res/brand.svg</file>
+        <file>res/devices.svg</file>
+        <file>res/network.svg</file>
+        <file>res/sliders.svg</file>
+        <file>res/activity.svg</file>
+        <file>res/help.svg</file>
         <file>res/question_mark.svg</file>
         <file>res/moonlight.svg</file>
         <file>res/update.svg</file>

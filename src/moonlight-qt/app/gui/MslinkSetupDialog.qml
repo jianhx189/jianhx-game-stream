@@ -377,7 +377,7 @@ Dialog {
                             text: MslinkTunnel.udpDirectOk
                                   ? qsTr("✓ UDP 双向可用（低延迟模式）")
                                   : MslinkTunnel.udpViaTcp
-                                    ? qsTr("⚠ UDP 回程不通，已回退到 TCP 兼容模式（实时性略降）")
+                                    ? qsTr("未收到有效 UDP 探测应答，暂用 TCP；尚不能确定是映射、过滤还是版本问题")
                                     : qsTr("… UDP 探测中")
                         }
                     }

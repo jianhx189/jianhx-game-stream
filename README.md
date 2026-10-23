@@ -124,3 +124,12 @@ MiniStream is an open-source Windows game and desktop streaming project built on
 - [预览版下载与 SHA-256](https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.0-preview)
 - [真实运行截图](https://ministream.jianhx.com/#screenshots) · [使用教程](https://ministream.jianhx.com/tutorial.html)
 - [源码覆盖层、构建说明与验收范围](docs/UI改版与被控端控制台.md)
+
+
+## 2.1.1 UI 预览版
+
+新增原创图标、主控端设备首页与被控端原生控制台，可查看本机状态、保存基础设置和导出诊断。预览版与正式版分开发行，尚未完成 Win10、UAC 服务启停和长时间跨网游戏验收。
+
+- [预览版下载与 SHA-256](https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.1-preview)
+- [真实运行截图](https://ministream.jianhx.com/#screenshots) · [使用教程](https://ministream.jianhx.com/tutorial.html)
+- [源码覆盖层、构建说明与验收范围](docs/UI改版与被控端控制台.md)

@@ -17,17 +17,20 @@ Button {
 
     Theme { id: theme }
 
-    implicitHeight: 32
+    implicitHeight: 38
     implicitWidth: label.length > 0 ? (contentRow.implicitWidth + 20)
                                     : (iconSource.length > 0 ? 34 : 80)
     padding: 0
     hoverEnabled: true
     focusPolicy: Qt.TabFocus
 
-    contentItem: Row {
-        id: contentRow
-        spacing: 6
-        anchors.centerIn: parent
+    contentItem: Item {
+        implicitWidth: contentRow.implicitWidth
+        implicitHeight: contentRow.implicitHeight
+        Row {
+            id: contentRow
+            anchors.centerIn: parent
+            spacing: 8
 
         Image {
             id: icon
@@ -52,6 +55,8 @@ Button {
             anchors.verticalCenter: parent.verticalCenter
         }
     }
+
+        }
 
     background: Rectangle {
         radius: theme.radiusControl

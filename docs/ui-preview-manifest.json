@@ -1,6 +1,6 @@
 {
   "product": "MiniStream",
-  "version": "2.1.0-preview",
+  "version": "2.1.1-preview",
   "channel": "prerelease",
   "basedOn": "2.0.5 sanitized delivery",
   "scope": [
@@ -11,7 +11,10 @@
     "Modern IT workspace and Powered by jianhx2026",
     "Authenticated peer telemetry and real decoder metrics",
     "UDP sequence/reorder/recovery corrections",
-    "Bundled signed Microsoft VC++ redistributable with installation checks"
+    "Bundled signed Microsoft VC++ redistributable with installation checks",
+    "Responsive compact sidebar, short-window summary and original blue icon set",
+    "Permission-aware telemetry identity checks and legacy daemon guidance",
+    "Per-attempt UDP probe/ACK/auth/data counters and authenticated receive age"
   ],
   "verified": [
     "Compiled client and host GUI; inspected real windows",
@@ -20,7 +23,10 @@
     "Missing second configuration does not partly update first",
     "Packaging inputs exclude runtime configurations, credentials, logs and dumps",
     "100/100 UDP burst and sequence reorder/replay/wrap regression",
-    "Independent host/client telemetry with RTT, device name and fresh JSON"
+    "Independent host/client telemetry with RTT, device name and fresh JSON",
+    "Desktop visual inspection around 1280x700; compact layout inspected around 800x560",
+    "Offscreen QML startup remained alive without selected binding/type errors",
+    "Backend selftest and both Inno installer builds passed after final diagnostic changes"
   ],
   "notVerified": [
     "Windows 10 crash reproduction",
@@ -28,18 +34,19 @@
     "Long-running real cross-network gameplay and input reliability",
     "Full installer install/uninstall in clean VM",
     "Clean-machine redistributable installation",
-    "Cross-machine media metrics and gaming regression"
+    "Cross-machine media metrics and gaming regression",
+    "Public UDP relay mapping and live old-daemon upgrade"
   ],
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49299666,
-      "sha256": "24c1ef90802b0a6639c8c5e188afb72b034457ae8c6d361369976b08a88bf4ce"
+      "size": 49331038,
+      "sha256": "0698900403c12c616bf7c7a97c725c1e76252f585083927a39dcb291754be55a"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63461486,
-      "sha256": "98956d0333229eb0aa50e715fac52a58b240681c5c07ec1fe9caec61ac858b4d"
+      "size": 63474033,
+      "sha256": "3702be1e72c37b49a53a3e64ff00061d0554043a03118d077f29a9788d09c3ee"
     }
   ]
 }

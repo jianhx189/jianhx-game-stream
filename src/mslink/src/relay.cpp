@@ -490,6 +490,9 @@ struct Relay::Impl {
     std::atomic<uint32_t> rttMs{0};
     std::atomic<uint64_t> lastPongMs{0}, connectedAtMs{0};
     std::atomic<uint32_t> jitterMs{0};
+    std::atomic<uint64_t> udpProbeSent{0},udpProbeAck{0},udpAuthRejected{0},udpDataReceived{0};
+    std::atomic<int> lastUdpSendError{0};
+    std::atomic<uint64_t> lastAuthenticatedUdpMs{0};
     std::atomic<bool> hostFallback{false};
     std::string peerReport;
     uint64_t peerReportAt=0;
@@ -666,6 +669,7 @@ bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
 }
 
 bool Relay::Impl::client_connect_tunnel() {
+    udpProbeSent=0;udpProbeAck=0;udpAuthRejected=0;udpDataReceived=0;lastAuthenticatedUdpMs=0;lastUdpSendError=0;
     udpLastSeq.clear();
     const int conn = ++g_connSeq;
     sock_close(tunnelTcp);
@@ -1024,17 +1028,19 @@ void Relay::Impl::client_loop() {
                     uint8_t expectTag[8];
                     udp_auth_tag(sessionKey, buf[1], fid, seq, buf + kUdpHdr, payloadLen, expectTag);
                     if (std::memcmp(buf + 12, expectTag, 8) != 0) {
+                        udpAuthRejected.fetch_add(1);
                         stat([](RelayStats& s) { s.udpDropped++; });
                         continue;
                     }
 
                     if(buf[1]==kUdpHelloAck){
-                        lastUdpAckMs=now_ms();udpDirectOk.store(true);
+                        udpProbeAck.fetch_add(1);lastAuthenticatedUdpMs.store(now_ms());lastUdpAckMs=now_ms();udpDirectOk.store(true);
                         if(udpViaTcp.load() && ++udpRecoverHits>=3){udpViaTcp.store(false);udpRecoverHits=0;logf("UDP recovered after three authenticated ACKs");}
                         continue;
                     }
                     if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
+                    udpDataReceived.fetch_add(1);lastAuthenticatedUdpMs.store(now_ms());lastUdpAckMs=now_ms();udpDirectOk.store(true);
                     auto byId = clientFlowById.find(fid);
                     if (byId == clientFlowById.end()) continue;
                     auto fit = clientFlows.find(byId->second);
@@ -1065,8 +1071,9 @@ void Relay::Impl::client_loop() {
             const uint64_t helloGap = udpDirectOk.load() ? 3000 : 500;
             if (tnow >= nextUdpHelloMs) {
                 nextUdpHelloMs = tnow + helloGap;
-                send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,
-                                sessionKey, nullptr, 0);
+                udpProbeSent.fetch_add(1);
+                if(!send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,sessionKey,nullptr,0))lastUdpSendError.store(WSAGetLastError());
+                else lastUdpSendError.store(0);
             }
 
             if (udpDirectOk.load()) {
@@ -1413,6 +1420,7 @@ void Relay::Impl::host_loop() {
                     uint8_t expectTag[8];
                     udp_auth_tag(sessionKey, ptype, fid, seq, buf + kUdpHdr, payloadLen, expectTag);
                     if (std::memcmp(buf + 12, expectTag, 8) != 0) {
+                        udpAuthRejected.fetch_add(1);
                         stat([](RelayStats& s) { s.udpDropped++; });
                         continue;
                     }
@@ -1575,7 +1583,7 @@ void Relay::Impl::host_loop() {
 }
 
 std::string Relay::Impl::telemetry_json() const {
-    auto s=snapshot();auto n=now_ms();auto connected=connectedAtMs.load();bool host=mode==Mode::Host;
+    auto s=snapshot();auto n=now_ms();auto lastUdp=lastAuthenticatedUdpMs.load();auto connected=connectedAtMs.load();bool host=mode==Mode::Host;
     std::string peer;uint64_t peerAt;{std::lock_guard<std::mutex> lock(statMtx);peer=peerReport;peerAt=peerReportAt;}
     std::string media;uint64_t mediaAt;{std::lock_guard<std::mutex> lock(g_mediaMutex);media=g_mediaJson;mediaAt=g_mediaAt;}
     std::ostringstream o;o<<"{\"schema\":1,\"updated_unix_ms\":"<<unix_ms()<<",\"pid\":"<<GetCurrentProcessId()
@@ -1588,6 +1596,9 @@ std::string Relay::Impl::telemetry_json() const {
       <<",\"udp_local_dropped\":"<<s.udpDropped<<",\"reconnects\":"<<s.tunnelReconnects
       <<",\"active_tcp_streams\":"<<s.activeTcpStreams<<",\"active_udp_flows\":"<<s.activeUdpFlows
       <<",\"queued_bytes\":"<<s.queuedBytes
+      <<",\"udp_last_success_age_ms\":"<<(lastUdp?std::to_string(n>=lastUdp?n-lastUdp:0):"null")
+      <<",\"udp_probe_sent\":"<<udpProbeSent.load()<<",\"udp_probe_ack\":"<<udpProbeAck.load()
+      <<",\"udp_auth_rejected\":"<<udpAuthRejected.load()<<",\"udp_data_received\":"<<udpDataReceived.load()<<",\"udp_last_send_error\":"<<lastUdpSendError.load()
       <<",\"peer_report_age_ms\":"<<(peerAt?n-peerAt:UINT64_MAX)<<",\"peer_report_json\":"<<json_quote(peer)
       <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null")<<"}";
     return o.str();
