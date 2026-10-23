@@ -4,7 +4,7 @@
 
 - `index.html`：产品介绍，真实界面截图，正式版与 UI 预览版入口。
 - `tutorial.html`：安装、连接、局域网/跨网与故障排查。
-- `assets/brand.svg`：原创品牌图标；四张 JPG 为本次编译程序的真实运行窗口，未包含私人连接信息。
+- `assets/brand.svg`：原创品牌图标；三张 JPG 为本次编译程序的真实运行窗口，未包含私人连接信息。
 
 运行 `node web/scripts/build-static.cjs` 生成 `web/dist`，该目录供 Cloudflare Pages 与 GitHub Pages 发布。不要复制凭据、配置、安装包、日志或发布工具输出到站点。
 

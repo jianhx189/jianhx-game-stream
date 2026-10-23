@@ -12,3 +12,6 @@ Qt 6 Widgets 原生 Windows 程序。通过 GetExtendedTcpTable 只读检查本�
 使用 Qt 6.9.3 / MSVC 2022，qmake host-console.pro 后 nmake。中文路径下 Windows RC 需 code_page(65001)，或使用 ASCII 构建目录。需要与编译工具链匹配的 VC143 CRT。
 
 不替用户自动修改防火墙，不扫描公网，不重置配对，不展示密码；高级 Sunshine 配置由侧栏打开本机管理页面。
+
+
+第二轮已加入现代 IT 工作台、真实认证客户端与性能遥测；详见仓库 `docs/UI改版与被控端控制台.md`。状态文件为同目录 `mslink-status.json`，要求配套新版隧道，5 秒后标记过期。媒体数据由新版主控端开始串流后回传。隧道仍只支持单个认证客户端。Powered by jianhx2026。
