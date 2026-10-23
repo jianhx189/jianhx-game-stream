@@ -8,6 +8,8 @@
 //  - P1-4: UDP 认证密钥明文传输 + 防重放（序号窗口）
 // =============================================================================
 #include "mslink/relay.h"
+#include "mslink/sequence_window.h"
+#include <sstream>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -56,6 +58,21 @@ static std::atomic<int> g_connSeq{0};
 static uint64_t now_ms() {
     return uint64_t(::GetTickCount64());
 }
+
+static std::mutex g_mediaMutex;
+static std::string g_mediaJson;
+static uint64_t g_mediaAt = 0;
+void publish_media_metrics(const std::string& json) {
+    if(json.size()>4096)return;
+    std::lock_guard<std::mutex> lock(g_mediaMutex);g_mediaJson=json;g_mediaAt=now_ms();
+}
+static std::string json_quote(const std::string& s) {
+    std::string out="\"";
+    for(unsigned char c:s){if(c=='"'||c=='\\'){out+='\\';out+=c;}else if(c<32){char b[7];snprintf(b,sizeof(b),"\\u%04x",c);out+=b;}else out+=c;}
+    return out+'"';
+}
+static uint64_t unix_ms(){FILETIME ft;GetSystemTimeAsFileTime(&ft);ULARGE_INTEGER n;n.LowPart=ft.dwLowDateTime;n.HighPart=ft.dwHighDateTime;return n.QuadPart/10000-11644473600000ULL;}
+static std::string device_name(){wchar_t name[256];DWORD size=256;if(!GetComputerNameW(name,&size))return "Windows client";int count=WideCharToMultiByte(CP_UTF8,0,name,size,nullptr,0,nullptr,nullptr);std::string out(count,0);WideCharToMultiByte(CP_UTF8,0,name,size,&out[0],count,nullptr,nullptr);return out;}
 
 static bool sock_valid(SOCKET s) { return s != INVALID_SOCKET; }
 static void sock_close(SOCKET& s) { if (sock_valid(s)) { ::closesocket(s); s = INVALID_SOCKET; } }
@@ -471,6 +488,12 @@ struct Relay::Impl {
 
     std::atomic<uint64_t> pingSentMs{0};
     std::atomic<uint32_t> rttMs{0};
+    std::atomic<uint64_t> lastPongMs{0}, connectedAtMs{0};
+    std::atomic<uint32_t> jitterMs{0};
+    std::atomic<bool> hostFallback{false};
+    std::string peerReport;
+    uint64_t peerReportAt=0;
+    std::string thisDevice=device_name();
 
     std::atomic<bool> tunnelUp{false};
 
@@ -518,7 +541,7 @@ struct Relay::Impl {
 
     // ---- UDP 回程探测 / TCP 兜底 ----
     std::atomic<bool> udpDirectOk{false};
-    bool     udpViaTcp        = false;
+    std::atomic<bool> udpViaTcp{false};
     bool     udpModeDecided   = false;
     uint64_t udpProbeStartMs  = 0;
     uint64_t nextUdpHelloMs   = 0;
@@ -541,7 +564,7 @@ struct Relay::Impl {
     bool sessionValid = false;
 
     // P1-4: UDP 序号防重放窗口（每个 flowId 记录最近收到的 seq）
-    std::map<uint16_t, uint32_t> udpLastSeq;
+    std::map<uint16_t, SequenceWindow> udpLastSeq;
 
     // ---- 统计 ----
     template <typename F> void stat(F fn) {
@@ -551,6 +574,7 @@ struct Relay::Impl {
     RelayStats snapshot() const { std::lock_guard<std::mutex> lk(statMtx); return st; }
     void set_tunnel_up(bool up) {
         tunnelUp.store(up);
+        if(up)connectedAtMs.store(now_ms());else {connectedAtMs.store(0);lastPongMs.store(0);stat([&](RelayStats&){peerReport.clear();peerReportAt=0;});}
         stat([&](RelayStats& s) { s.tunnelUp = up; });
     }
 
@@ -561,6 +585,8 @@ struct Relay::Impl {
     void client_loop();
     void host_loop();
     void stats_loop();
+    std::string telemetry_json() const;
+    void record_pong(){const auto sent=pingSentMs.load(),n=now_ms();if(sent && n>=sent){auto sample=uint32_t(n-sent),old=rttMs.exchange(sample);auto diff=sample>old?sample-old:old-sample;jitterMs.store((jitterMs.load()*3+diff)/4);lastPongMs.store(n);}}
 
     bool client_connect_tunnel();
     void client_close_streams();
@@ -577,6 +603,7 @@ struct Relay::Impl {
 bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
     mode = Mode::Client;
     ccfg = cfg;
+    if(!ccfg.deviceName.empty())thisDevice=ccfg.deviceName.substr(0,128);
     if (ccfg.tcpListenPorts.empty()) ccfg.tcpListenPorts = {47989, 47984, 48010, 47990};
     if (ccfg.udpListenPorts.empty()) ccfg.udpListenPorts = {47998, 47999, 48000};
 
@@ -639,6 +666,7 @@ bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
 }
 
 bool Relay::Impl::client_connect_tunnel() {
+    udpLastSeq.clear();
     const int conn = ++g_connSeq;
     sock_close(tunnelTcp);
     tunnelOutQ = OutQueue{};
@@ -782,8 +810,7 @@ void Relay::Impl::client_handle_frame(uint16_t type, uint16_t sid,
             send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPong, 0, nullptr, 0);
             break;
         case kTcpPong: {
-            const uint64_t sent = pingSentMs.load();
-            if (sent != 0 && now_ms() >= sent) rttMs.store(uint32_t(now_ms() - sent));
+            record_pong();
             break;
         }
         default:
@@ -978,15 +1005,7 @@ void Relay::Impl::client_loop() {
                     int n = ::recvfrom(udpTunnel, (char*)buf, sizeof(buf), 0, (sockaddr*)&from, &fl);
                     if (n <= 0) break;
                     if (n < int(kUdpHdr) || buf[0] != kUdpMagic) continue;
-                    if (buf[1] == kUdpHelloAck) {
-                        lastUdpAckMs = now_ms();
-                        if (!udpDirectOk.load()) {
-                            udpDirectOk.store(true);
-                            logf("客户端：收到 UDP 回程应答（HELLO_ACK），UDP 双向可用");
-                        }
-                        continue;
-                    }
-                    if (buf[1] != kUdpData) continue;
+                    if (buf[1] != kUdpData && buf[1] != kUdpHelloAck) continue;
 
                     if (!sessionValid) {
                         stat([](RelayStats& s) { s.udpDropped++; });
@@ -1001,14 +1020,6 @@ void Relay::Impl::client_loop() {
                                          (uint32_t(buf[6]) << 16) | (uint32_t(buf[7]) << 24);
                     const uint16_t fid = uint16_t(buf[2] | (buf[3] << 8));
 
-                    // P1-4: 防重放检查（序号必须大于上次）
-                    auto lastIt = udpLastSeq.find(fid);
-                    if (lastIt != udpLastSeq.end() && seq <= lastIt->second) {
-                        stat([](RelayStats& s) { s.udpDropped++; });
-                        continue;
-                    }
-                    udpLastSeq[fid] = seq;
-
                     const size_t payloadLen = size_t(n) - kUdpHdr;
                     uint8_t expectTag[8];
                     udp_auth_tag(sessionKey, buf[1], fid, seq, buf + kUdpHdr, payloadLen, expectTag);
@@ -1016,6 +1027,13 @@ void Relay::Impl::client_loop() {
                         stat([](RelayStats& s) { s.udpDropped++; });
                         continue;
                     }
+
+                    if(buf[1]==kUdpHelloAck){
+                        lastUdpAckMs=now_ms();udpDirectOk.store(true);
+                        if(udpViaTcp.load() && ++udpRecoverHits>=3){udpViaTcp.store(false);udpRecoverHits=0;logf("UDP recovered after three authenticated ACKs");}
+                        continue;
+                    }
+                    if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
                     auto byId = clientFlowById.find(fid);
                     if (byId == clientFlowById.end()) continue;
@@ -1061,16 +1079,8 @@ void Relay::Impl::client_loop() {
                     logf("提示：UDP 回程应答中断，重新探测中（期间自动用 TCP 兜底）");
                 } else {
                     udpProbeFails = 0;
-                    if (udpViaTcp) {
-                        // 之前是 TCP 兜底，现在连续收到 ACK → 切回 UDP
-                        if (++udpRecoverHits >= 3) {
-                            udpViaTcp = false;
-                            udpRecoverHits = 0;
-                            logf("UDP 回程已恢复：自动切回原生 UDP 传输");
-                        }
-                    } else {
-                        udpRecoverHits = 0;
-                    }
+                    // Recovery count is updated only by authenticated HELLO_ACK packets.
+
                 }
             } else {
                 udpRecoverHits = 0;
@@ -1083,11 +1093,14 @@ void Relay::Impl::client_loop() {
             udpModeDecided = true;
         }
 
-        if (now_ms() - lastPingMs > 5000) {
+        if (now_ms() - lastPingMs > 1000) {
             lastPingMs = now_ms();
             pingSentMs.store(now_ms());
             send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPing, 0, nullptr, 0);
+            const auto report=telemetry_json();
+            send_tcp_frame_queued(tunnelTcp,tunnelOutQ,kTcpTelemetry,0,report.data(),report.size());
         }
+        stat([&](RelayStats& s){s.activeTcpStreams=uint32_t(clientStreams.size());s.activeUdpFlows=uint32_t(clientFlows.size());s.queuedBytes=tunnelOutQ.totalBytes;});
         if (now_ms() - lastSweepMs > 30000) {
             lastSweepMs = now_ms();
             const uint64_t cutoff = now_ms() - uint64_t(kUdpFlowIdleMs);
@@ -1310,6 +1323,10 @@ void Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
             stat([](RelayStats& s) { s.udpPacketsUp++; });
             break;
         }
+        case kTcpTelemetry:
+            if(pl.size()<=8192)stat([&](RelayStats&){peerReport.assign(pl.begin(),pl.end());peerReportAt=now_ms();});
+            break;
+        case kTcpPong: record_pong(); break;
         case kTcpPing:
             send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPong, 0, nullptr, 0);
             break;
@@ -1392,14 +1409,6 @@ void Relay::Impl::host_loop() {
                     const uint32_t seq = uint32_t(buf[4]) | (uint32_t(buf[5]) << 8) |
                                          (uint32_t(buf[6]) << 16) | (uint32_t(buf[7]) << 24);
 
-                    // P1-4: 防重放检查（序号必须大于上次）
-                    auto lastIt = udpLastSeq.find(fid);
-                    if (lastIt != udpLastSeq.end() && seq <= lastIt->second) {
-                        stat([](RelayStats& s) { s.udpDropped++; });
-                        continue;
-                    }
-                    udpLastSeq[fid] = seq;
-
                     const size_t payloadLen = size_t(n) - kUdpHdr;
                     uint8_t expectTag[8];
                     udp_auth_tag(sessionKey, ptype, fid, seq, buf + kUdpHdr, payloadLen, expectTag);
@@ -1407,6 +1416,8 @@ void Relay::Impl::host_loop() {
                         stat([](RelayStats& s) { s.udpDropped++; });
                         continue;
                     }
+
+                    if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
                     clientUdpAddr = from;
                     clientUdpKnown = true;
@@ -1454,6 +1465,7 @@ void Relay::Impl::host_loop() {
                         it = hostFlows.find(fid);
                         logf("被控端：UDP 流 #%u -> %s:%u", fid, hcfg.targetHost.c_str(), targetPort);
                     }
+                    it->second.viaTcp=false;
                     it->second.lastMs = now_ms();
                     ::send(it->second.up, (const char*)(pl + 2), int(payloadLen - 2), 0);
                     udpBytesUp.fetch_add(uint64_t(payloadLen - 2));
@@ -1528,7 +1540,7 @@ void Relay::Impl::host_loop() {
                                                buf, size_t(n));
                     } else if (clientUdpKnown) {
                         send_udp_packet(hUdpListen, clientUdpAddr, kUdpData, fid,
-                                        uint32_t(now_ms() & 0xFFFFFFFF), sessionKey,
+                                        ++udpSeq, sessionKey,
                                         buf, size_t(n));
                     } else {
                         continue;
@@ -1539,10 +1551,12 @@ void Relay::Impl::host_loop() {
             }
         }
 
-        if (now_ms() - lastPingMs > 5000) {
+        if (now_ms() - lastPingMs > 1000) {
             lastPingMs = now_ms();
-            if (sock_valid(hTunnel)) send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPing, 0, nullptr, 0);
+            if (sock_valid(hTunnel)) {pingSentMs.store(now_ms());send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPing, 0, nullptr, 0);}
         }
+        bool anyFallback=false;for(const auto& flow:hostFlows)anyFallback|=flow.second.viaTcp;hostFallback.store(anyFallback);
+        stat([&](RelayStats& s){s.activeTcpStreams=uint32_t(hostStreams.size());s.activeUdpFlows=uint32_t(hostFlows.size());s.queuedBytes=hTunnelOutQ.totalBytes;});
         if (now_ms() - lastSweepMs > 30000) {
             lastSweepMs = now_ms();
             const uint64_t cutoff = now_ms() - uint64_t(kUdpFlowIdleMs);
@@ -1558,6 +1572,25 @@ void Relay::Impl::host_loop() {
     sock_close(hTcpListen);
     sock_close(hUdpListen);
     set_tunnel_up(false);
+}
+
+std::string Relay::Impl::telemetry_json() const {
+    auto s=snapshot();auto n=now_ms();auto connected=connectedAtMs.load();bool host=mode==Mode::Host;
+    std::string peer;uint64_t peerAt;{std::lock_guard<std::mutex> lock(statMtx);peer=peerReport;peerAt=peerReportAt;}
+    std::string media;uint64_t mediaAt;{std::lock_guard<std::mutex> lock(g_mediaMutex);media=g_mediaJson;mediaAt=g_mediaAt;}
+    std::ostringstream o;o<<"{\"schema\":1,\"updated_unix_ms\":"<<unix_ms()<<",\"pid\":"<<GetCurrentProcessId()
+      <<",\"role\":"<<json_quote(host?"host":"client")<<",\"device_name\":"<<json_quote(thisDevice)
+      <<",\"tunnel_up\":"<<(s.tunnelUp?"true":"false")<<",\"connected_seconds\":"<<(connected?(n-connected)/1000:0)
+      <<",\"rtt_ms\":"<<(lastPongMs.load() && n-lastPongMs.load()<8000?std::to_string(rttMs.load()):"null")
+      <<",\"rtt_jitter_ms\":"<<jitterMs.load()<<",\"transport\":"<<json_quote((host?hostFallback.load():udpViaTcp.load())?"tcp_fallback":(host?s.activeUdpFlows>0:udpDirectOk.load())?"udp":"probing")
+      <<",\"tcp_bytes_up\":"<<s.tcpBytesUp<<",\"tcp_bytes_down\":"<<s.tcpBytesDown
+      <<",\"udp_bytes_up\":"<<udpBytesUp.load()<<",\"udp_bytes_down\":"<<udpBytesDown.load()
+      <<",\"udp_local_dropped\":"<<s.udpDropped<<",\"reconnects\":"<<s.tunnelReconnects
+      <<",\"active_tcp_streams\":"<<s.activeTcpStreams<<",\"active_udp_flows\":"<<s.activeUdpFlows
+      <<",\"queued_bytes\":"<<s.queuedBytes
+      <<",\"peer_report_age_ms\":"<<(peerAt?n-peerAt:UINT64_MAX)<<",\"peer_report_json\":"<<json_quote(peer)
+      <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null")<<"}";
+    return o.str();
 }
 
 // =============================================================================
@@ -1634,6 +1667,8 @@ void Relay::Impl::stop_impl() {
 
 void Relay::stop() { impl_->stop_impl(); }
 bool Relay::running() const { return impl_->runningFlag.load(); }
+std::string Relay::telemetry_json() const {return impl_->telemetry_json();}
+
 RelayStats Relay::stats() const {
     RelayStats s = impl_->snapshot();
     s.tunnelUp = impl_->tunnelUp.load();
@@ -1645,7 +1680,7 @@ bool Relay::udpDirectOk() const {
     return impl_->udpDirectOk.load();
 }
 bool Relay::udpViaTcp() const {
-    return impl_->udpViaTcp;
+    return impl_->udpViaTcp.load();
 }
 
 void Relay::set_log_sink(void (*sink)(const char*, void*), void* ctx) {

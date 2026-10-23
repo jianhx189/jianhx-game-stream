@@ -7,31 +7,39 @@
     "Custom vector branding and Windows icons",
     "Controller home, state and setup layout",
     "Qt Widgets host console, settings and redacted diagnostics",
-    "App-local VC143 runtime and per-user client config"
+    "App-local VC143 runtime and per-user client config",
+    "Modern IT workspace and Powered by jianhx2026",
+    "Authenticated peer telemetry and real decoder metrics",
+    "UDP sequence/reorder/recovery corrections",
+    "Bundled signed Microsoft VC++ redistributable with installation checks"
   ],
   "verified": [
     "Compiled client and host GUI; inspected real windows",
     "Both Inno Setup installers compiled successfully",
     "Settings helper save and unrelated-field preservation in isolated fixture",
     "Missing second configuration does not partly update first",
-    "Packaging inputs exclude runtime configurations, credentials, logs and dumps"
+    "Packaging inputs exclude runtime configurations, credentials, logs and dumps",
+    "100/100 UDP burst and sequence reorder/replay/wrap regression",
+    "Independent host/client telemetry with RTT, device name and fresh JSON"
   ],
   "notVerified": [
     "Windows 10 crash reproduction",
     "UAC service start/restart on installed host",
     "Long-running real cross-network gameplay and input reliability",
-    "Full installer install/uninstall in clean VM"
+    "Full installer install/uninstall in clean VM",
+    "Clean-machine redistributable installation",
+    "Cross-machine media metrics and gaming regression"
   ],
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 30971574,
-      "sha256": "34a9b59232a2b98f008faf427719c4f9300bd1463a6c27948418db1fd14d8399"
+      "size": 49299666,
+      "sha256": "24c1ef90802b0a6639c8c5e188afb72b034457ae8c6d361369976b08a88bf4ce"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 45152685,
-      "sha256": "126c125dceb58866eec926a8c6d7fa077f4acb9e2beb59b224980170fb387da8"
+      "size": 63461486,
+      "sha256": "98956d0333229eb0aa50e715fac52a58b240681c5c07ec1fe9caec61ac858b4d"
     }
   ]
 }

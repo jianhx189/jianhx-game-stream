@@ -434,6 +434,7 @@ void configureSignalHandlers()
 
 int main(int argc, char *argv[])
 {
+    qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
     SDL_SetMainReady();
 
     // Set the app version for the QCommandLineParser's showVersion() command
@@ -1067,7 +1068,7 @@ int main(int argc, char *argv[])
     IdentityManager::get();
 
     // We require the Material theme
-    QQuickStyle::setStyle("Material");
+    QQuickStyle::setStyle("Basic");
 
     // Our icons are styled for a dark theme, so we do not allow the user to override this
     qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");

@@ -13,6 +13,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QVariantMap>
 
 namespace MslinkBridge {
 
@@ -36,6 +37,7 @@ QString statusText();
 // =============================================================================
 class MslinkTunnel : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap telemetry READ telemetry NOTIFY stateChanged)
     Q_PROPERTY(QString server     READ server     NOTIFY configChanged)
     Q_PROPERTY(int     tcpPort    READ tcpPort    NOTIFY configChanged)
     Q_PROPERTY(int     udpPort    READ udpPort    NOTIFY configChanged)
@@ -63,6 +65,8 @@ public:
     explicit MslinkTunnel(QObject* parent = nullptr);
     static MslinkTunnel* get();
 
+    QVariantMap telemetry() const;
+    Q_INVOKABLE QString exportDiagnostics();
     QString server() const     { return m_server; }
     int     tcpPort() const    { return m_tcpPort; }
     int     udpPort() const    { return m_udpPort; }

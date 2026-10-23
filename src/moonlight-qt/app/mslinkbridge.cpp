@@ -1,3 +1,6 @@
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSaveFile>
 #include <QStandardPaths>
 // =============================================================================
 //  mslinkbridge.cpp —— 2 端口复用通道的客户端集成
@@ -447,4 +450,15 @@ bool MslinkTunnel::udpDirectOk() const {
 
 bool MslinkTunnel::udpViaTcp() const {
     return MslinkBridge::udpViaTcp();
+}
+
+QVariantMap MslinkTunnel::telemetry() const {
+    if(!MslinkBridge::g_relay || !MslinkBridge::g_started)return {};
+    return QJsonDocument::fromJson(QByteArray::fromStdString(MslinkBridge::g_relay->telemetry_json())).object().toVariantMap();
+}
+QString MslinkTunnel::exportDiagnostics() {
+    auto data=QJsonObject::fromVariantMap(telemetry());data.remove("device_name");data.remove("peer_report_json");
+    const QString directory=QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)+"/MiniStream";QDir().mkpath(directory);
+    const QString path=directory+"/diagnostics-"+QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss")+".json";
+    QSaveFile file(path);if(!file.open(QIODevice::WriteOnly))return QStringLiteral("诊断保存失败");file.write(QJsonDocument(data).toJson());return file.commit()?path:QStringLiteral("诊断保存失败");
 }

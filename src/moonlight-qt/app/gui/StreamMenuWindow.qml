@@ -3,7 +3,7 @@
 // Window.transientParent 这种后加的属性会被判定为「不可用」，整个组件加载失败。
 import QtQuick
 import QtQuick.Window
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 
 import StreamMenu 1.0
 

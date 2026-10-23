@@ -6,25 +6,25 @@ import QtQuick
 // =============================================================================
 QtObject {
     // ---- 底色 ----
-    readonly property color canvas:        "#111c18"   // 窗口最底层
-    readonly property color toolbar:       "#15231d"   // 工具栏
-    readonly property color surface:       "#1c2c24"   // 卡片 / 弹窗
-    readonly property color surfaceAlt:    "#263a30"   // 输入框 / 次级块
-    readonly property color surfaceHover:  "#2b4236"   // 悬停态
+    readonly property color canvas:        "#101827"   // 窗口最底层
+    readonly property color toolbar:       "#131f32"   // 工具栏
+    readonly property color surface:       "#19273c"   // 卡片 / 弹窗
+    readonly property color surfaceAlt:    "#22324b"   // 输入框 / 次级块
+    readonly property color surfaceHover:  "#2a3e5d"   // 悬停态
 
     // ---- 边框 ----
-    readonly property color border:        "#344b3e"
-    readonly property color borderSoft:    "#263a30"
-    readonly property color borderStrong:  "#53705d"
+    readonly property color border:        "#344863"
+    readonly property color borderSoft:    "#22324b"
+    readonly property color borderStrong:  "#587599"
 
     // ---- 文字 ----
-    readonly property color text:          "#e7efe8"
-    readonly property color textSecondary: "#acbdb0"
-    readonly property color textTertiary:  "#829788"
+    readonly property color text:          "#edf2fb"
+    readonly property color textSecondary: "#afbed4"
+    readonly property color textTertiary:  "#7e92af"
 
     // ---- 强调 / 语义色 ----
-    readonly property color primary:       "#74be91"
-    readonly property color success:       "#35d39a"
+    readonly property color primary:       "#88a6ff"
+    readonly property color success:       "#54d8b4"
     readonly property color warning:       "#f0b429"
     readonly property color danger:        "#f87171"
     readonly property color dangerSoft:    "#3a2226"

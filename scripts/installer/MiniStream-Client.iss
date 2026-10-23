@@ -9,7 +9,11 @@
 AppId={{3C8E5A2B-1D4F-4B7C-9E2A-6D8F0A1B2C02}
 AppName=MiniStream 主控端 UI Preview
 AppVersion=2.1.0
-AppPublisher=MiniStream
+AppPublisher=jianhx2026
+AppCopyright=Powered by jianhx2026
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+DisableWelcomePage=no
 DefaultDirName={autopf}\MiniStream
 DisableDirPage=no
 PrivilegesRequired=admin
@@ -22,7 +26,7 @@ UninstallDisplayName=MiniStream 主控端
 SetupLogging=yes
 
 [Files]
-Source: "{#ClientSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "Moonlight.exe,*.log,*.dmp,*.pdb,mslink.ini,_launcher\*.log"
+Source: "{#ClientSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "Moonlight.exe,*.log,*.dmp,*.pdb,*.obj,mslink-status.json,mslink-status.jsonl,mslink-status.jsonl.previous,mslink.ini,_launcher\*.log"
 
 [Icons]
 ; 客户端将配置保存到当前用户 AppLocalDataLocation，不向 Program Files 写入用户配置。
@@ -33,3 +37,5 @@ Name: "{group}\MiniStream 主控端"; Filename: "{app}\MiniStream.exe"; WorkingD
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
 
+
+#include "vc-runtime.iss"

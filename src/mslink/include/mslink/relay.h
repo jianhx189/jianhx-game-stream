@@ -62,6 +62,7 @@ enum TcpFrameType : uint16_t {
     kTcpUdpDown    = 9,   // host -> client：streamId=flowId，payload=[UDP 数据]
     // P1-4：TCP 认证成功后，host -> client 下发 32 字节会话密钥（UDP 包校验用）
     kTcpSessionKey = 10,
+    kTcpTelemetry  = 11,  // authenticated client -> host, optional bounded status report
 };
 
 enum UdpPacketType : uint8_t {
@@ -79,6 +80,7 @@ struct Endpoint {
 
 // 客户端（远控端）配置
 struct ClientConfig {
+    std::string deviceName;          // optional display name; defaults to the Windows computer name
     std::string serverHost;          // FRP 的 TCP/UDP 目标地址（可同一主机）
     uint16_t    serverTcpPort = 0;   // FRP 映射的 TCP 端口
     uint16_t    serverUdpPort = 0;   // FRP 映射的 UDP 端口
@@ -126,6 +128,9 @@ struct RelayStats {
     uint64_t udpDropped = 0;         // 隧道未就绪/流表满
     uint64_t tunnelReconnects = 0;
     bool     tunnelUp = false;
+    uint32_t activeTcpStreams = 0;
+    uint32_t activeUdpFlows = 0;
+    uint64_t queuedBytes = 0;
 };
 
 // ---- 运行主体 ---------------------------------------------------------------
@@ -140,6 +145,7 @@ public:
     void stop();
     bool running() const;
     RelayStats stats() const;
+    std::string telemetry_json() const;
 
     // 传入非空回调即可收到运行日志（默认打到 stderr）
     void set_log_sink(void (*sink)(const char* line, void* ctx), void* ctx);
@@ -152,5 +158,8 @@ public:
 private:
     std::unique_ptr<Impl> impl_;
 };
+
+// Called by the media decoder; thread safe and independent of Relay lifetime.
+void publish_media_metrics(const std::string& json);
 
 } // namespace mslink

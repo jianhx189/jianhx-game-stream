@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls.Basic
 import QtQuick.Layouts 1.3
 
 import MslinkTunnel 1.0

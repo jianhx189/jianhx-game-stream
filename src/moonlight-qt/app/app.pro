@@ -1,3 +1,4 @@
+INCLUDEPATH += $$PWD/../mslink/include
 QT += core quick network quickcontrols2 svg
 CONFIG += c++17
 unix:!macx {

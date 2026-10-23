@@ -9,7 +9,11 @@
 AppId={{7F2A1C4E-9B3D-4E6A-A1F2-5A1B2C3D4E01}
 AppName=MiniStream 被控端 UI Preview
 AppVersion=2.1.0
-AppPublisher=MiniStream
+AppPublisher=jianhx2026
+AppCopyright=Powered by jianhx2026
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+DisableWelcomePage=no
 DefaultDirName={autopf}\MiniStream-Host
 DisableDirPage=no
 PrivilegesRequired=admin
@@ -23,7 +27,7 @@ SetupLogging=yes
 
 [Files]
 ; 整个被控端先解到 {tmp}\mspkg，再由 install.ps1 复制到安装目录
-Source: "{#HostSourceDir}\*"; DestDir: "{tmp}\mspkg"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.dmp,*.pdb,sunshine\config\*,mslink-host.ini,_internal\*.log"
+Source: "{#HostSourceDir}\*"; DestDir: "{tmp}\mspkg"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.dmp,*.pdb,*.obj,mslink-status.json,mslink-status.jsonl,mslink-status.jsonl.previous,sunshine\config\*,mslink-host.ini,_internal\*.log"
 
 [Icons]
 Name: "{commondesktop}\MiniStream 被控端"; Filename: "{app}\console\MiniStreamHost.exe"; Parameters: "--root ""{app}"""; WorkingDir: "{app}\console"
@@ -527,3 +531,5 @@ begin
     DeleteFile(WrapperPath);
   end;
 end;
+
+#include "vc-runtime.iss"

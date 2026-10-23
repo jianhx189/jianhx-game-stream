@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 
 // =============================================================================
 //  BrandButton.qml —— MiniStream 深色工具栏按钮

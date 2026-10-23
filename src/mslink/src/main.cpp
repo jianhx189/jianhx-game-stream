@@ -14,6 +14,8 @@
 //      mslink.exe selftest
 // =============================================================================
 #include "mslink/relay.h"
+#include "mslink/sequence_window.h"
+#include <set>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -295,6 +297,24 @@ int run() {
         ::closesocket(s);
     }
 
+    // Regression: many replies can arrive in the same millisecond.
+    bool burstPass=false;
+    {
+        SOCKET s=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);DWORD tmo=2000;
+        ::setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,(const char*)&tmo,sizeof(tmo));
+        sockaddr_in a{};a.sin_family=AF_INET;a.sin_port=htons(kLocalUdp);::inet_pton(AF_INET,"127.0.0.1",&a.sin_addr);
+        for(uint32_t i=0;i<100;++i)::sendto(s,(const char*)&i,sizeof(i),0,(sockaddr*)&a,sizeof(a));
+        std::set<uint32_t> received;
+        for(int i=0;i<100;++i){uint32_t value;int n=::recv(s,(char*)&value,sizeof(value),0);if(n!=sizeof(value))break;received.insert(value);}
+        burstPass=received.size()==100;printf("%s UDP burst: %zu/100 distinct packets\n",burstPass?"[ OK ]":"[FAIL]",received.size());::closesocket(s);
+    }
+    SequenceWindow window;bool windowPass=window.accept(100)&&window.accept(102)&&window.accept(101)&&!window.accept(101)&&!window.accept(1);
+    SequenceWindow wrap;windowPass=windowPass&&wrap.accept(0xfffffffeu)&&wrap.accept(0)&&wrap.accept(0xffffffffu)&&!wrap.accept(0xffffffffu);
+    printf("%s replay window: reorder, duplicate, old packet and wrap\n",windowPass?"[ OK ]":"[FAIL]");
+    sleep_ms(1300);
+    bool telemetryPass=hostRelay.telemetry_json().find("peer_report_json")!=std::string::npos && hostRelay.telemetry_json().find("device_name\\\"")!=std::string::npos;
+    printf("%s authenticated peer telemetry\n",telemetryPass?"[ OK ]":"[FAIL]");
+
     // ---- 统计 ----
     sleep_ms(200);
     const RelayStats cs = clientRelay.stats();
@@ -318,12 +338,28 @@ int run() {
     udpSrv.join();
     ::WSACleanup();
 
-    const bool ok = tunnelUp && tcpPass && udpPass;
+    const bool ok = tunnelUp && tcpPass && udpPass && burstPass && windowPass && telemetryPass;
     printf("\n=== 自检结果：%s ===\n", ok ? "全部通过" : "存在失败项");
     return ok ? 0 : 2;
 }
 
 } // namespace selftest
+
+// Bounded local diagnostics, written by the CLI thread rather than the transport loop.
+static void write_status(const std::string& json) {
+    wchar_t exe[32768];DWORD n=GetModuleFileNameW(nullptr,exe,32768);if(!n||n>=32768)return;
+    std::wstring path(exe,n);path=path.substr(0,path.find_last_of(L"\\/")+1)+L"mslink-status.json";
+    std::wstring temp=path+L".new";
+    HANDLE h=CreateFileW(temp.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if(h==INVALID_HANDLE_VALUE)return;
+    DWORD written=0;bool ok=WriteFile(h,json.data(),DWORD(json.size()),&written,nullptr)&&written==json.size();CloseHandle(h);
+    if(ok)MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
+    std::wstring history=path+L"l";
+    WIN32_FILE_ATTRIBUTE_DATA attr;
+    if(GetFileAttributesExW(history.c_str(),GetFileExInfoStandard,&attr) && (attr.nFileSizeHigh||attr.nFileSizeLow>1024*1024))MoveFileExW(history.c_str(),(history+L".previous").c_str(),MOVEFILE_REPLACE_EXISTING);
+    h=CreateFileW(history.c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if(h!=INVALID_HANDLE_VALUE){std::string line=json+"\n";WriteFile(h,line.data(),DWORD(line.size()),&written,nullptr);CloseHandle(h);}
+}
 
 // =============================================================================
 //  main
@@ -381,6 +417,7 @@ int main(int argc, char** argv) {
         printf("被控端复用器运行中（Ctrl+C 退出）\n");
     } else if (mode == "client") {
         ClientConfig cc;
+        cc.deviceName = get("device-name");
         cc.serverHost = get("server");
         cc.serverTcpPort = uint16_t(geti("tcp"));
         cc.serverUdpPort = uint16_t(geti("udp"));
@@ -408,7 +445,8 @@ int main(int argc, char** argv) {
 
     // 常驻：每 10 秒打一次统计
     while (relay.running()) {
-        sleep_ms(10000);
+        sleep_ms(1000);
+        write_status(relay.telemetry_json());
         const RelayStats s = relay.stats();
         printf("[统计] 隧道 %s | tcp流 %llu | tcp↑%llu ↓%llu B | udp↑%llu ↓%llu | 丢 %llu | 重连 %llu\n",
                s.tunnelUp ? "UP" : "DOWN",

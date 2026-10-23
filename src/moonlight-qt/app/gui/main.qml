@@ -1,5 +1,5 @@
 import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick.Controls.Basic
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.2
 import QtQuick.Controls.Material 2.2
@@ -34,10 +34,10 @@ ApplicationWindow {
     property string tunnelActionMessage: ""
 
     id: window
-    title: "MiniStream"
+    title: "MiniStream · Workspace | Powered by jianhx2026"
     width: 1280
     height: 800
-    minimumWidth: 900
+    minimumWidth: 1120
     minimumHeight: 600
     color: theme.canvas
 
@@ -228,9 +228,79 @@ ApplicationWindow {
         onTriggered: window.tunnelActionMessage = ""
     }
 
+    readonly property var liveMetrics: MslinkTunnel.telemetry
+    readonly property var mediaMetrics: liveMetrics.media || ({})
+    function metric(value, suffix, digits) { return typeof value === "number" && isFinite(value) ? value.toFixed(digits) + suffix : "—" }
+
+    Rectangle {
+        id: workspaceNav
+        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+        width: 210; color: "#131f32"
+        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: theme.borderSoft }
+        ColumnLayout {
+            anchors.fill: parent; anchors.margins: 20; spacing: 12
+            Text { text: "WORKSPACE"; color: theme.textTertiary; font.pixelSize: 10; font.letterSpacing: 2; Layout.topMargin: 14; Layout.bottomMargin: 12 }
+            BrandButton { label: "◈   我的设备"; Layout.fillWidth: true; accent: stackView.depth === 1; onClicked: { while(stackView.depth > 1) window.goBack() } }
+            BrandButton { label: "⌁   连接配置"; Layout.fillWidth: true; onClicked: mslinkSetupDialog.open() }
+            BrandButton { label: "⊞   串流偏好"; Layout.fillWidth: true; onClicked: settingsButton.clicked() }
+            BrandButton { label: "≋   性能与诊断"; Layout.fillWidth: true; onClicked: diagnosticsDialog.open() }
+            Item { Layout.fillHeight: true }
+            Rectangle { Layout.fillWidth: true; height: 1; color: theme.borderSoft }
+            BrandButton { label: "使用教程  ↗"; Layout.fillWidth: true; onClicked: Qt.openUrlExternally("https://ministream.jianhx.com/tutorial.html") }
+            Text { text: "MiniStream 2.1 · Preview"; color: theme.textTertiary; font.pixelSize: 10 }
+            Text { text: "Powered by jianhx2026"; color: theme.textSecondary; font.pixelSize: 10 }
+            Text { text: "Sunshine / Moonlight · GPLv3"; color: theme.textTertiary; font.pixelSize: 9 }
+        }
+    }
+
+    Rectangle {
+        id: performanceStrip
+        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.bottom: parent.bottom
+        anchors.margins: 24; height: 114; radius: 12; color: theme.surface; border.color: theme.borderSoft
+        ColumnLayout {
+            anchors.fill: parent; anchors.margins: 18; spacing: 12
+            RowLayout { Layout.fillWidth: true
+                Text { text: "LIVE TELEMETRY / 连接与性能"; color: theme.textSecondary; font.pixelSize: 10; font.letterSpacing: 1 }
+                Item { Layout.fillWidth: true }
+                Text { text: window.tunnelConnected ? "● 已认证隧道 · 每秒刷新" : "○ 尚未连接"; color: window.tunnelConnected ? theme.success : theme.textTertiary; font.pixelSize: 10 }
+            }
+            RowLayout { Layout.fillWidth: true; spacing: 26
+                Repeater {
+                    model: [
+                        {label:"隧道 RTT", value:window.metric(window.liveMetrics.rtt_ms," ms",0)},
+                        {label:"实际帧率", value:window.metric(window.mediaMetrics.fps," FPS",1)},
+                        {label:"媒体码率", value:window.metric(window.mediaMetrics.video_mbps," Mbps",1)},
+                        {label:"网络丢帧", value:window.metric(window.mediaMetrics.network_frame_drop_percent," %",2)},
+                        {label:"解码 / 排队", value:window.metric(window.mediaMetrics.decode_ms,"",1)+" / "+window.metric(window.mediaMetrics.queue_ms," ms",1)}
+                    ]
+                    delegate: ColumnLayout {
+                        Layout.fillWidth: true; spacing: 5
+                        Text { text: modelData.label; color: theme.textTertiary; font.pixelSize: 10 }
+                        Text { text: modelData.value; color: theme.text; font.family: "Segoe UI"; font.pixelSize: 19; font.weight: Font.DemiBold }
+                    }
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: diagnosticsDialog; title: "性能与诊断"; modal: true
+        x: Math.round((window.width-width)/2); y: Math.round((window.height-height)/2); width: 620
+        standardButtons: Dialog.Close
+        background: Rectangle { color: theme.surface; radius: 12; border.color: theme.border }
+        contentItem: ColumnLayout { spacing: 18
+            Label { Layout.fillWidth: true; text: "只显示真实采样。帧率和解码数据需开始串流后才会出现，停止 5 秒后失效。网络丢帧不等于网络丢包率，隧道 RTT 也不是端到端操作延迟。"; wrapMode: Text.WordWrap; color: theme.textSecondary }
+            Label { text: "传输模式：" + (window.liveMetrics.transport || "暂无数据") + "    本地丢弃：" + (window.liveMetrics.udp_local_dropped === undefined ? "—" : window.liveMetrics.udp_local_dropped); color: theme.text }
+            Label { text: "主机处理："+window.metric(window.mediaMetrics.host_processing_ms," ms",2)+"    渲染："+window.metric(window.mediaMetrics.render_ms," ms",2); color: theme.text }
+            BrandButton { label: "导出性能诊断"; accent: true; onClicked: diagnosticsResult.text = MslinkTunnel.exportDiagnostics() }
+            Label { id: diagnosticsResult; Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; color: theme.textSecondary }
+        }
+    }
+
     StackView {
         id: stackView
-        anchors.fill: parent
+        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: performanceStrip.top
+        anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 16; anchors.bottomMargin: 12
         focus: true
         // StackView 是 Control，会自带一层 style 的浅色 background，
         // 不覆盖的话深色主题下窗口内容区会是一片浅灰。
