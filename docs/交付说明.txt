@@ -1,0 +1,127 @@
+MiniStream v2.0.4 —— 交付说明
+================================
+
+## 这一版修了什么（对应你给的 6 条）
+
+### [P1-1] 发给 Sunshine 的数据多一层帧头 —— 已修
+原因：`send_tcp_frame_queued()` 被用在了「本地程序 ↔ Sunshine」的转发上，
+它会加 8 字节 mslink 帧头，Sunshine 收到的是垃圾。
+修法：拆成两个函数
+  · `send_raw_queued()`      只管原始字节，用于本地 Moonlight / Sunshine 两侧
+  · `send_tcp_frame_queued()` 加帧头，只用于两个 mslink 之间的隧道
+验证：mslink selftest 的 TCP 回显、3 路并发 TCP 全部恢复通过；
+      跨机实测 HTTP serverinfo 经隧道返回 576 字节 `200 OK`。
+
+### [P1-2] TCP 粘包导致握手失败 —— 已修
+原因：每次读握手帧前都 `tcpIn.buf.clear()`，认证应答和会话密钥一起到达时，
+第二帧被冲掉。
+修法：`FrameReader` 改成 offset 游标，取出一帧后保留剩余数据；
+      只有新建连接时才 reset()。
+验证：selftest 里两帧连续到达（隧道握手 + 会话密钥）稳定成功。
+
+### [P1-3] 非阻塞发送队列没接全 —— 已修
+原因：外层隧道 socket 握手后仍是阻塞模式；客户端下行还用旧的 `send_all()`。
+修法：
+  · 握手完成后对隧道 socket 显式 `set_nonblocking()`
+  · 所有转发路径统一走各自的 `OutQueue`
+  · 队列超 4MB 或发送出错 → 关闭该连接重建（绝不丢字节后继续用）
+  · `stop()` 里 `shutdown()` 唤醒 WSAPoll，避免 join 卡住
+验证：selftest 全过；隧道持续运行无数据错乱。
+
+### [P1-4] UDP 认证/密钥 —— 已加强
+修法：
+  · HELLO 不再携带明文口令（认证已由 TCP 完成）
+  · UDP 包格式 `[magic][type][flowId][seq][sessionId][tag8][payload]`
+    tag 覆盖 type + flowId + seq + payload
+  · 收包先校验 sessionId，再校验 tag，最后过序号防重放窗口
+  · 目标端口白名单（Moonlight 标准端口 + 自检 19000-19099）
+局限（如实说明）：会话密钥仍经外层 TCP 明文下发，未做加密握手；
+      认证算法是轻量 keyed hash 而非 HMAC-SHA256。真正的对抗性场景还需要一轮加固。
+
+### [P2-5] 传输模式 UI 是占位实现 —— 已修
+`Relay` 新增 `udpDirectOk()` / `udpViaTcp()`，`MslinkTunnel` 透出到 QML，
+向导第 3 步分别显示：TCP 隧道认证 / UDP 双向可用 / 是否回退 TCP 兼容模式。
+
+### [P2-6] 客户端疑似没打进修复 —— 已解决
+上次交付确实存在「源码与二进制不同步」：
+交付源码里缺 `Theme.qml`、`BrandButton.qml`、`brand.svg`、`refresh.svg`、`plus.svg`
+（ui 重做时新增的，没同步进交付目录），导致用交付源码根本编不出同样的程序。
+这一版从同一份源码重编了 mslink、Moonlight、两个安装包，并核对了哈希：
+
+  manifest.json 里记录了 4 个产物的 SHA-256；
+  安装包静默安装出来的 Moonlight.exe 与构建产物哈希一致。
+
+二进制内含性验证：在 Moonlight.exe 里能搜到本次新增的
+「会话密钥已接收」「隧道发送队列超过 4MB」「原始字节发送队列超过 4MB」等字符串。
+
+### 额外修复
+· UDP 白名单误拦自检端口（19002）→ 放行 19000-19099
+· 补齐交付源码缺失的 5 个文件
+
+## 交付物
+
+安装包/
+  MiniStream-Host-Setup.exe     被控端（装玩游戏的电脑）
+  MiniStream-Client-Setup.exe   主控端（装操作的电脑）
+  Moonlight.exe                 主控端便携版（免安装单文件）
+
+源码/
+  moonlight-qt/                 主控端源码（基于 Moonlight-Qt 修改，含所有改动文件）
+  mslink/                       隧道源码
+  安装包脚本/                   Inno Setup 脚本
+
+构建产物/
+  client/                       主控端完整分发目录（含 Qt 运行库）
+  host/                         被控端完整分发目录（含 Sunshine）
+  setup/                        两个安装包的输出
+
+manifest.json                   版本 / 构建时间 / 修复列表 / 产物 SHA-256
+
+## 验收记录（本轮实测）
+
+1. `mslink.exe selftest`
+   隧道建立 ✓ / TCP 往返 ✓ / 并发 TCP 3 条 ✓ / UDP 往返 ✓ —— 全部通过
+
+2. 本机跨进程隧道
+   HTTP `GET /serverinfo` 经隧道 → 576 字节 `200 OK` ✓
+
+3. 跨机（wry → FRP → 本机）
+   · serverinfo 经隧道 → 576 字节 `200 OK`，含 hostname 被控端主机 ✓
+   · Sunshine 管理 API `GET /api/pin` 经隧道 → `{"pairings":[]}` ✓
+   · Moonlight 主机卡片 `被控端主机` 显示 **online**，入口 `127.0.0.1:47989` ✓
+
+4. 安装包
+   主控端：静默安装 → 启动 → 卸载，无残留；安装后 exe 哈希与构建产物一致 ✓
+   被控端：静默安装 → 14738/14739/47989/47990/48010 全部监听 ✓
+
+5. GUI
+   启动无 QML 警告；主机列表、连接向导、串流菜单均可正常加载 ✓
+
+## 已知限制 / 还没做的
+
+1. **UDP 回程不通（当前线路）**
+   FRP 只转发了 UDP 去程，回程被丢，隧道自动回退到 TCP 承载音视频。
+   功能可用，但这是「兼容模式」，不是低延迟模式。
+   根因在 FRP 服务端配置，不在客户端代码。
+
+2. **会话密钥明文传输**
+   见 P1-4 局限。要做得更硬需要加密握手 + HMAC-SHA256。
+
+3. **真实游戏长跑数据缺**
+   五分钟/十分钟的压测是回环或仿真线路；真实线路跑 30 分钟、
+   记录输入响应 P95/P99 和断触次数，这一轮还没做。
+
+4. **被控端 Sunshine 与控制台会话**
+   Sunshine 必须在控制台会话（非 RDP）运行才能检测到显示器。
+
+## 部署状态
+
+· 本机（被控端）：已安装 v2.0.4，14738/14739/47989/47990/48010 全监听
+    隧道口令 <隧道口令>
+    Sunshine 管理 admin / <Sunshine口令>
+· wry（主控端）：已安装 v2.0.4，mslink.ini 已预填，桌面有快捷方式和测试说明
+    双击「MiniStream 主控端」→ 主机在线 → 双击主机 → 自动配对 → 选桌面即串流
+
+## GitHub
+
+https://github.com/jianhx189/jianhx-game-stream

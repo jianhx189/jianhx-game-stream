@@ -1,0 +1,21 @@
+name: Sync website to gh-pages
+on:
+  push:
+    branches: [main]
+    paths: ['web/dist/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: web/dist
+          keep_files: false
+          commit_message: "site update from main@${{ github.sha }}"

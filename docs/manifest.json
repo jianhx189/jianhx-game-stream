@@ -1,0 +1,55 @@
+{
+    "product":  "MiniStream",
+    "version":  "2.0.5",
+    "buildTime":  "2026-10-23 20:40:00",
+    "fixes":  [
+                  "[脱敏] 安装包与文档中不再包含任何真实服务器地址、隧道口令、Sunshine 密码与本机内网信息；被控端安装包不再打包预填的 mslink-host.ini",
+                  "[脱敏] 隧道口令改为安装时随机生成，写入本机 mslink-host.ini，由用户自行复制到主控端",
+                  "[P1-1] 拆分 send_raw_queued / send_tcp_frame_queued：本地程序与 Sunshine 两侧原样转发，不再多一层帧头",
+                  "[P1-2] FrameReader 改为 offset 游标并保留剩余数据，修复 TCP 粘包导致握手失败",
+                  "[P1-3] 隧道 socket 握手后显式切非阻塞；所有转发统一走各自发送队列；队列超限即关闭重建",
+                  "[P1-4] UDP 包增加 type/flowId/seq 认证标签 + 序号防重放；HELLO 不再携带口令",
+                  "[P2-5] Relay 暴露 udpDirectOk / udpViaTcp，向导显示真实传输模式",
+                  "[P2-6] UDP 目标端口白名单兼容自检端口 19000-19099",
+                  "UDP 传输改为持续探测 + 迟滞恢复：不再 1.5 秒一次性探测就永久回退 TCP；连续 3 个 ACK 才切回 UDP",
+                  "客户端关闭窗口默认进托盘，托盘右键菜单才退出；托盘图标用 QML SystemTrayIcon 实现",
+                  "客户端单实例：重复启动只唤起已有窗口，不再重复绑定本地端口",
+                  "关闭 Moonlight 自带的主机网络检测（该检测在隧道架构下必然误报“网络被阻塞”）",
+                  "被控端 Sunshine 控制台窗口隐藏启动，不再弹出黑框",
+                  "补齐交付源码缺失的 Theme.qml / BrandButton.qml / brand.svg / refresh.svg / plus.svg"
+              ],
+    "verifications":  [
+                          "mslink selftest: 隧道建立 / TCP 往返 / 并发 TCP x3 / UDP 往返 全部通过",
+                          "本机跨进程隧道: HTTP serverinfo 经隧道返回 200 OK",
+                          "跨机（公网线路 -> 本机）: serverinfo 200 OK；Sunshine API 经隧道返回 JSON",
+                          "客户端主机列表使用本地入口 127.0.0.1:47989，主机状态 online",
+                          "主控端安装包静默安装 -> 启动 -> 卸载 全通过；安装后 exe 哈希与构建产物一致",
+                          "被控端安装包静默安装 -> 端口监听 14738/14739/47989/47990/48010 全就绪",
+                          "主控端单实例实测: 第 2、3 次启动退出码 0，进程数保持 1",
+                          "被控端实测: mslink 监听 14738/14739，Sunshine 监听 47984/47989/47990/48010，控制台窗口已隐藏",
+                          "脱敏复核: 两个安装包的打包清单（Host 150 项 / Client 347 项）中不含任何 ini、安装信息、配置指南或日志文件",
+                          "脱敏复核: 全树扫描未发现真实服务器 IP、隧道口令、Sunshine 密码、内网地址与主机名"
+                      ],
+    "files":  [
+                  {
+                      "sha256":  "9C3F2F2D379D64B7BAA758AF01533BFEED0A6C865C8D6847CA2AC55D79A6BF44",
+                      "name":  "MiniStream-Host-Setup.exe",
+                      "size":  29610909
+                  },
+                  {
+                      "sha256":  "66532A3DA95C7B763031ACD4F56B0147296760801E023139354271D13FEB1E03",
+                      "name":  "MiniStream-Client-Setup.exe",
+                      "size":  30753239
+                  },
+                  {
+                      "sha256":  "B3954E5ADB7F7971039EE5F6E175ECB5653DF70628624F052DE6A8B6A69CA6D4",
+                      "name":  "Moonlight.exe",
+                      "size":  2966528
+                  },
+                  {
+                      "sha256":  "22FA99A1D45C1A749D8EAF3BAA18E0EDCFA93A226E6FF1120C411D1FA3EF033C",
+                      "name":  "mslink.exe",
+                      "size":  106496
+                  }
+              ]
+}

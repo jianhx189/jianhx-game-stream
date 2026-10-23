@@ -1,0 +1,30 @@
+# 构建产物
+build/
+out/
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+
+# 第三方二进制（自行下载 FFmpeg 预编译包放到 third_party/ffmpeg）
+third_party/ffmpeg/
+third_party/*.zip
+
+# 运行时产物 / 日志
+*.log
+*.dmp
+crash*.txt
+host.ini
+client.ini
+
+# 本机工具/临时文件
+tools/__pycache__/
+tools/ffmpeg.zip
+tools/mingw.zip
+*.tmp
+*.bak
+
+# 凭据（绝不入库）：docs/git/ 里放的是令牌/推送说明
+docs/git/
