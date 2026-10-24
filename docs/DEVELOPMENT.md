@@ -1,6 +1,6 @@
 # MiniStream 开发交接与维护手册
 
-适用版本：2.1.3。此文是当前实现的接管入口，历史实验、旧原型说明与过往测试记录不能替代本文。发布的具体文件哈希、上游来源和验证结果以同版本 `release-manifest.json` 为准。
+适用版本：2.1.4。此文是当前实现的接管入口，历史实验、旧原型说明与过往测试记录不能替代本文。发布的具体文件哈希、上游来源和验证结果以同版本 `release-manifest.json` 为准。
 
 ## 1. 产品与实现现状
 
@@ -32,7 +32,7 @@
 
 ## 3. 上游与工具链锁定
 
-- Moonlight-Qt：`dc92b6d2f361064d3e9e53ce5de92f611db77220`，上游基线 6.2.0；MiniStream 对外版本单独为 2.1.3（`app/version.txt`、控制台、两份安装脚本与网站需一致）。
+- Moonlight-Qt：`dc92b6d2f361064d3e9e53ce5de92f611db77220`，上游基线 6.2.0；MiniStream 对外版本单独为 2.1.4（`app/version.txt`、控制台、两份安装脚本与网站需一致）。
 - 子模块：moonlight-common-c `04053843c90c4268583f2496b997d54d59f03957`；qmdnsengine `920c097ffa742e2968290f15d4dde6693aec02e5`；SDL_GameControllerDB `8d9fefd7b810f2541f78cc7a8ccbd185bc84c7a5`。
 - Windows 预编译依赖：Moonlight `moonlight-qt-deps` 的 `v19`，由基线 `setup-deps.ps1` 获取；位于完整树的 `libs/windows`。
 - Qt：6.9.3 `msvc2022_64`，本机 `D:\Qt\6.9.3\msvc2022_64`。
@@ -52,13 +52,15 @@
 
 `backend/autoupdatechecker.cpp` 使用本项目官网 `updates.json`，不要恢复上游 Moonlight 的更新通道。修改 `app/version.txt` 并重新 qmake 后，必须重编 main/systemproperties/autoupdatechecker 等使用 VERSION_STR 的对象；NMake 不一定因命令行宏变化自动重编旧对象。不能只核对 Windows 文件属性版本。
 
-主控端连接配置位于 Qt `AppLocalDataLocation` 下的 `mslink.ini`。路径由程序统一计算，不应向 Program Files 写入用户配置。隧道口令与 Sunshine 口令以 `dpapi:v1:` 密文保存，读取时优先密文、其次旧版明文；载入旧配置后用 `QSaveFile` 原子迁移（先加密好两份再整体写入，失败不动原文件）。DPAPI 为当前 Windows 用户范围：内存中仍是明文，同一用户可解密，不是端到端保护；迁移后旧版本读不到口令。`MINISTREAM_UI_PREVIEW=1` 为隔离 QA 组织名和单实例使用；测试不要读取真实连接或抢占用户流。
+主控端连接配置位于 Qt `AppLocalDataLocation` 下的 `mslink.ini`。路径由程序统一计算，不应向 Program Files 写入用户配置。隧道口令与 Sunshine 口令以 `dpapi:v1:` 密文保存，读取时优先密文、其次旧版明文；载入旧配置后用 `QSaveFile` 原子迁移（先加密好两份再整体写入，失败不动原文件）。2.1.4 起，**配置文件不存在时保存也必须成功**：用 `QSaveFile` 直接创建新文件并提交，不能因为“文件不存在”返回失败；空口令必须拒绝，且不得删除已有密文。DPAPI 为当前 Windows 用户范围：内存中仍是明文，同一用户可解密，不是端到端保护；迁移后旧版本读不到口令。`MINISTREAM_UI_PREVIEW=1` 为隔离 QA 组织名和单实例使用；测试不要读取真实连接或抢占用户流。
 
 ### mslink
 
 `src/relay.cpp` 是 Windows C++17 实现，私有 Impl 负责非阻塞套接字、收发队列、TCP frame reader、UDP 流表、认证、防重放、探测/恢复和遥测。`include/mslink/sequence_window.h` 提供 64 包窗口。`src/main.cpp` 提供 CLI、自检和每秒落盘状态；口令只接受 `--password-stdin`（推荐）或 `--password`，两者互斥，空 stdin 直接失败。
 
 2.1.3 的资源与握手约束（实现位置以代码为准）：每连接发送队列 `OutQueue::kMaxQueueBytes = 4 MiB`，`push()` 先整帧预留空间再复制，空间不足时**整帧拒绝**并返回 `false`，不做截断；部分已发送的缓冲只把未发送的尾部计入队列。TCP 单帧 `kMaxTcpFrame = 64 KiB`，`FrameReader` 缓冲上限为 8 字节头 + 64 KiB + 16 KiB，读到 8 字节头即可拒绝超长帧。被控端握手为非阻塞，`kMaxPendingHandshakes = 8`、`kHandshakeTimeoutMs = 5000`；新会话晋升时关闭其余 pending，仍只保留一个已认证客户端。`SequenceWindow::duplicate()` 现在把 `seq == highest` 也算作重复副本，冗余副本与真实丢包分别统计。
+
+2.1.4 的启动与失败路径：`start_host` 和 `start_client` 在返回失败前必须关闭本次已创建的全部监听/隧道 socket 并调用 `WSACleanup`；`listen`/`bind` 前校验地址为 IPv4，非 IPv4 直接报错，不能用未初始化的 `sockaddr_in` 绑定。主控端带 47990 的隧道启动失败后会退回 3 个标准端口重试，只有上一次启动完整清理，重试才不会在同一进程内二次 bind 并挂住首次连接。上游 Sunshine 目标连接失败时必须向对应流发送 `StreamClose` 并结束转发，不能静默保留流让客户端等到超时。
 
 TCP 帧为 `[u32长度][u16类型][u16流ID][payload]`；UDP 当前认证头为 20 字节：magic/type/flow/seq/session-prefix/tag。勿再按早期 8 字节头解释所有预算。类型和字节序以代码为准，历史 PROTOCOL 文档仅作背景。
 
@@ -83,6 +85,9 @@ CLI 原子写 JSON 并轮转 JSONL（约 1 MiB × 2）。GUI 不生成示例性�
 9. **重复统计**：`SequenceWindow::duplicate()` 必须把 `seq == highest` 计为重复副本；改动窗口逻辑时不要让它改变窗口状态（只读判定）。
 10. **凭据存储**：主控端口令只写 `dpapi:v1:` 密文，迁移走 `QSaveFile` 原子替换；不要为了兼容旧版把明文写回 ini，也不要对外宣称 DPAPI 等于端到端加密。
 11. **口令传递与 ACL**：被控端口令只经 `--password-stdin` 或安装脚本 stdin 传递，日志不得出现隧道/Sunshine 口令；`mslink-host.ini`、`安装信息.txt`、安装日志的 ACL 保持仅 SYSTEM / Administrators / 安装用户，不能放宽到 Users 或 Everyone。
+12. **配置创建与空口令**：`mslink.ini` 不存在时保存也必须成功，用 `QSaveFile` 创建新文件并提交；空口令必须拒绝且不能删除已有密文或其它字段。保存失败时应如实报错，不能让用户反复重填。
+13. **启动失败清理**：`start_host` / `start_client` 的任何失败返回都要关闭本次已创建的 socket 并 `WSACleanup`；`listen`/`bind` 前校验 IPv4。主控端 47990 回退重试依赖这一点，禁止留下半初始化监听；`relay_startup` 覆盖启动失败后同端口再次启动。
+14. **上游关闭**：上游 Sunshine 目标连接失败时向对应流发送 `StreamClose` 并结束转发，不能让客户端空等到超时；`relay_stream_open_failure` 覆盖该路径。
 
 ## 6. 构建和本地操作
 
@@ -98,9 +103,9 @@ Sunshine 与隧道由登录计划任务 `MiniStreamSunshine` / `MiniStreamTunnel
 
 ## 7. 验证与发布
 
-最低验证：CMake/CTest 四项（`udp_reply_source`、`relay_queue_frame`、`relay_handshake_integration`、`relay_selftest`）、`--password-stdin` 启动检查、100 包 UDP 突发、窗口/序号边界、真实媒体上报新鲜度；界面检查低分辨率、空状态和过期状态。多网卡修复还需真实转发抓取证明 ACK 源地址与入包目标一致，普通 UDP 字符串超时不算端口不通证据。
+最低验证：CMake/CTest 六项（`udp_reply_source`、`relay_queue_frame`、`relay_handshake_integration`、`relay_startup`、`relay_stream_open_failure`、`relay_selftest`）、`--password-stdin` 启动检查、100 包 UDP 突发、窗口/序号边界、真实媒体上报新鲜度；界面检查低分辨率、空状态和过期状态。多网卡修复还需真实转发抓取证明 ACK 源地址与入包目标一致，普通 UDP 字符串超时不算端口不通证据。
 
-2.1.3 在本地回环验证：CTest 4/4（含队列/帧白盒测试，以及慢速/非法对端等待时的握手集成、单认证客户端、超长帧与快速停止）、`stdin_check.py` 全部通过（argv 不含口令、host 从 stdin 获取口令并监听、空 stdin 与参数互斥被拒绝、telemetry 正常）。这些结果只覆盖本机回环、白盒与集成测试；两端最终构建、安装包编译、真实干净系统和真实网络待发布清单生成时确认。2.1.2 记录过真实 HELLO 到达但 ACK 从错误网卡发出，修复后客户端切回 UDP、有效 ACK 增长、发送错误为 0；该结论继续有效，但新的长时间媒体串流仍非完整验收。
+2.1.3 在本地回环验证：CTest 4/4（当时为四项，含队列/帧白盒测试，以及慢速/非法对端等待时的握手集成、单认证客户端、超长帧与快速停止）、`stdin_check.py` 全部通过（argv 不含口令、host 从 stdin 获取口令并监听、空 stdin 与参数互斥被拒绝、telemetry 正常）。这些结果只覆盖本机回环、白盒与集成测试。2.1.4 新增 `relay_startup`（启动失败清理、IPv4 校验、失败后同端口重启）与 `relay_stream_open_failure`（上游不可达返回 `StreamClose`），并重建全部组件；**最终 CTest、两端构建与安装包结果以发布清单记录为准**，本文不预先宣称通过。2.1.2 记录过真实 HELLO 到达但 ACK 从错误网卡发出，修复后客户端切回 UDP、有效 ACK 增长、发送错误为 0；该结论继续有效，但新的长时间媒体串流仍非完整验收。
 
 发布流程：重建应用 → 同步安装输入 → 脱敏清单检查 → 编译两端安装包 → 生成 SHA256/manifest/源码包 → 创建 draft Release → 上传并核对 GitHub digest → 发布正式版 → 提交网站输出并部署 Cloudflare/GitHub Pages → 核对线上页面与下载。
 
@@ -111,6 +116,7 @@ GitHub Pages 由远端仓库的工作流负责（此前交接记为 `.github/wor
 ## 8. 已知限制与接手顺序
 
 - 缺少所有干净 Win10/Win11 安装/卸载、不同 GPU/驱动和长时弱网游戏的覆盖；稳定发布不应写成兼容性认证。
+- 2.1.3 的首次保存失败与启动失败残留 socket 回归已在 2.1.4 修复；旧截图、安装记录和验收材料应注明版本，不要把 2.1.3 当作全新安装基线。2.1.4 的最终构建/测试结果仍以发布清单为准。
 - UDP 预算：常量已按 20 字节认证头计算（`kMaxUdpPayload = 1472 - 20`，上行 DATA 再减 2 字节目标端口，视频载荷上限 1450 字节），旧文档“仍按 8 字节头估预算”的说法已过时。真正未解决的是固定 1500 MTU 假设：没有路径 MTU 发现，PPPoE、VPN、FRP 等更小 MTU 链路可能分片或被静默丢弃，1450 上限也不随链路调整。下一轮应做 MTU 探测或分段策略，并用大包实测。
 - 队列 4 MiB、TCP 帧 64 KiB、8 个 pending 握手与 5 秒超时目前只在本地回环与白盒/集成测试中验证，没有公网慢速链路或高并发扫描压测；这些上限只限制资源增长，不构成抗 DoS 保证。
 - 自定义认证和明文会话密钥传递需独立安全设计；DPAPI 只保护同一用户可解的本地文件，ACL 只限制本机读取，二者都不改变网络机密性；不要只增加一个加密开关便宣称完成审计。

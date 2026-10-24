@@ -102,12 +102,15 @@ struct IniLineReplacement {
 // 用 QSaveFile 原子落盘，写失败时原文件不动。
 bool rewriteIniAtomic(const QString& path, const QList<IniLineReplacement>& reps, QString* err) {
     QFile in(path);
-    if (!in.open(QIODevice::ReadOnly)) {
-        if (err) *err = QStringLiteral("读不到 %1：%2").arg(path, in.errorString());
-        return false;
+    QByteArray raw;
+    if (in.exists()) {
+        if (!in.open(QIODevice::ReadOnly)) {
+            if (err) *err = QStringLiteral("读不到 %1：%2").arg(path, in.errorString());
+            return false;
+        }
+        raw = in.readAll();
+        in.close();
     }
-    const QByteArray raw = in.readAll();
-    in.close();
 
     const bool hadBom = raw.startsWith("\xEF\xBB\xBF");
     const QByteArray body = hadBom ? raw.mid(3) : raw;
@@ -672,6 +675,11 @@ QString MslinkTunnel::connectToServer(const QString& server, int tcpPort,
     }
     if (tcpPort <= 0 || tcpPort > 65535 || udpPort <= 0 || udpPort > 65535) {
         m_lastError = QStringLiteral("端口必须是 1–65535");
+        emit stateChanged();
+        return m_lastError;
+    }
+    if (password.isEmpty()) {
+        m_lastError = QStringLiteral("请填写隧道口令");
         emit stateChanged();
         return m_lastError;
     }

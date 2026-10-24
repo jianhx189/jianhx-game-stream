@@ -7,9 +7,12 @@ MiniStream combines **Sunshine and Moonlight-Qt** with a connection wizard, nati
 
 No MiniStream cloud account is required. You manage your host, credentials and network. Provide a reachable LAN, FRP deployment or another trusted path; MiniStream does not operate a public relay or provide automatic NAT traversal.
 
-## What's in v2.1.3
+## What's in v2.1.4
 
-- **Tunnel hardening.** Each connection's send queue has a hard 4 MiB cap; a frame is reserved and queued as a whole, and enqueue/overflow failures are returned to the caller instead of silently dropping bytes. TCP frames are capped at 64 KiB and the frame reader stays bounded. The host handshake is non-blocking with at most 8 pending peers and a 5 s timeout, and only one authenticated controller is kept; duplicate copies with `seq == highest` are now counted correctly.
+- **Fixes for 2.1.3 regressions.** Saving a controller connection failed whenever `mslink.ini` did not exist yet, so the password had to be entered again every time; 2.1.4 creates the configuration atomically even when the file is missing. A failed `mslink` start leaked listening sockets, and the 47990 fallback retry could bind twice and hang the first connection; failure paths now close every socket, call `WSACleanup`, and validate that listen/bind addresses are IPv4.
+- **Empty passwords and upstream failures.** An empty password is rejected without deleting the stored `dpapi:v1:` ciphertext, and a failed upstream Sunshine connection sends `StreamClose`, so the controller no longer waits for a timeout.
+- **Upgrade note.** 2.1.3 has these regressions and **should not be used for a fresh install**; use 2.1.4 instead. Existing 2.1.3 installations can upgrade in place and keep their configuration and credentials.
+- **Tunnel hardening (introduced in 2.1.3).** Each connection's send queue has a hard 4 MiB cap; a frame is reserved and queued as a whole, and enqueue/overflow failures are returned to the caller instead of silently dropping bytes. TCP frames are capped at 64 KiB and the frame reader stays bounded. The host handshake is non-blocking with at most 8 pending peers and a 5 s timeout, and only one authenticated controller is kept; duplicate copies with `seq == highest` are now counted correctly.
 - **Local credential protection.** The controller stores the tunnel and Sunshine passwords with current-user Windows DPAPI (`dpapi:v1:`) and atomically migrates a legacy plaintext INI. The host tunnel accepts `--password-stdin`, the installer passes the password on standard input, install logs no longer record tunnel or Sunshine passwords, and ini/install-info/log ACLs are limited to SYSTEM, Administrators and the installing user. New installs require a 12–64 character tunnel password; existing passwords remain valid.
 - **A complete desktop workflow.** Device cards, pairing status, connection wizard and in-session menu on the controller; a native Qt Widgets host console for sessions, services, settings and diagnostics.
 - **Actual connection information.** Authenticated device, duration, transport, tunnel RTT/jitter, outgoing throughput and history. Compatible controllers report media frame rate, network frame loss, decoding and frame pacing while streaming. Missing or stale samples appear as a dash.
@@ -17,7 +20,7 @@ No MiniStream cloud account is required. You manage your host, credentials and n
 - **Deployment and usability improvements.** Original branding, small-display layouts, collapsible navigation, app-local VC143 files and detection/installation of the bundled Microsoft x64 Redistributable when needed.
 - **Continuity when UDP fails.** Logical UDP traffic can temporarily use the TCP tunnel. Authenticated probing continues so the application can recover after the path becomes available.
 
-DPAPI only protects local files that the same Windows user can decrypt; passwords are still plaintext in memory and network confidentiality is unchanged. The custom authentication and plaintext session key are also unchanged, so mslink is **not end-to-end encrypted**. Downgrading from 2.1.3 to 2.1.2 or earlier requires entering the passwords again, and previously shared tunnel or Sunshine passwords should be rotated.
+DPAPI only protects local files that the same Windows user can decrypt; passwords are still plaintext in memory and network confidentiality is unchanged. The custom authentication and plaintext session key are also unchanged, so mslink is **not end-to-end encrypted**. Downgrading from 2.1.3 or 2.1.4 to 2.1.2 or earlier requires entering the passwords again, and previously shared tunnel or Sunshine passwords should be rotated.
 
 [Changelog](CHANGELOG.md) · [User guide](docs/USAGE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
@@ -33,13 +36,13 @@ These are real windows from the 2.1 series captured without an active session, n
 
 ## Get connected
 
-1. Install [Host](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.3/MiniStream-Host-Setup.exe) on the PC running the desktop or game. Keep your tunnel password and Sunshine management details private.
+1. Install [Host](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.4/MiniStream-Host-Setup.exe) on the PC running the desktop or game. Keep your tunnel password and Sunshine management details private.
 2. On a LAN, use the host's LAN address. Across networks configure separate TCP and UDP forwarding. Default local ports are **TCP 14738 / UDP 14739**; public ports may differ. Enter the actual public ports on the controller.
-3. Install [Client](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.3/MiniStream-Client-Setup.exe) on the PC you operate, complete the wizard and pairing, then launch a desktop or application.
+3. Install [Client](https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.4/MiniStream-Client-Setup.exe) on the PC you operate, complete the wizard and pairing, then launch a desktop or application.
 
 Sunshine management credentials enable optional automatic pairing. Otherwise follow the manual PIN flow. During a stream, `F12` or `Ctrl+Alt+Shift+X` opens mouse mode, display, statistics and disconnect controls.
 
-Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 migrates plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them.
+Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 to fix first-save failures and leaked listening sockets; use 2.1.4 for fresh installs.
 
 ## How it works
 
@@ -72,9 +75,9 @@ Release assets include a source bundle and component/build manifest. GitHub's au
 
 ## Status, security and contributions
 
-v2.1.3 is a regular release. Locally verified: CTest 4/4 (UDP reply source, queue/frame bounds, handshake integration and tunnel self-test) and the `--password-stdin` startup check, plus the 2.1.2 forwarded-connection UDP result. Clean Windows 10/11 installations, all GPU/driver combinations and high-bitrate weak-network or long-running WAN sessions have **not** been verified; final builds of both applications and the installers are recorded when the release manifest is generated. Quality depends on hardware, network and the application.
+v2.1.4 is a hotfix release for 2.1.3: it fixes first-save failures when the controller configuration does not exist yet, leaked listening sockets on a failed `mslink` start (including the 47990 fallback retry), empty passwords deleting stored credentials, and missing `StreamClose` when the upstream Sunshine connection fails. 2.1.3 was verified locally with CTest 4/4 and the `--password-stdin` startup check; 2.1.4 adds startup-failure and upstream-close tests (six CTest cases) and rebuilds every component. **Final test and build results are recorded in the release manifest and are not claimed here.** Clean Windows 10/11 installations, all GPU/driver combinations and high-bitrate weak-network or long-running WAN sessions have **not** been verified. Quality depends on hardware, network and the application.
 
-The custom authentication and key exchange are not independently audited and must not be treated as an encrypted VPN or zero-trust system. DPAPI and the tightened ACLs only reduce local file exposure: the same Windows user can still decrypt the values, passwords stay plaintext in memory, and traffic is not protected end to end. Use a trusted protected path and rotate passwords that were shared before 2.1.3: [SECURITY](SECURITY.md). Never publish working credentials or unredacted dumps.
+The custom authentication and key exchange are not independently audited and must not be treated as an encrypted VPN or zero-trust system. DPAPI and the tightened ACLs introduced in 2.1.3 and kept in 2.1.4 only reduce local file exposure: the same Windows user can still decrypt the values, passwords stay plaintext in memory, and traffic is not protected end to end. Use a trusted protected path and rotate passwords that were shared before 2.1.3: [SECURITY](SECURITY.md). Never publish working credentials or unredacted dumps.
 
 Reproducible reports and contributions are welcome: [CONTRIBUTING](CONTRIBUTING.md), [Issues](https://github.com/jianhx189/jianhx-game-stream/issues/new/choose).
 

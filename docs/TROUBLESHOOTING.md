@@ -25,9 +25,11 @@
 
 ## 口令、本地文件与握手
 
+- **首次连接保存总是失败、之后每次都要重填**：这是 2.1.3 的已知回归（`mslink.ini` 尚不存在时保存失败）。升级到 2.1.4 后保存会原子创建配置；升级不会清空已有连接。
+- **启动失败后首次连接卡住或本机端口被占**：2.1.3 的 `mslink` 启动失败会残留监听 socket，带 47990 的回退重试可能二次 bind。升级到 2.1.4；临时可先完全退出主控端进程再重试。被控端未运行时，2.1.4 会收到 `StreamClose` 立即失败，而不是等到超时。
 - **主控端提示“无法用当前 Windows 用户解密”**：`mslink.ini` 中的 `dpapi:v1:` 只能用保存它的 Windows 用户解密。换用户、换机器或回退到 2.1.2 及更早版本后需要重新填写口令，这是预期行为；不要手工删除密文来“修复”。
 - **被控端读不到配置或日志**：`mslink-host.ini`、`安装信息.txt` 和安装日志的 ACL 只允许 SYSTEM、Administrators 与安装用户。其他账户读不到属于预期；分享安装目录前先删除 `安装信息.txt`。
-- **命令行看不到口令**：2.1.3 的隧道通过 `--password-stdin` 接收口令，任务计划 XML 与进程命令行都不会出现口令，安装日志也不再记录隧道/Sunshine 口令。若旧日志或截图曾经包含口令，按 SECURITY 的建议轮换。
+- **命令行看不到口令**：2.1.3 起的隧道通过 `--password-stdin` 接收口令，任务计划 XML 与进程命令行都不会出现口令，安装日志也不再记录隧道/Sunshine 口令。若旧日志或截图曾经包含口令，按 SECURITY 的建议轮换。
 - **握手等待/超时**：被控端最多保留 8 个待认证握手，单个 5 秒超时。日志出现占满或超时的提示时，先确认来源地址与防火墙规则，等待超时释放；不要通过绕过认证来处理。已认证会话始终只有一个。
 
 ## 鼠标与偶发卡顿
@@ -38,4 +40,4 @@
 
 ## English
 
-Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. Passwords stored as `dpapi:v1:` can only be decrypted by the same Windows user; after a downgrade or user change, re-enter them instead of editing the ini. Host passwords arrive on standard input, so seeing none on the command line is expected. At most 8 host handshakes wait for 5 seconds each; a full queue means slow or unexpected peers and is not a reason to bypass authentication. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.
+Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. Two 2.1.3 regressions are fixed in 2.1.4: saving a controller connection failed when the ini did not exist yet, and leaked listening sockets could hang the first connection after a failed start — upgrade in place if you see either. Passwords stored as `dpapi:v1:` can only be decrypted by the same Windows user; after a downgrade or user change, re-enter them instead of editing the ini. Host passwords arrive on standard input, so seeing none on the command line is expected. At most 8 host handshakes wait for 5 seconds each; a full queue means slow or unexpected peers and is not a reason to bypass authentication. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.

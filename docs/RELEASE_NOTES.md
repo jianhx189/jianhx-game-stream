@@ -1,44 +1,43 @@
-# MiniStream 2.1.3 · 正式版 / Regular release
+# MiniStream 2.1.4 · 热修复版 / Hotfix
 
-这一版集中加固 mslink 隧道、保护本机凭据并收紧口令的传递方式。没有新增媒体格式或性能承诺。Powered by jianhx2026。
+2.1.4 修复 2.1.3 发布后发现的两处回归，并补上两处会影响首次使用和失败恢复的问题。没有新增媒体格式或性能改动。Powered by jianhx2026。
 
 ## 下载与升级
 
 - **Host**：`MiniStream-Host-Setup.exe`，安装在运行游戏/桌面的电脑。
 - **Client**：`MiniStream-Client-Setup.exe`，安装在操作电脑。两端建议配套升级。
-- **Source**：`MiniStream-2.1.3-Source.zip`，包含修改版 Moonlight 源码与检出的子模块、mslink、控制台、脚本和交接文档；Qt/外部 SDK/Sunshine 来源见清单。
-- **校验**：`SHA256SUMS.txt` 与 `release-manifest.json`。发布清单在安装包编译完成后生成，哈希不能沿用 2.1.2。
+- **Source**：`MiniStream-2.1.4-Source.zip`，包含修改版 Moonlight 源码与检出的子模块、mslink、控制台、脚本和交接文档；Qt/外部 SDK/Sunshine 来源见清单。
+- **校验**：`SHA256SUMS.txt` 与 `release-manifest.json`。哈希在 2.1.4 安装包编译完成后生成，不能沿用 2.1.3。
 
-先结束当前串流、保存配置，在已有安装目录覆盖升级。安装器识别旧安装路径并保留已有隧道配置和 Sunshine 账号。2.1.3 首次载入旧主控端配置时会把明文口令迁移为当前用户的 `dpapi:v1:` 密文，因此**回退到 2.1.2 及更早版本需要重新填写口令**。新安装要求隧道口令 12–64 字符，升级保留的旧口令仍可用，但建议更换。
+**2.1.3 用户**：请结束串流后覆盖升级到 2.1.4。配置、隧道口令、Sunshine 配对和 `dpapi:v1:` 凭据都会保留，不需要重新配对。**全新安装请只使用 2.1.4**：2.1.3 在主控端首次保存连接和 `mslink` 启动失败清理上存在回归，不建议用于新部署。回退到 2.1.2 及更早版本仍需重新填写主控端口令。
 
-## 本轮改进
+## 本轮修复
 
-- **队列与帧有界**：每个连接的发送队列 4 MiB 硬上限，整帧先预留空间再入队，空间不足时整帧拒绝而不是截断；入队和发送失败向上返回，不再静默丢数据。TCP 单帧上限 64 KiB，`FrameReader` 缓冲区有界，读到 8 字节帧头即可拒绝超长帧。
-- **握手不阻塞**：被控端最多同时保留 8 个待认证握手，单个 5 秒超时；新会话认证成功后关闭其余 pending，始终只有一个已认证客户端。慢速或异常连接不再拖住已认证会话。
-- **重复统计修正**：`seq == highest` 的副本现在计为重复，冗余副本与真实丢包分开统计。
-- **测试**：新增队列/帧白盒测试与握手集成测试，CTest 现有四项（`udp_reply_source`、`relay_queue_frame`、`relay_handshake_integration`、`relay_selftest`），本机 4/4 通过；`--password-stdin` 启动脚本实测通过。
-- **主控端凭据保护**：连接口令与 Sunshine 口令以当前 Windows 用户的 DPAPI（`dpapi:v1:`）保存，旧明文 ini 由 `QSaveFile` 原子迁移。口令在内存中仍是明文，同一 Windows 用户可解密，**不是端到端保护**。
-- **被控端口令传递**：`mslink` 新增 `--password-stdin`，隧道口令由安装脚本经标准输入交给后台，不进入命令行、计划任务 XML 或临时文件；日志不再记录隧道/Sunshine 口令；`mslink-host.ini`、`安装信息.txt` 与安装日志的 ACL 收紧到 SYSTEM / Administrators / 安装用户。
-- **文档与网站**：README、CHANGELOG、SECURITY、开发交接、构建与更新说明同步到 2.1.3；旧优化文档加入历史校订提示，不再把自研采集/手柄原型当作当前实现。
+- **首次保存失败（2.1.3 回归）**：主控端首次连接时 `mslink.ini` 还不存在，保存连接必定失败，导致之后每次连接都要重填。2.1.4 在配置文件不存在时也通过 `QSaveFile` 原子创建，保存一次即可保留。
+- **启动失败泄漏 socket（2.1.3 回归）**：`mslink` 启动失败时未清理已创建的监听 socket；带 47990 的隧道启动失败后回退为三个标准端口重试，可能在同一进程内二次 bind 并挂住首次连接。2.1.4 在失败路径关闭全部已创建 socket 并调用 `WSACleanup`，同时校验 listen/bind 地址必须为 IPv4，非 IPv4 直接报错。
+- **空口令不再删除凭据**：空口令会被拒绝，已保存的 `dpapi:v1:` 密文保持不变，不会因为一次空提交而丢失连接配置。
+- **上游失败发送 `StreamClose`**：上游 Sunshine 目标连接失败时主动发送 `StreamClose`，客户端立即结束对应流，不再一直等待超时。
+- **测试与构建**：2.1.3 的基线为本机 CTest 4/4 与 `--password-stdin` 启动实测；2.1.4 增加 `relay_startup`（启动失败清理与重试）和 `relay_stream_open_failure`（上游失败返回 `StreamClose`），CTest 共六项，并在发布前重建两端应用与安装包。2.1.4 的最终测试、构建与安装包结果以发布清单记录为准，本文不预先宣称已通过。
+- 2.1.3 的隧道加固、DPAPI 凭据、`--password-stdin`、ACL 与多网卡 UDP 修复在 2.1.4 中保持不变。
 
 ## 验证范围
 
-本轮已完成：本机 CTest 4/4、`--password-stdin` 启动实测（argv 不含口令、监听与遥测正常、空 stdin 与参数互斥被拒绝）。这些结果只覆盖**本地回环、白盒与集成测试**。
+2.1.3 已完成本机 CTest 4/4、`--password-stdin` 启动实测、两端应用与安装包构建。2.1.4 增加 `relay_startup` 与 `relay_stream_open_failure` 测试并重建全部组件；**最终结果以同版本 `release-manifest.json` 与发布记录为准**，本文不预先给出通过结论。
 
-两端 2.1.3 应用构建、两份 Inno 安装包编译和隔离 UI 启动检查已完成。未覆盖：干净 Win10/11 安装/卸载、所有 GPU/驱动组合、高码率弱网与长时间跨网串流。队列 4 MiB、帧 64 KiB 与 8 pending 上限只限制资源增长，不构成抗 DoS 保证；2.1.2 的真实转发 UDP 修复结论继续沿用，新的真实链路媒体串流仍需单独验收。RTT 不是端到端操作延迟，媒体丢帧不是 IP 丢包率。
+仍未覆盖：干净 Win10/11 安装/卸载、所有 GPU/驱动组合、高码率弱网与长时间跨网串流。4 MiB 队列、64 KiB 帧与 8 pending 握手上限只限制资源增长，不构成抗 DoS 保证；2.1.2 的真实转发 UDP 修复结论继续沿用。RTT 不是端到端操作延迟，媒体丢帧不是 IP 丢包率。
 
 自定义隧道认证与密钥交换仍未经过独立安全审计，会话密钥仍通过 TCP 明文传送，不替代加密 VPN。DPAPI 与 ACL 只降低本机文件泄露面：换用户或回退旧版会读不到口令，分享过口令的用户应尽快轮换。请使用可信、受保护的网络路径。
 
 ## English
 
-MiniStream 2.1.3 hardens the mslink tunnel, protects local credentials and removes passwords from process command lines. There are no new media formats or performance claims.
+MiniStream 2.1.4 is a hotfix for two regressions found after 2.1.3 and two related failure-handling issues. There are no new media formats or performance claims.
 
-**Changes.** Each connection's send queue now has a hard 4 MiB cap; frames are reserved and queued as a whole and enqueue/overflow failures propagate instead of silently dropping bytes. TCP frames are capped at 64 KiB with a bounded frame reader that rejects an oversized frame from its 8-byte header. The host handshake no longer blocks: at most 8 peers wait, each with a 5 s timeout, a newly authenticated session closes the other pending handshakes, and only one authenticated controller is kept. Copies with `seq == highest` are now counted as duplicates. New white-box queue/frame and handshake integration tests bring CTest to four cases (`udp_reply_source`, `relay_queue_frame`, `relay_handshake_integration`, `relay_selftest`); all four passed locally, and the `--password-stdin` startup check passed. The controller stores tunnel and Sunshine passwords with current-user Windows DPAPI (`dpapi:v1:`) and migrates a legacy plaintext ini atomically with `QSaveFile`. The host tunnel accepts `--password-stdin`; the installer passes the tunnel password on standard input, install logs no longer contain tunnel or Sunshine passwords, and ini/install-info/log ACLs are limited to SYSTEM, Administrators and the installing user. New installs require a 12–64 character tunnel password; existing passwords stay valid.
+**Downloads.** Host and Client are installed on the gaming PC and the PC you operate; use matching versions. The source bundle contains the modified Moonlight checkout and its submodules plus the mslink tunnel, host console, scripts and handoff documents. Verify against `SHA256SUMS.txt` and `release-manifest.json`; 2.1.4 hashes are generated after the installers are rebuilt and cannot be reused from 2.1.3.
 
-**Upgrade.** End sessions, keep your configuration and install over the existing directories. Because 2.1.3 migrates plaintext controller passwords to DPAPI, downgrading to 2.1.2 or earlier requires entering them again. Rotate any tunnel or Sunshine password that was shared before this release.
+**Upgrade.** Existing 2.1.3 users should upgrade in place: configuration, tunnel password, Sunshine pairing and `dpapi:v1:` credentials are preserved and no re-pairing is required. Use 2.1.4 for every fresh install — 2.1.3 should not be used for new deployments because of the first-save and startup-cleanup regressions. Downgrading to 2.1.2 or earlier still requires re-entering controller passwords.
 
-**Verification.** Verified locally: CTest 4/4 and the `--password-stdin` startup check. These cover loopback, white-box and integration paths only. Both applications and both installers were built successfully, and isolated application launch checks passed; clean Windows 10/11 installs, all GPU/driver combinations, high-bitrate weak networks and long WAN sessions remain unverified. The 4 MiB queue, 64 KiB frame and 8-pending handshake limits bound resource growth but are not a DoS guarantee. The 2.1.2 forwarded-connection UDP result still applies; a new real-network media session requires its own acceptance.
+**Fixes.** 2.1.4 creates `mslink.ini` atomically when it does not exist, so the first controller save succeeds and the password persists. Failed `mslink` starts now close every created listening socket and call `WSACleanup`, validate that listen/bind addresses are IPv4, and therefore keep the 47990 fallback retry from double-binding and hanging the first connection. Empty passwords are rejected without deleting the stored ciphertext, and a failed upstream Sunshine connection sends `StreamClose` instead of leaving the controller to time out.
 
-DPAPI and the ACLs only reduce local file exposure: the same Windows user can still decrypt the values, passwords remain plaintext in memory, the custom authentication still sends a plaintext session key over TCP, and this is not an encrypted VPN. Use a trusted protected path.
+**Verification.** 2.1.3 was verified locally with CTest 4/4, the `--password-stdin` startup check and rebuilt applications/installers. 2.1.4 adds `relay_startup` (failure cleanup and retry) and `relay_stream_open_failure` (upstream failure returns `StreamClose`), bringing CTest to six cases, and rebuilds all components; final test, build and installer results are recorded in the release manifest and are **not** claimed here. Clean Windows 10/11 installs, all GPU/driver combinations, high-bitrate weak networks and long WAN sessions remain unverified. The tunnel limits bound resource growth but are not a DoS guarantee. 2.1.3's DPAPI, ACL and hardening behaviour is unchanged in 2.1.4: local files are still decryptable by the same Windows user, passwords stay plaintext in memory, the session key is sent in plaintext over TCP, and this is not an encrypted VPN.
 
 [官网 / Website](https://ministream.jianhx.com/) · [教程 / Guide](https://ministream.jianhx.com/tutorial.html) · [GitHub Pages](https://jianhx189.github.io/jianhx-game-stream/) · [Developer handoff](https://github.com/jianhx189/jianhx-game-stream/blob/main/docs/DEVELOPMENT.md)

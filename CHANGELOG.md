@@ -1,6 +1,20 @@
 # Changelog / 更新记录
 
+## 2.1.4 — 热修复版 / Hotfix
+
+- **修复 2.1.3 回归（首次连接保存）**：主控端首次连接时 `mslink.ini` 尚不存在，保存连接必定失败，之后每次都要重新填写。2.1.4 在文件不存在时同样通过 `QSaveFile` 原子创建配置，保存一次即可保留。
+- **修复 2.1.3 回归（启动失败）**：`mslink` 启动失败会泄漏已创建的监听 socket，带 47990 的隧道启动失败后回退重试可能二次 bind 并卡住首次连接。2.1.4 在失败路径关闭全部已创建 socket 并调用 `WSACleanup`，同时校验 listen/bind 地址必须为 IPv4。
+- **空口令不再破坏凭据**：空口令直接拒绝，不会删除已保存的 `dpapi:v1:` 密文。
+- **上游失败不再等超时**：上游 Sunshine 目标连接失败时发送 `StreamClose`，客户端立即结束对应流，而不是一直等待超时。
+- **测试与构建**：2.1.3 的基线为本机 CTest 4/4 与 `--password-stdin` 启动实测；2.1.4 新增 `relay_startup`（启动失败清理与重试）和 `relay_stream_open_failure`（上游失败返回 `StreamClose`），CTest 共六项，并重建全部组件。最终通过数、构建与安装包结果以发布清单记录为准，本说明不预先宣称已通过。
+- **安装建议**：2.1.3 存在上述回归，**不建议用于全新安装**；全新安装请使用 2.1.4，已安装 2.1.3 的用户覆盖升级即可，配置、隧道与 DPAPI 凭据保留。
+- 其余 2.1.3 能力（隧道队列/帧/握手加固、DPAPI 凭据、`--password-stdin`、ACL、多网卡 UDP 修复）在 2.1.4 中保持不变。
+
+English: Hotfix for two 2.1.3 regressions: saving a controller connection failed whenever `mslink.ini` did not exist (2.1.4 creates it atomically), and a failed `mslink` start leaked listening sockets so the 47990 fallback retry could bind twice and hang the first connection (failure paths now close every socket, call `WSACleanup` and validate IPv4 listen/bind addresses). An empty password is rejected without deleting stored `dpapi:v1:` ciphertext, and a failed upstream Sunshine connection now sends `StreamClose` instead of leaving the controller to time out. 2.1.4 adds `relay_startup` (failure cleanup, IPv4 checks and a retry on the same ports) and `relay_stream_open_failure` (upstream failure returns `StreamClose`), bringing CTest to six cases, and rebuilds all components; final pass counts and build/installer results are recorded in the release manifest and are not claimed here. 2.1.3 should not be used for a fresh install; 2.1.3 users should upgrade in place and keep their configuration.
+
 ## 2.1.3 — 正式版 / Regular release
+
+> 已知回归：该版本在 `mslink.ini` 不存在时保存主控端连接必定失败，且 `mslink` 启动失败会残留监听 socket（47990 回退可能二次 bind 卡住首次连接）。**不建议用于全新安装**；请使用 2.1.4，已安装用户覆盖升级。
 
 - 隧道健壮性：每个连接的发送队列改为 **4 MiB 硬上限**，整帧先预留空间再入队，空间不足时整帧拒绝而不是截断；入队与发送失败一律向上返回，不再静默丢数据。
 - TCP 帧上限 **64 KiB**，`FrameReader` 缓冲区有界；读到 8 字节帧头即可判定超长帧并断开，不再按对端声明无限增长。

@@ -121,6 +121,41 @@ static bool resolve_v4(const std::string& host, uint16_t port, sockaddr_in& out)
     return true;
 }
 
+// 带超时的 connect：先置非阻塞再 WSAPoll 等待成功。
+// 被控端目标若不可达（丢包而不是立即拒绝），阻塞 connect 会按系统默认重试近 21 秒，
+// 期间整个事件循环都被卡住，隧道里其它流全部停摆。
+// stopFlag 非空时每 100 ms 检查一次：客户端 stop() 不必等 connect 自己超时。
+static bool connect_v4(SOCKET s, const sockaddr_in& addr, int timeoutMs,
+                       const std::atomic<bool>* stopFlag = nullptr) {
+    if (!set_nonblocking(s)) return false;
+    if (::connect(s, (const sockaddr*)&addr, sizeof(addr)) == 0) return true;
+    if (::WSAGetLastError() != WSAEWOULDBLOCK) return false;
+
+    const uint64_t deadline = now_ms() + uint64_t(timeoutMs);
+    for (;;) {
+        if (stopFlag && stopFlag->load()) return false;
+        const uint64_t n = now_ms();
+        if (n >= deadline) return false;
+        const uint64_t remain = deadline - n;
+        const int slice = int(remain < 100 ? remain : 100);
+
+        // 这里必须用 select 而不是 WSAPoll：Windows 的 WSAPoll 对「连接失败」
+        // 不会唤醒（只有连接成功才给 POLLWRNORM），会白等到超时；
+        // select 会把失败放进 exceptfds，成功放进 writefds。
+        fd_set wr, ex;
+        FD_ZERO(&wr);
+        FD_ZERO(&ex);
+        FD_SET(s, &wr);
+        FD_SET(s, &ex);
+        timeval tv{ 0, slice * 1000 };
+        const int rc = ::select(0, nullptr, &wr, &ex, &tv);
+        if (rc < 0) return false;
+        if (rc == 0) continue;
+        if (FD_ISSET(s, &ex)) return false;
+        if (FD_ISSET(s, &wr)) return true;
+    }
+}
+
 // ---------------------------------------------------------------------------
 //  P1-4: 会话密钥派生（TCP 认证后生成，UDP 包校验用）
 // ---------------------------------------------------------------------------
@@ -577,6 +612,9 @@ struct Relay::Impl {
 
     // ---- 客户端 ----
     SOCKET tunnelTcp = INVALID_SOCKET;
+    // 握手/连接阶段临时使用的 socket：此时隧道还没建立，tunnelTcp 仍是 INVALID_SOCKET，
+    // stop() 需要它才能 shutdown 掉阻塞中的 connect/recv，否则退出要等系统超时。
+    std::atomic<SOCKET> connectingSock{INVALID_SOCKET};
     SOCKET udpTunnel = INVALID_SOCKET;
     sockaddr_in serverUdpAddr{};
     std::vector<SOCKET> tcpListeners;
@@ -790,19 +828,40 @@ bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
     WSADATA wsa{};
     if (::WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { err = "WSAStartup 失败"; return false; }
 
+    // 任何一步失败都必须关掉本次已创建的 socket 并 WSACleanup：
+    // 调用方（主控端带 47990 启动失败 -> 降级重试）会在同一进程里立刻再启动一次，
+    // 残留监听口会让二次 bind 全部 WSAEADDRINUSE，表现为「降级也起不来」。
+    auto fail = [&](const std::string& msg) -> bool {
+        for (SOCKET s : tcpListeners) sock_close(s);
+        tcpListeners.clear();
+        tcpListenPorts.clear();
+        for (SOCKET s : udpListeners) sock_close(s);
+        udpListeners.clear();
+        udpListenPorts.clear();
+        if (sock_valid(udpTunnel)) { sock_close(udpTunnel); udpTunnel = INVALID_SOCKET; }
+        tcpIn.reset();
+        runningFlag.store(false);
+        ::WSACleanup();
+        err = msg;
+        return false;
+    };
+
+    sockaddr_in localAddr{};
+    localAddr.sin_family = AF_INET;
+    if (::inet_pton(AF_INET, ccfg.listenAddr.c_str(), &localAddr.sin_addr) != 1) {
+        return fail("本机监听地址不合法: " + ccfg.listenAddr);
+    }
+
     for (uint16_t port : ccfg.tcpListenPorts) {
         SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (!sock_valid(s)) { err = "创建 TCP 监听失败"; return false; }
+        if (!sock_valid(s)) return fail("创建 TCP 监听失败");
         int yes = 1;
         ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes));
-        sockaddr_in a{};
-        a.sin_family = AF_INET;
+        sockaddr_in a = localAddr;
         a.sin_port = htons(port);
-        ::inet_pton(AF_INET, ccfg.listenAddr.c_str(), &a.sin_addr);
         if (::bind(s, (sockaddr*)&a, sizeof(a)) != 0 || ::listen(s, 16) != 0) {
-            err = "本机 TCP 端口监听失败: " + std::to_string(port) + "（被占用？）";
             sock_close(s);
-            return false;
+            return fail("本机 TCP 端口监听失败: " + std::to_string(port) + "（被占用？）");
         }
         set_nonblocking(s);
         tcpListeners.push_back(s);
@@ -811,15 +870,12 @@ bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
     }
     for (uint16_t port : ccfg.udpListenPorts) {
         SOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (!sock_valid(s)) { err = "创建 UDP 监听失败"; return false; }
-        sockaddr_in a{};
-        a.sin_family = AF_INET;
+        if (!sock_valid(s)) return fail("创建 UDP 监听失败");
+        sockaddr_in a = localAddr;
         a.sin_port = htons(port);
-        ::inet_pton(AF_INET, ccfg.listenAddr.c_str(), &a.sin_addr);
         if (::bind(s, (sockaddr*)&a, sizeof(a)) != 0) {
-            err = "本机 UDP 端口绑定失败: " + std::to_string(port);
             sock_close(s);
-            return false;
+            return fail("本机 UDP 端口绑定失败: " + std::to_string(port));
         }
         set_nonblocking(s);
         tune_buffers(s, "客户端 UDP 监听");
@@ -829,11 +885,11 @@ bool Relay::Impl::start_client(const ClientConfig& cfg, std::string& err) {
     }
 
     udpTunnel = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (!sock_valid(udpTunnel)) { err = "创建隧道 UDP socket 失败"; return false; }
+    if (!sock_valid(udpTunnel)) { udpTunnel = INVALID_SOCKET; return fail("创建隧道 UDP socket 失败"); }
     set_nonblocking(udpTunnel);
     tune_buffers(udpTunnel, "隧道 UDP");
     if (!resolve_v4(ccfg.serverHost, ccfg.serverUdpPort, serverUdpAddr)) {
-        err = "解析服务器 UDP 地址失败"; return false;
+        return fail("解析服务器 UDP 地址失败");
     }
 
     stopReq.store(false);
@@ -855,18 +911,30 @@ bool Relay::Impl::client_connect_tunnel() {
 
     sockaddr_in addr{};
     if (!resolve_v4(ccfg.serverHost, ccfg.serverTcpPort, addr)) return false;
+    if (stopReq.load()) return false;
 
     SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (!sock_valid(s)) return false;
-    DWORD tmo = 8000;
+    // 握手阶段的阻塞读写用短超时（250 ms），read_frame 自己按 8 秒总预算循环；
+    // 这样 stop() 最多等一个 250 ms 片，而不是整个 8 秒。
+    DWORD tmo = 250;
     ::setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tmo, sizeof(tmo));
     ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tmo, sizeof(tmo));
     tune_buffers(s, "隧道 TCP");
-    if (::connect(s, (sockaddr*)&addr, sizeof(addr)) != 0) {
+    // 发布给 stop()：连接期间 stop() 也能看到这个 socket。
+    connectingSock.store(s);
+    // 连接 3 秒、握手 8 秒是两个独立预算：连不上时重连周期不会被拖到 8 秒。
+    const bool connected = connect_v4(s, addr, 3000, &stopReq);
+    connectingSock.store(INVALID_SOCKET);
+    if (!connected) {
         logf("客户端[#%d]：隧道 TCP 连接失败（WSA=%d）", conn, ::WSAGetLastError());
         sock_close(s);
         return false;
     }
+    // connect_v4 会把 socket 置成非阻塞；握手阶段恢复阻塞 + 短超时。
+    u_long blocking = 0;
+    ::ioctlsocket(s, FIONBIO, &blocking);
+    if (stopReq.load()) { sock_close(s); return false; }
     tunnelTcp = s;
 
     // P1-2: 新连接时重置 FrameReader
@@ -879,6 +947,7 @@ bool Relay::Impl::client_connect_tunnel() {
     auto read_frame = [&](int timeoutMs) -> bool {
         const uint64_t deadline = now_ms() + uint64_t(timeoutMs);
         while (now_ms() < deadline) {
+            if (stopReq.load()) return false;
             if (tcpIn.bad()) return false;
             if (tcpIn.complete()) {
                 if (!tcpIn.pop(type, sid, pl)) return false;
@@ -886,7 +955,13 @@ bool Relay::Impl::client_connect_tunnel() {
             }
             uint8_t tmp[1024];
             int n = ::recv(tunnelTcp, (char*)tmp, sizeof(tmp), 0);
-            if (n <= 0) return false;
+            if (n == 0) return false;
+            if (n < 0) {
+                const int e = ::WSAGetLastError();
+                // 250 ms 短超时：回到循环顶部检查 stopReq / 总 deadline。
+                if (e == WSAETIMEDOUT || e == WSAEWOULDBLOCK) continue;
+                return false;
+            }
             if (!tcpIn.feed(tmp, size_t(n))) return false;
         }
         return false;
@@ -1053,7 +1128,8 @@ void Relay::Impl::client_loop() {
             logf("客户端：正在连接隧道 %s:%u …", ccfg.serverHost.c_str(), ccfg.serverTcpPort);
             if (!client_connect_tunnel()) {
                 stat([](RelayStats& s) { s.tunnelReconnects++; });
-                ::Sleep(1000);
+                // 可中断退避：否则 stop() 要等够 1 秒才返回
+                for (int i = 0; i < 10 && !stopReq.load(); ++i) ::Sleep(100);
                 continue;
             }
             lastPingMs = now_ms();
@@ -1379,35 +1455,42 @@ bool Relay::Impl::start_host(const HostConfig& cfg, std::string& err) {
     WSADATA wsa{};
     if (::WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { err = "WSAStartup 失败"; return false; }
 
+    // 与 start_client 相同的约定：失败路径必须释放所有已创建的 socket 并 WSACleanup，
+    // 这样同一进程里可以立刻用相同端口重试（安装器/控制台的「重试」按钮就依赖这一点）。
+    auto fail = [&](const std::string& msg) -> bool {
+        if (sock_valid(hTcpListen)) { sock_close(hTcpListen); hTcpListen = INVALID_SOCKET; }
+        if (sock_valid(hUdpListen)) { sock_close(hUdpListen); hUdpListen = INVALID_SOCKET; }
+        hTcpIn.reset();
+        runningFlag.store(false);
+        ::WSACleanup();
+        err = msg;
+        return false;
+    };
+
     sockaddr_in a{};
     a.sin_family = AF_INET;
-    ::inet_pton(AF_INET, hcfg.bindAddr.c_str(), &a.sin_addr);
+    if (::inet_pton(AF_INET, hcfg.bindAddr.c_str(), &a.sin_addr) != 1) {
+        return fail("被控端监听地址不合法: " + hcfg.bindAddr);
+    }
 
     hTcpListen = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (!sock_valid(hTcpListen)) { err = "创建监听失败"; return false; }
+    if (!sock_valid(hTcpListen)) { hTcpListen = INVALID_SOCKET; return fail("创建监听失败"); }
     int yes = 1;
     ::setsockopt(hTcpListen, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes));
     a.sin_port = htons(hcfg.listenTcpPort);
     if (::bind(hTcpListen, (sockaddr*)&a, sizeof(a)) != 0 || ::listen(hTcpListen, 8) != 0) {
-        err = "被控端 TCP 监听失败: " + std::to_string(hcfg.listenTcpPort);
-        sock_close(hTcpListen);
-        return false;
+        return fail("被控端 TCP 监听失败: " + std::to_string(hcfg.listenTcpPort));
     }
     set_nonblocking(hTcpListen);
 
     hUdpListen = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (!sock_valid(hUdpListen)) { err = "创建 UDP 监听失败"; return false; }
+    if (!sock_valid(hUdpListen)) { hUdpListen = INVALID_SOCKET; return fail("创建 UDP 监听失败"); }
     a.sin_port = htons(hcfg.listenUdpPort);
     if (::bind(hUdpListen, (sockaddr*)&a, sizeof(a)) != 0) {
-        err = "被控端 UDP 监听失败: " + std::to_string(hcfg.listenUdpPort);
-        sock_close(hUdpListen);
-        return false;
+        return fail("被控端 UDP 监听失败: " + std::to_string(hcfg.listenUdpPort));
     }
     if (!hostUdpIo.enable(hUdpListen)) {
-        err = "初始化 UDP 回包源地址控制失败 (WSA=" + std::to_string(WSAGetLastError()) + ")";
-        sock_close(hUdpListen);
-        sock_close(hTcpListen);
-        return false;
+        return fail("初始化 UDP 回包源地址控制失败 (WSA=" + std::to_string(WSAGetLastError()) + ")");
     }
     set_nonblocking(hUdpListen);
     tune_buffers(hUdpListen, "被控端 UDP 监听");
@@ -1624,11 +1707,25 @@ bool Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
             const uint16_t logical = uint16_t(pl[0] | (pl[1] << 8));
             const uint16_t port = hcfg.resolve_tcp(logical);
             sockaddr_in a{};
-            if (!resolve_v4(hcfg.targetHost, port, a)) break;
-            SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            if (!sock_valid(s)) break;
-            if (::connect(s, (sockaddr*)&a, sizeof(a)) != 0) { sock_close(s); break; }
-            set_nonblocking(s);
+            const char* why = nullptr;
+            if (!resolve_v4(hcfg.targetHost, port, a)) why = "解析目标地址失败";
+            SOCKET s = INVALID_SOCKET;
+            if (!why) {
+                s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (!sock_valid(s)) { s = INVALID_SOCKET; why = "创建目标 socket 失败"; }
+            }
+            if (!why && !connect_v4(s, a, 1500)) {
+                sock_close(s);
+                why = "连接目标失败";
+            }
+            if (why) {
+                // 打不开就明确回一条 STREAM_CLOSE，客户端不必等自己的读超时。
+                logf("被控端：流 #%u 打开失败（%s，目标 %s:%u，逻辑 %u）",
+                     sid, why, hcfg.targetHost.c_str(), port, logical);
+                if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0))
+                    return false;
+                break;
+            }
             HostStream hs; hs.up = s; hs.targetPort = port;
             hostStreams[sid] = hs;
             logf("被控端：流 #%u -> %s:%u（逻辑 %u）", sid, hcfg.targetHost.c_str(), port, logical);
@@ -2104,6 +2201,11 @@ void Relay::Impl::stop_impl() {
     if (!runningFlag.load()) return;
     stopReq.store(true);
     // P1-3: 取消阻塞：shutdown 所有 socket 唤醒 WSAPoll
+    // 连接/握手中的 socket 也要 shutdown，否则阻塞中的 connect/recv 会把 stop 拖到超时。
+    {
+        SOCKET connecting = connectingSock.load();
+        if (sock_valid(connecting)) ::shutdown(connecting, SD_BOTH);
+    }
     if (sock_valid(tunnelTcp)) ::shutdown(tunnelTcp, SD_BOTH);
     if (sock_valid(hTunnel)) ::shutdown(hTunnel, SD_BOTH);
     {

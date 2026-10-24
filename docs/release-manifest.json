@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "channel": "stable",
-  "created_utc": "2026-10-24T03:56:12.428975+00:00",
+  "created_utc": "2026-10-24T04:22:56.363708+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49336648,
-      "sha256": "958f5a86c0714b32bf0b7b88723a525c061709d1e7ede9a9699b0ed564d9ed9d"
+      "size": 49334998,
+      "sha256": "bfc61b3123aeb7be43631e496b76da1cf286b425adc233bd94caad70f041adc5"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63492283,
-      "sha256": "1cdbcfd8af4f549efe4f170d74fc922d2d3d032ab9efba0041232064dc838fc5"
+      "size": 63490054,
+      "sha256": "7b46546a68e2f38b616b67c4c11a22ad95947d9bf0dcad9f894bda8913a48ce5"
     },
     {
-      "name": "MiniStream-2.1.3-Source.zip",
-      "size": 2763045,
-      "sha256": "17cc4c6c485c50260a504198f1bae61584f3b58223edd7fabbea083da46d6b75"
+      "name": "MiniStream-2.1.4-Source.zip",
+      "size": 2782141,
+      "sha256": "12f77ad30cd9bdcfd1c8cc2afadfb9b91aa6117a05cf9aab76629cb464d980e3"
     }
   ],
   "sources": {
@@ -38,44 +38,49 @@
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
   "verification": {
-    "version": "2.1.3",
+    "version": "2.1.4",
     "passed": true,
     "checked_utc": "2026-10-24",
     "results": [
       {
         "name": "mslink CMake Release and CTest",
         "status": "passed",
-        "evidence": "4/4: udp_reply_source, relay_queue_frame, relay_handshake_integration, relay_selftest"
+        "evidence": "6/6: udp_reply_source, relay_queue_frame, relay_handshake_integration, relay_startup, relay_stream_open_failure, relay_selftest"
+      },
+      {
+        "name": "startup failure cleanup and retry",
+        "status": "passed",
+        "evidence": "Failed startup releases listeners; the same ports can be bound again; invalid listen/bind addresses rejected; stop during handshake completed in about 217 ms"
+      },
+      {
+        "name": "upstream stream-open failure",
+        "status": "passed",
+        "evidence": "A refused upstream target causes the controller-side stream to close in about 1.5 s instead of an 8 s read timeout"
       },
       {
         "name": "stdin credential startup and command-line inspection",
         "status": "passed",
-        "evidence": "12/12; host starts and listens with --password-stdin; process command line contains no password; empty stdin and conflicting options rejected"
+        "evidence": "Host starts and listens with --password-stdin; process command line contains no password; empty stdin and conflicting options rejected"
       },
       {
         "name": "controller credential migration",
         "status": "passed",
-        "evidence": "Isolated real-code harness: plaintext migration, DPAPI reload, atomic write failure, preserved custom settings"
+        "evidence": "Real-code harness: first save without an existing ini, DPAPI reload after restart, empty-password rejection and no plaintext fields"
       },
       {
         "name": "controller and host console builds",
         "status": "passed",
-        "evidence": "MSVC 14.44 / Qt 6.9.3; Windows file versions 2.1.3.0"
-      },
-      {
-        "name": "isolated application launch",
-        "status": "passed",
-        "evidence": "Client UI Preview starts without reading real configuration; host console renders all three pages and shows dashes without live telemetry"
+        "evidence": "MSVC 14.44 / Qt 6.9.3; Windows file versions 2.1.4.0"
       },
       {
         "name": "Inno installers",
         "status": "passed",
-        "evidence": "MiniStream-Client-Setup.exe and MiniStream-Host-Setup.exe compiled successfully"
+        "evidence": "MiniStream-Client-Setup.exe and MiniStream-Host-Setup.exe compiled successfully; ProductVersion 2.1.4"
       },
       {
-        "name": "PowerShell 5.1 syntax",
+        "name": "PowerShell 5.1 syntax and ACL helper",
         "status": "passed",
-        "evidence": "tunnel-common, run-tunnel, start-tunnel and install scripts parsed successfully with UTF-8 BOM"
+        "evidence": "Install scripts parsed; ACL helper produced protected rules for SYSTEM, Administrators and the current user"
       }
     ],
     "not_covered": [
@@ -161,8 +166,8 @@
       },
       {
         "path": "MiniStream.exe",
-        "size": 3037184,
-        "sha256": "7941fe7027bf222de98d6cf3e4fa7043995861ab66009044bef2b91d7227f144"
+        "size": 3039232,
+        "sha256": "c57515b3b8ace7db1f0f8ab39f49067e3e834e266ab0c1f992f73a794529b381"
       },
       {
         "path": "ministream.ico",
@@ -1838,8 +1843,8 @@
       },
       {
         "path": "mslink.exe",
-        "size": 159744,
-        "sha256": "7bebec29f16a62ad848e1a5ee17914937275434ffa3648e25a1b0f1e15b1fd31"
+        "size": 163328,
+        "sha256": "74aba3d6cc160df2e111e4d0f85dd3ace7eb83e068306120fa1ecc5132ed0ca6"
       },
       {
         "path": "THIRD_PARTY_NOTICES.txt",
@@ -1884,7 +1889,7 @@
       {
         "path": "console/MiniStreamHost.exe",
         "size": 166912,
-        "sha256": "242dd39d743d513f7d0b0023945627ffe4e7e3ea61dde40f36dda5b268441eda"
+        "sha256": "a2198b3bc9fec6962d6c2ec7a246727b2b7dc554dedcec89e4d5f6816bc24ad8"
       },
       {
         "path": "console/msvcp140.dll",
