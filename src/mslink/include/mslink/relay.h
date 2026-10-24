@@ -25,10 +25,12 @@
 //
 //  协议：
 //    TCP 帧： [u32 payloadLen][u16 type][u16 streamId][payload...]
-//    UDP 包： [u8 magic='M'][u8 type][u16 flowId][u32 seq][payload...]
+//    UDP 包： [u8 magic='M'][u8 type][u16 flowId][u32 seq][u32 sessionPrefix][u8 tag[8]][payload...]
+//             2.1.2 起认证头为 20 字节（首版是 8 字节，勿再按 8 字节估预算）
 // =============================================================================
 #pragma once
 
+#include <cctype>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -43,10 +45,44 @@ constexpr uint32_t kTunnelVersion   = 1;
 constexpr size_t   kMaxTcpFrame     = 64 * 1024;   // 单帧上限（TLS 握手/RTSP 响应都远小于此）
 // 单包上限。约束来自最外层 UDP 载荷不能超过 1472B（1500 MTU - 20 IP - 8 UDP），
 // 否则会被 IP 分片，任一分片丢失就等于整包丢失，视频链路上不可接受。
-// 我们的封装头是 8 字节，所以内层最多 1472 - 8 = 1464。
+// 封装头实际是 20 字节（不是首版的 8 字节），所以内层最多 1472 - 20 = 1452；
+// 上行 kUdpData 的 payload 还多 2 字节目标端口，故视频数据本身最多 1450 字节。
 // Sunshine 默认 packetSize=1024，但它是可在被控端配置里调大的，这里留足余量。
-constexpr size_t   kMaxUdpPayload   = 1472 - 8;
+constexpr size_t   kMaxUdpPayload   = 1472 - 20;
+constexpr size_t   kUdpHdrBytes     = 20;          // magic/type/flow/seq/sessionPrefix/tag
 constexpr int      kUdpFlowIdleMs   = 120000;      // UDP 流表空闲回收（2 分钟）
+// 视频流的目标端口。冗余策略为 Control 时只保护非视频流（音频/控制），
+// 因为视频占绝大多数带宽，静音复制会让上行带宽翻倍。
+constexpr uint16_t kVideoTargetPort = 47998;
+
+// ---- 抗丢包：1+1 冗余发送 --------------------------------------------------
+// 做法：把同一个 UDP 数据报按同一 (flowId, seq) 发送两份，副本延迟 gap 毫秒。
+// 接收侧不需要任何协议变更：现有 64 包防重放窗口本来就会丢弃重复 seq，
+// 因此「旧版本对端 + 新版本发送端」也能安全工作（副本被静默丢弃，只是没有收益）。
+// 代价：被保护方向的带宽约翻倍。突发拥塞造成的丢包下收益有限，随机丢包下收益显著
+// （丢包率 p -> 约 p^2）。
+enum class UdpRedundancy : uint8_t {
+    Off     = 0,   // 关闭（默认）
+    Control = 1,   // 只复制非视频流（音频 48000、输入 47999），带宽代价很小
+    All     = 2,   // 复制所有 UDP 数据报，含视频（带宽约翻倍）
+};
+
+// 解析 "off" / "control" / "all"（大小写不敏感）。无法识别时返回 false。
+inline bool parse_udp_redundancy(const std::string& text, UdpRedundancy& out) {
+    std::string v;
+    for (char c : text) v.push_back(char(::tolower(static_cast<unsigned char>(c))));
+    if (v.empty() || v == "off" || v == "0" || v == "false" || v == "no") { out = UdpRedundancy::Off; return true; }
+    if (v == "control" || v == "audio" || v == "1")                        { out = UdpRedundancy::Control; return true; }
+    if (v == "all" || v == "on" || v == "true" || v == "2")                { out = UdpRedundancy::All; return true; }
+    return false;
+}
+inline const char* udp_redundancy_name(UdpRedundancy v) {
+    switch (v) {
+        case UdpRedundancy::Control: return "control";
+        case UdpRedundancy::All:     return "all";
+        default:                     return "off";
+    }
+}
 
 enum TcpFrameType : uint16_t {
     kTcpHello      = 1,   // client -> host：版本 + 认证 token
@@ -90,6 +126,10 @@ struct ClientConfig {
     std::vector<uint16_t> tcpListenPorts;   // 默认 {47989, 47984, 48010}
     std::vector<uint16_t> udpListenPorts;   // 默认 {47998, 47999, 48000}
     std::string listenAddr = "127.0.0.1";
+
+    // 抗丢包：上行（输入/控制/音频/视频）1+1 冗余发送。默认关闭。
+    UdpRedundancy udpRedundancy = UdpRedundancy::Off;
+    uint16_t      udpRedundancyGapMs = 2;   // 副本延迟，0-50 ms
 };
 
 // 被控端配置
@@ -116,6 +156,10 @@ struct HostConfig {
         auto it = udpPortMap.find(logical);
         return it == udpPortMap.end() ? logical : it->second;
     }
+
+    // 抗丢包：下行（视频/音频）1+1 冗余发送，可在被控端控制台开关。默认关闭。
+    UdpRedundancy udpRedundancy = UdpRedundancy::Off;
+    uint16_t      udpRedundancyGapMs = 2;   // 副本延迟，0-50 ms
 };
 
 // ---- 运行统计（验收/诊断用）--------------------------------------------------
@@ -125,7 +169,9 @@ struct RelayStats {
     uint64_t tcpBytesDown = 0;       // 对端 -> 本机
     uint64_t udpPacketsUp = 0;
     uint64_t udpPacketsDown = 0;
-    uint64_t udpDropped = 0;         // 隧道未就绪/流表满
+    uint64_t udpDropped = 0;         // 隧道未就绪/流表满/防重放窗口拒绝
+    uint64_t udpRedundantSent = 0;   // 抗丢包：已发出的冗余副本数
+    uint64_t udpDuplicates = 0;      // 抗丢包：收到的重复副本（正常现象，不是错误）
     uint64_t tunnelReconnects = 0;
     bool     tunnelUp = false;
     uint32_t activeTcpStreams = 0;

@@ -377,6 +377,10 @@ try {
         Log '  沿用安装目录里已有的 mslink-host.ini（保留用户改动）'
     }
     $settings = Get-MslinkHostSettings -Root $TargetDir
+    $installUserId = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    foreach ($privateFile in @($targetIni, $LogPath)) {
+        Protect-MiniStreamFile -Path $privateFile -UserId $installUserId
+    }
     Log ("  隧道端口：TCP " + $settings.TcpPort + " / UDP " + $settings.UdpPort + "，目标 Sunshine：" + $settings.Target)
 
     # ---- 3. Sunshine 网页账号 -------------------------------------------
@@ -444,6 +448,7 @@ Sunshine 网页口令：$($webPasswordSaved)
     } else {
         Log '  安装信息.txt 已存在，保留原文件'
     }
+    Protect-MiniStreamFile -Path $infoPath -UserId $installUserId
 
     # ---- 4. 防火墙 -------------------------------------------------------
     Log '[4/6] 配置防火墙（只放行 1 TCP + 1 UDP）…'
@@ -510,9 +515,9 @@ Sunshine 网页口令：$($webPasswordSaved)
     Log '============================================================'
     Log ' 安装完成'
     Log "  安装目录：$TargetDir"
-    Log "  隧道：TCP $($settings.TcpPort) / UDP $($settings.UdpPort)，口令：$($settings.Password)"
+    Log "  隧道：TCP $($settings.TcpPort) / UDP $($settings.UdpPort)，口令不写入日志"
     if ($webPasswordSaved) {
-        Log "  Sunshine 网页：https://localhost:47990  用户名 $WebUser  口令 $webPasswordSaved"
+        Log "  Sunshine 网页：https://localhost:47990  用户名 $WebUser（口令见权限受限的安装信息.txt）"
     } else {
         Log '  Sunshine 网页：https://localhost:47990（账号见首次安装生成的 安装信息.txt）'
     }

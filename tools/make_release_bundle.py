@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--version',default='2.1.2')
+parser.add_argument('--version',required=True)
 parser.add_argument('--moonlight',type=Path)
 parser.add_argument('--forbid-text',action='append',default=[])
 args=parser.parse_args()
@@ -14,6 +14,16 @@ OUT=ROOT/'安装包'/args.version;OUT.mkdir(parents=True,exist_ok=True)
 from sync_docs import sync
 from update_site import sync_dist
 sync()
+version_files=[ROOT/'源码/moonlight-qt/app/version.txt',ROOT/'源码/host-console/host-console.pro',ROOT/'源码/host-console/main.cpp',ROOT/'源码/安装包脚本/MiniStream-Client.iss',ROOT/'源码/安装包脚本/MiniStream-Host.iss']
+for file in version_files:
+    if args.version not in file.read_text(encoding='utf-8-sig'):
+        raise RuntimeError('Version mismatch: '+str(file))
+for left,right in [('源码/moonlight-qt/app','构建环境/mlqt/app'),('源码/mslink','构建环境/mlqt/mslink')]:
+    for file in (ROOT/left).rglob('*'):
+        if file.is_file() and file.suffix in {'.cpp','.h','.qml','.qrc','.svg','.ico','.pro','.txt','.manifest'}:
+            peer=ROOT/right/file.relative_to(ROOT/left)
+            if not peer.is_file() or file.read_bytes()!=peer.read_bytes():
+                raise RuntimeError('Build tree differs from authoritative source: '+str(file))
 bad_token=re.compile(rb'(?:github_pat_[A-Za-z0-9_]{25,}|cfat_[A-Za-z0-9]{20,})')
 def check(data,name):
     if bad_token.search(data) or any(s.encode() in data for s in args.forbid_text):
@@ -75,8 +85,15 @@ for name in ('MiniStream-Client-Setup.exe','MiniStream-Host-Setup.exe'):
     shutil.copy2(ROOT/'构建产物/setup'/name,OUT/name)
 for file in [OUT/'MiniStream-Client-Setup.exe',OUT/'MiniStream-Host-Setup.exe',bundle]:
     data=file.read_bytes();files.append({'name':file.name,'size':len(data),'sha256':sha(data)})
-manifest={'product':'MiniStream','version':args.version,'channel':'stable','created_utc':datetime.now(timezone.utc).isoformat(),'files':files,'sources':refs,'compiler':'MSVC 14.44 x64 / Qt 6.9.3','privacy':'Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.','verification':['CMake/CTest: 2/2','Local address source preservation: 60/60','UDP burst: 100/100','Authenticated forwarding probes recovered to UDP on affected multi-interface host'],'limits':['Clean Win10/Win11 installation and all driver combinations not comprehensively covered','Long-duration cross-network media/input testing remains ongoing','Custom tunnel/key exchange is not an independently audited encrypted VPN'],'package_input_files':inputs}
+test_report=ROOT/'构建产物/release-verification.json'
+if not test_report.is_file():
+    raise RuntimeError('Current release verification report is required: '+str(test_report))
+verification=json.loads(test_report.read_text(encoding='utf-8'))
+if verification.get('version')!=args.version or not verification.get('passed'):
+    raise RuntimeError('Release verification is missing, failed or belongs to another version')
+manifest={'product':'MiniStream','version':args.version,'channel':'stable','created_utc':datetime.now(timezone.utc).isoformat(),'files':files,'sources':refs,'compiler':'MSVC 14.44 x64 / Qt 6.9.3','privacy':'Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.','verification':verification,'limits':['Clean Win10/Win11 installation and all driver combinations not comprehensively covered','Long-duration cross-network media/input testing remains ongoing','Custom tunnel/key exchange is not an independently audited encrypted VPN'],'package_input_files':inputs}
 (OUT/'release-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+(ROOT/'manifest.json').write_bytes((OUT/'release-manifest.json').read_bytes())
 checksum_files=files+[{'name':'release-manifest.json','sha256':sha((OUT/'release-manifest.json').read_bytes())}]
 (OUT/'SHA256SUMS.txt').write_text(''.join(x['sha256']+'  '+x['name']+'\n' for x in checksum_files),encoding='utf-8')
 release={'tag_name':'v'+args.version,'published_at':datetime.now(timezone.utc).isoformat(),'assets':[dict(x,browser_download_url='https://github.com/jianhx189/jianhx-game-stream/releases/download/v'+args.version+'/'+x['name']) for x in files]}

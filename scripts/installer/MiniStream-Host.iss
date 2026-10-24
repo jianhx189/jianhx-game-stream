@@ -1,4 +1,4 @@
-﻿; =============================================================================
+; =============================================================================
 ; MiniStream-Host.iss —— MiniStream 被控端 Inno Setup 安装包
 ; 用 ISCC.exe 编译（本文件必须保存为 UTF-8 带 BOM）
 ; =============================================================================
@@ -8,7 +8,7 @@
 [Setup]
 AppId={{7F2A1C4E-9B3D-4E6A-A1F2-5A1B2C3D4E01}
 AppName=MiniStream 被控端
-AppVersion=2.1.2
+AppVersion=2.1.3
 AppPublisher=jianhx2026
 AppCopyright=Powered by jianhx2026
 ArchitecturesAllowed=x64compatible
@@ -71,6 +71,20 @@ begin
     P := Pos('=', Line);
     if (P > 0) and (CompareText(Trim(Copy(Line, 1, P - 1)), Key) = 0) then begin
       Result := Trim(Copy(Line, P + 1, Length(Line))); exit;
+    end;
+  end;
+end;
+
+function ReadInfoValue(Path, Prefix, Fallback: String): String;
+var Lines: TArrayOfString; I, P: Integer; Line: String;
+begin
+  Result := Fallback;
+  if not LoadStringsFromFile(Path, Lines) then exit;
+  for I := 0 to GetArrayLength(Lines) - 1 do begin
+    Line := Trim(Lines[I]);
+    P := Pos(Prefix, Line);
+    if P = 1 then begin
+      Result := Trim(Copy(Line, Length(Prefix) + 1, Length(Line))); exit;
     end;
   end;
 end;
@@ -344,14 +358,17 @@ begin
       Result := False; exit;
     end;
     Pw := Trim(PortPage.Values[2]);
-    Ok := (Length(Pw) >= 1) and (Length(Pw) <= 64);
+    if FileExists(ExpandConstant('{app}\mslink-host.ini')) then
+      Ok := (Length(Pw) >= 1) and (Length(Pw) <= 64)
+    else
+      Ok := (Length(Pw) >= 12) and (Length(Pw) <= 64);
     if Ok then
       for I := 1 to Length(Pw) do
         if Pos(Pw[I], 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.@-') = 0 then begin
           Ok := False; break;
         end;
     if not Ok then begin
-      MsgBox('口令只支持字母、数字和 _ . @ - ，长度 1-64（不要空格、引号、中文）。', mbError, MB_OK);
+      MsgBox('新安装口令须为 12-64 个字母、数字或 _ . @ -；升级保留的旧口令可暂时不变，建议尽快更换。', mbError, MB_OK);
       Result := False; exit;
     end;
     PortPage.Values[0] := IntToStr(T);
@@ -438,15 +455,12 @@ begin
     exit;
   end;
 
-  { ---- 2. 生成 Sunshine 网页管理口令 ---- }
-  WebPassword := RandPwd(12);
-
+  { ---- 2. Sunshine 网页口令由 install.ps1 生成，避免安装器命令行传递 ---- }
   { ---- 3. 写临时 .ps1 包装脚本（UTF-8 BOM），再执行，避免命令行拼中文/长参数 ---- }
   { 用 & 调用符执行脚本；包装脚本全 ASCII，不写 BOM }
   Ps1 := '& ' + PsQuote(PkgDir + '\_internal\install.ps1') +
     ' -TargetDir ' + PsQuote(ExpandConstant('{app}')) +
     ' -WebUser admin' +
-    ' -WebPassword ' + PsQuote(WebPassword) +
     ' -NoPause' +
     ' -LogPath ' + PsQuote(ExpandConstant('{app}\install.log'));
   if not StartCheck.Checked then
@@ -477,6 +491,8 @@ begin
       MsgBox('无法启动 PowerShell 执行安装脚本。', mbError, MB_OK);
     exit;
   end;
+  DeleteFile(PkgDir + '\_internal\web-credential.txt');
+  DeleteFile(WrapperPath);
   Log('install.ps1 退出码：' + IntToStr(ResultCode));
   if LoadStringFromFile(OutPath, OutText) then
     Log('install.ps1 输出：' + OutText);
@@ -494,12 +510,23 @@ begin
     PortPage.Values[1] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'udp_port', PortPage.Values[1]);
     PortPage.Values[2] := ReadHostSetting(ExpandConstant('{app}\mslink-host.ini'), 'password', PortPage.Values[2]);
   end;
-  if ExistingWebCredentials then WebPassword := '原有管理密码保持不变，请使用原安装信息';
+  if ExistingWebCredentials then
+    WebPassword := '原有管理密码保持不变，请使用原安装信息'
+  else
+    WebPassword := ReadInfoValue(ExpandConstant('{app}\安装信息.txt'), 'Sunshine 网页口令：', '见安装信息.txt');
 
   { ---- 4. 生成 配置指南.html（纯 ASCII + 字符实体，任何系统区域设置下都显示正确） ---- }
   SaveStringToFile(ExpandConstant('{app}\配置指南.html'),
     BuildGuideHtml(LanIp, PortPage.Values[0], PortPage.Values[1],
                    PortPage.Values[2], WebPassword, ExpandConstant('{app}')), False);
+  Ps1 := '. ' + PsQuote(ExpandConstant('{app}\_internal\tunnel-common.ps1')) + #13#10 +
+    '$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name' + #13#10 +
+    'Protect-MiniStreamFile -Path ' + PsQuote(ExpandConstant('{app}\配置指南.html')) + ' -UserId $user' + #13#10;
+  SaveStringToFile(WrapperPath, Ps1, False);
+  Args := '-NoProfile -ExecutionPolicy Bypass -File "' + WrapperPath + '"';
+  if not ShellExec('', PsExe, Args, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+    Log('配置指南的访问权限未能收紧，请手工检查文件 ACL。');
+  DeleteFile(WrapperPath);
 end;
 
 procedure OpenGuide(Sender: TObject);

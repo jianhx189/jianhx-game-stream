@@ -1,0 +1,2736 @@
+{
+  "product": "MiniStream",
+  "version": "2.1.3",
+  "channel": "stable",
+  "created_utc": "2026-10-24T03:56:12.428975+00:00",
+  "files": [
+    {
+      "name": "MiniStream-Client-Setup.exe",
+      "size": 49336648,
+      "sha256": "958f5a86c0714b32bf0b7b88723a525c061709d1e7ede9a9699b0ed564d9ed9d"
+    },
+    {
+      "name": "MiniStream-Host-Setup.exe",
+      "size": 63492283,
+      "sha256": "1cdbcfd8af4f549efe4f170d74fc922d2d3d032ab9efba0041232064dc838fc5"
+    },
+    {
+      "name": "MiniStream-2.1.3-Source.zip",
+      "size": 2763045,
+      "sha256": "17cc4c6c485c50260a504198f1bae61584f3b58223edd7fabbea083da46d6b75"
+    }
+  ],
+  "sources": {
+    "moonlight_commit": "dc92b6d2f361064d3e9e53ce5de92f611db77220",
+    "windows_dependencies": "https://github.com/moonlight-stream/moonlight-qt-deps/releases/tag/v19",
+    "qt": "6.9.3",
+    "sunshine_tag": "v2026.914.233613",
+    "sunshine_commit": "63d35f702ee9e362e43263742981836ec0710384",
+    "sunshine_source": "https://github.com/LizardByte/Sunshine/archive/63d35f702ee9e362e43263742981836ec0710384.tar.gz",
+    "submodules": [
+      " 8d9fefd7b810f2541f78cc7a8ccbd185bc84c7a5 app/SDL_GameControllerDB (remotes/origin/docs-364-g8d9fefd)",
+      " 04053843c90c4268583f2496b997d54d59f03957 moonlight-common-c/moonlight-common-c (heads/master)",
+      " aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1 moonlight-common-c/moonlight-common-c/enet (v1.3.15-118-gaca8784)",
+      " b1e3c22ca0cdc0bb83e3cd6ed1a2fc77869ed99a moonlight-common-c/moonlight-common-c/nanors (b1e3c22)",
+      " 920c097ffa742e2968290f15d4dde6693aec02e5 qmdnsengine/qmdnsengine (0.1.0-82-g920c097)"
+    ]
+  },
+  "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
+  "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
+  "verification": {
+    "version": "2.1.3",
+    "passed": true,
+    "checked_utc": "2026-10-24",
+    "results": [
+      {
+        "name": "mslink CMake Release and CTest",
+        "status": "passed",
+        "evidence": "4/4: udp_reply_source, relay_queue_frame, relay_handshake_integration, relay_selftest"
+      },
+      {
+        "name": "stdin credential startup and command-line inspection",
+        "status": "passed",
+        "evidence": "12/12; host starts and listens with --password-stdin; process command line contains no password; empty stdin and conflicting options rejected"
+      },
+      {
+        "name": "controller credential migration",
+        "status": "passed",
+        "evidence": "Isolated real-code harness: plaintext migration, DPAPI reload, atomic write failure, preserved custom settings"
+      },
+      {
+        "name": "controller and host console builds",
+        "status": "passed",
+        "evidence": "MSVC 14.44 / Qt 6.9.3; Windows file versions 2.1.3.0"
+      },
+      {
+        "name": "isolated application launch",
+        "status": "passed",
+        "evidence": "Client UI Preview starts without reading real configuration; host console renders all three pages and shows dashes without live telemetry"
+      },
+      {
+        "name": "Inno installers",
+        "status": "passed",
+        "evidence": "MiniStream-Client-Setup.exe and MiniStream-Host-Setup.exe compiled successfully"
+      },
+      {
+        "name": "PowerShell 5.1 syntax",
+        "status": "passed",
+        "evidence": "tunnel-common, run-tunnel, start-tunnel and install scripts parsed successfully with UTF-8 BOM"
+      }
+    ],
+    "not_covered": [
+      "Full elevated install.ps1/task/firewall execution; non-admin syntax and ACL helper checks only",
+      "Clean Windows 10/11 installation and uninstall",
+      "All GPU and driver combinations",
+      "High-bitrate weak-network and long-duration WAN media sessions",
+      "Full independent security audit",
+      "Authenticode signing; installers remain unsigned"
+    ]
+  },
+  "limits": [
+    "Clean Win10/Win11 installation and all driver combinations not comprehensively covered",
+    "Long-duration cross-network media/input testing remains ongoing",
+    "Custom tunnel/key exchange is not an independently audited encrypted VPN"
+  ],
+  "package_input_files": {
+    "client": [
+      {
+        "path": "AntiHooking.dll",
+        "size": 47104,
+        "sha256": "b9efae18f0203d7c91ff5a5e6b9ca33fb09e060e5f02aba49fdd5f018f4bfb06"
+      },
+      {
+        "path": "avcodec-63.dll",
+        "size": 5220864,
+        "sha256": "5f165d9a2d4d3957d49455e8b29aeb540639942df9f79064b38df5984a9a6193"
+      },
+      {
+        "path": "avformat-63.dll",
+        "size": 1247744,
+        "sha256": "d9ec2e008c638f256e82c46a8e2ba9b1aa32608c2d9adedd68085968770a7cd4"
+      },
+      {
+        "path": "avutil-61.dll",
+        "size": 2404352,
+        "sha256": "b4d5a0e4e05e4c6faa030706e7f7b6e5406b451e5cbe838d4f315f329e3d2929"
+      },
+      {
+        "path": "concrt140.dll",
+        "size": 324208,
+        "sha256": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376"
+      },
+      {
+        "path": "dav1d.dll",
+        "size": 1978368,
+        "sha256": "0f02acb3c42cc9c57c5567e6e95cf820ffe47bbda6d8adc3f91ee688adea35ac"
+      },
+      {
+        "path": "discord-rpc.dll",
+        "size": 56832,
+        "sha256": "9550343b95df77e91936984171e57ff826d5adf1e2bbc2332a0ced5926e8fe19"
+      },
+      {
+        "path": "dxcompiler.dll",
+        "size": 14316920,
+        "sha256": "b855ee494c60a5dd0638d4574bc4d728c87fac5d415b9be3122058b5adefda77"
+      },
+      {
+        "path": "dxil.dll",
+        "size": 1509744,
+        "sha256": "2ae215743ca9c9c5ccfe4d53856e582c234a300a3186fc987c1d2bbe0738c50a"
+      },
+      {
+        "path": "libcrypto-3-x64.dll",
+        "size": 6971392,
+        "sha256": "9b2341894692e51c1d029dff0b58a28992ccc5c1950c40119d5de470ccd81809"
+      },
+      {
+        "path": "libplacebo-374.dll",
+        "size": 8593408,
+        "sha256": "8400e8e50e44768052d2ba495f9028daa9ef492a8041afd425e203191933d7ca"
+      },
+      {
+        "path": "libssl-3-x64.dll",
+        "size": 1570816,
+        "sha256": "1229e9b198ff4a6bbe1d4e8fb54fff9131a5f0ea42cca01c7145334bf310b7e3"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 35815,
+        "sha256": "53927bd0b739d38c87a0a82236fd9b070c2dfff11c0c119be50372005d5047ad"
+      },
+      {
+        "path": "MiniStream.exe",
+        "size": 3037184,
+        "sha256": "7941fe7027bf222de98d6cf3e4fa7043995861ab66009044bef2b91d7227f144"
+      },
+      {
+        "path": "ministream.ico",
+        "size": 18234,
+        "sha256": "d4b14eedeb75eba0a2de7f6f1981e5109fc717880cdfcb124b47abcc0352009a"
+      },
+      {
+        "path": "msvcp140.dll",
+        "size": 557728,
+        "sha256": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9"
+      },
+      {
+        "path": "msvcp140_1.dll",
+        "size": 35952,
+        "sha256": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d"
+      },
+      {
+        "path": "msvcp140_2.dll",
+        "size": 280200,
+        "sha256": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9"
+      },
+      {
+        "path": "msvcp140_atomic_wait.dll",
+        "size": 50304,
+        "sha256": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479"
+      },
+      {
+        "path": "msvcp140_codecvt_ids.dll",
+        "size": 31872,
+        "sha256": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18"
+      },
+      {
+        "path": "opus.dll",
+        "size": 481792,
+        "sha256": "64d7bacab9a026ee4879ec9bfc8fae2b2a52802aa96ed34d4a240541ec74ad32"
+      },
+      {
+        "path": "Qt6Core.dll",
+        "size": 10023136,
+        "sha256": "b6c6bedca4e798f9a6cfae20946688ab0a0c3dbd7de605951b0ffb7b679e4f53"
+      },
+      {
+        "path": "Qt6Gui.dll",
+        "size": 9497312,
+        "sha256": "569f50c8fde5e3841197e4f44bc4673b330e2f8744391f36f0dccc17fc858f03"
+      },
+      {
+        "path": "Qt6LabsPlatform.dll",
+        "size": 282336,
+        "sha256": "b19e0d943bd144aef31d32e68e7a42d55a75666cd73eede85cd0b281c31f0727"
+      },
+      {
+        "path": "Qt6LabsQmlModels.dll",
+        "size": 162528,
+        "sha256": "994d0ce4597ea9980bde7e9781712c60633323f7348507196a6cb9677aab89bd"
+      },
+      {
+        "path": "Qt6Network.dll",
+        "size": 1735392,
+        "sha256": "dcd4d0951de4f8a7d8609dd2f44cb32cc7fd507c7562b635346df2de6707374b"
+      },
+      {
+        "path": "Qt6OpenGL.dll",
+        "size": 1972960,
+        "sha256": "2dbcc6b28480c186fd0c9f47b1987e85da3487861e1e0e76326b2cb68e183e81"
+      },
+      {
+        "path": "Qt6Qml.dll",
+        "size": 5308128,
+        "sha256": "aa42efbb5fb3d57bbca196f6bf82411b4b8619227328f985241ab4ff03e4591e"
+      },
+      {
+        "path": "Qt6QmlMeta.dll",
+        "size": 152288,
+        "sha256": "3af981d2e637a2f0ce330cefc37ff188657e65f4e513f0a50c14798b3a5a1f62"
+      },
+      {
+        "path": "Qt6QmlModels.dll",
+        "size": 765664,
+        "sha256": "77d606418d6d3e57f54f83eed963f32bd02476b75f1a8ccf0c031566160b0430"
+      },
+      {
+        "path": "Qt6QmlWorkerScript.dll",
+        "size": 77536,
+        "sha256": "a56c80a3baa876cf9713f8ffc694544c44bdc788a37dafaa66e470cbb08a7eb3"
+      },
+      {
+        "path": "Qt6Quick.dll",
+        "size": 6428384,
+        "sha256": "1213d2ff0583399be7b87c0aa8ccc9a7e7d824f3b93f555f58cbecdb82d76d60"
+      },
+      {
+        "path": "Qt6QuickControls2.dll",
+        "size": 100064,
+        "sha256": "211353f2cb5e662d4563e5f4125602f35348e01c7268ff95016a6776abb10b31"
+      },
+      {
+        "path": "Qt6QuickControls2Basic.dll",
+        "size": 1716448,
+        "sha256": "ae4b02e205f2528248390be7d18f3216da277e276ad6241a2b0cfe3efe1bfa01"
+      },
+      {
+        "path": "Qt6QuickControls2BasicStyleImpl.dll",
+        "size": 63200,
+        "sha256": "c5a9981b061fe01bb915bee4dda7f9ab9985370a0ec9509bfbc31031c62a17c9"
+      },
+      {
+        "path": "Qt6QuickControls2FluentWinUI3StyleImpl.dll",
+        "size": 192224,
+        "sha256": "a640ea30005b7b41ab5f6e0115f026b4ad855825c63fddca9ce9afdb33bb14d0"
+      },
+      {
+        "path": "Qt6QuickControls2Fusion.dll",
+        "size": 1458400,
+        "sha256": "956a09dd45724be51f00cfc6b7241a081ba62e1ef838ce055cccfad353ed7f28"
+      },
+      {
+        "path": "Qt6QuickControls2FusionStyleImpl.dll",
+        "size": 177888,
+        "sha256": "e1e8cb837a15c483a175d1d55999d6bd8c5ed950a5fa438fd78bf131e17de463"
+      },
+      {
+        "path": "Qt6QuickControls2ImagineStyleImpl.dll",
+        "size": 51424,
+        "sha256": "087a1badc770a17f832fd5bbd8b3da69d159e225ef47076f0fcddc7e1f2a0e1d"
+      },
+      {
+        "path": "Qt6QuickControls2Impl.dll",
+        "size": 291552,
+        "sha256": "2d109b9a72b0badf64dbff4f3cfd2f266f83651307b3139da6359655a96af7d8"
+      },
+      {
+        "path": "Qt6QuickControls2Material.dll",
+        "size": 1752288,
+        "sha256": "63e83548448ebc065e035d99566a026948f10ddf8e4a01b352878cd8f14f5a18"
+      },
+      {
+        "path": "Qt6QuickControls2MaterialStyleImpl.dll",
+        "size": 297184,
+        "sha256": "4c9d00920342fba7022447ab1a50de6800cbd1b4391a27df93124fac670189b7"
+      },
+      {
+        "path": "Qt6QuickControls2WindowsStyleImpl.dll",
+        "size": 52448,
+        "sha256": "81e81483d99f721038aeddc046ccce324b4a267213c07756ea2ab4cfec5e0dd1"
+      },
+      {
+        "path": "Qt6QuickEffects.dll",
+        "size": 420064,
+        "sha256": "f3725cde4fe20f83a86e57da8fcad7719c8eaa345963ab526b38e119b5df96de"
+      },
+      {
+        "path": "Qt6QuickLayouts.dll",
+        "size": 209120,
+        "sha256": "c196fcbbc158f4310ff6f4a0993b7a01da39fd85b03752c0d871c99818aa3bff"
+      },
+      {
+        "path": "Qt6QuickShapes.dll",
+        "size": 332000,
+        "sha256": "4d265be24f2c88d186a78ce9387c936f4076da205a2a92f535fd45b9782a9241"
+      },
+      {
+        "path": "Qt6QuickTemplates2.dll",
+        "size": 1947872,
+        "sha256": "e6f559bf7b2a3307bd29e3091ef6281761d1260222d3aa08a9970381790cad48"
+      },
+      {
+        "path": "Qt6Svg.dll",
+        "size": 607968,
+        "sha256": "da0da4afa90789bf7f7dcc61f745308b3e02af7afb74269fc2b1ac771b1f93a3"
+      },
+      {
+        "path": "Qt6Widgets.dll",
+        "size": 6540512,
+        "sha256": "36cfd5321d60623047f51bc9ce34333e1d090aca7a23b45e6c8a79f92d6a1aa6"
+      },
+      {
+        "path": "SDL2.dll",
+        "size": 340480,
+        "sha256": "b5064d6a4c4826419ff2a5e271bf17be4e33f82d1ed59f7191cf358fe5bfcda0"
+      },
+      {
+        "path": "SDL2_ttf.dll",
+        "size": 777728,
+        "sha256": "6a30e6949d6abf75d5322355be28a890a54c1ec48f2d490d0a090365b8ae982d"
+      },
+      {
+        "path": "SDL3.dll",
+        "size": 3185664,
+        "sha256": "adb5717f9159c68f48ee7fed86d5d744eca0857b3a20a085794d193cf4335ae8"
+      },
+      {
+        "path": "swscale-10.dll",
+        "size": 2548224,
+        "sha256": "fdf102ef3976b1e01ca2f7a1ea7cf8387cc1f92a920c2e777569462d9a4c99ee"
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES.txt",
+        "size": 2492,
+        "sha256": "52b5d6a0be8271813217fcffc96691def04d1c2fe2c82b0740d6543c6782cbe6"
+      },
+      {
+        "path": "vccorlib140.dll",
+        "size": 352384,
+        "sha256": "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd"
+      },
+      {
+        "path": "vcruntime140.dll",
+        "size": 124544,
+        "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+      },
+      {
+        "path": "vcruntime140_1.dll",
+        "size": 49792,
+        "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+      },
+      {
+        "path": "vcruntime140_threads.dll",
+        "size": 38528,
+        "sha256": "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa"
+      },
+      {
+        "path": "generic/qtuiotouchplugin.dll",
+        "size": 103136,
+        "sha256": "6e9784408b75adc57a28527e6ebc24baada0e90fb5bf4946ccb9798bd8784057"
+      },
+      {
+        "path": "imageformats/qgif.dll",
+        "size": 48352,
+        "sha256": "cee83c066006c46f8dee16f33e524bac12f166ac667f4a86956473e8e207d68b"
+      },
+      {
+        "path": "imageformats/qico.dll",
+        "size": 46816,
+        "sha256": "82afc4eb27771e452a39fdc896bc638a138a0afb820d1b813b36cabba48c178d"
+      },
+      {
+        "path": "imageformats/qjpeg.dll",
+        "size": 576736,
+        "sha256": "43ca4ed440f9f03e79f75fd76905e3350ec4008650d02d7041fdd2ac4043dfd2"
+      },
+      {
+        "path": "imageformats/qsvg.dll",
+        "size": 39648,
+        "sha256": "f613467380c982c166f573ce7e0a35243ef49a4ae253dcfa07e0f781d8f73bbe"
+      },
+      {
+        "path": "networkinformation/qnetworklistmanager.dll",
+        "size": 71904,
+        "sha256": "9a00977c2406a0cacfd25e24e9f32d7d2721a8e125f7576def00307a5850d067"
+      },
+      {
+        "path": "platforms/qwindows.dll",
+        "size": 925920,
+        "sha256": "133983755958a0f4d955b4a6f3712a014ac62351ec5edd3c32b802094f66ac96"
+      },
+      {
+        "path": "tls/qcertonlybackend.dll",
+        "size": 103136,
+        "sha256": "9f03bd4a3fb9779439bbea7b151fbbadf556541e56a7493481a5140625c4da7f"
+      },
+      {
+        "path": "tls/qschannelbackend.dll",
+        "size": 259296,
+        "sha256": "33d5b218ffbe581742fd07dd2da5b7394b66f41161235e785642bbcb2b5834e2"
+      },
+      {
+        "path": "qml/QML/plugins.qmltypes",
+        "size": 144909,
+        "sha256": "017a8c2737c1b12cc0668d514ea2c398dc50bf0364f31441495f2b25f452b3c1"
+      },
+      {
+        "path": "qml/QML/qmldir",
+        "size": 114,
+        "sha256": "0ba0b60157111b988cc583b73ceb445a2d0c8633179513e284ede7a2794bce70"
+      },
+      {
+        "path": "qml/QtQml/plugins.qmltypes",
+        "size": 6205,
+        "sha256": "ac842bb44683610354ba7cc3ced60b9424e3d6a16d0174a2c900e4b9cef2d247"
+      },
+      {
+        "path": "qml/QtQml/qmldir",
+        "size": 253,
+        "sha256": "4487f30737a083fa69c5b9d408fc29856908cb50956a0652db50c47b9683a289"
+      },
+      {
+        "path": "qml/QtQml/qmlplugin.dll",
+        "size": 31456,
+        "sha256": "013d3dd4b8c0a92dc5b433f840c9e199841be48c93b846e070ab344c0d6c2ef4"
+      },
+      {
+        "path": "qml/QtQuick/plugins.qmltypes",
+        "size": 556221,
+        "sha256": "69ed90d6320cd299d34366836383254cd7d297c8f7605250446219da536c7c82"
+      },
+      {
+        "path": "qml/QtQuick/qmldir",
+        "size": 215,
+        "sha256": "137c386f9b2ba49fb3a3417b55096f6f1bd15a794a98613a862b490a6fe4fa79"
+      },
+      {
+        "path": "qml/QtQuick/qtquick2plugin.dll",
+        "size": 31456,
+        "sha256": "3e615f0f7fe85ce6e47a8c8e4dc7110a2d99ea7f641a5a4fa11f21c33975af21"
+      },
+      {
+        "path": "qml/Qt/labs/platform/labsplatformplugin.dll",
+        "size": 31456,
+        "sha256": "a52a823781018a44939ee130c481d30938661c78a522fe73e81bd351d9b711ba"
+      },
+      {
+        "path": "qml/Qt/labs/platform/plugins.qmltypes",
+        "size": 39346,
+        "sha256": "6469400b5f74e111f7c7ebaf4922a1e61609db2361b6ed39b36a2e99ac660f79"
+      },
+      {
+        "path": "qml/Qt/labs/platform/qmldir",
+        "size": 270,
+        "sha256": "ac81d315147544c1467c53711b67171a70cf6f83f55bb8399188407b7db97c1e"
+      },
+      {
+        "path": "qml/QtQml/Models/modelsplugin.dll",
+        "size": 31456,
+        "sha256": "53e839330b50cb47e293155216c2c215ff4ca0db244f43f9308a39b8553bd06c"
+      },
+      {
+        "path": "qml/QtQml/Models/plugins.qmltypes",
+        "size": 55534,
+        "sha256": "2a3b040a50176f88362c6781b3eeb271c498231a6acb063992e66001441a6b51"
+      },
+      {
+        "path": "qml/QtQml/Models/qmldir",
+        "size": 222,
+        "sha256": "313cec98e20382271b7627998f3afba3cbb1c69bc05204728406517000db0247"
+      },
+      {
+        "path": "qml/QtQml/WorkerScript/plugins.qmltypes",
+        "size": 1358,
+        "sha256": "520febb8b3efd6a08ca58620a3406ec8e59b186e855af2508cdd905a38d97e77"
+      },
+      {
+        "path": "qml/QtQml/WorkerScript/qmldir",
+        "size": 252,
+        "sha256": "7e930397861106a9a5931f5448f76b3e981c0bc0c150a1e7bc6fbe6a049f9ed8"
+      },
+      {
+        "path": "qml/QtQml/WorkerScript/workerscriptplugin.dll",
+        "size": 31456,
+        "sha256": "4fab32bc679eb6a4254321775aa5834fac8a9e7e7218e8ac5c30a792a625854b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/plugins.qmltypes",
+        "size": 215,
+        "sha256": "a96c7bf5832767bdc9d91e2290a3920aec3abfbf2e3814bce38b49483f16f84a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/qmldir",
+        "size": 667,
+        "sha256": "5919bda2e85c7312b3091e368e42fb75e29a2a8ccfcb6a529575c85b0693d79e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/qtquickcontrols2plugin.dll",
+        "size": 41696,
+        "sha256": "d79d6039a546c99e49e5bc733dd89bcc71fddfa9004611f52ababdb93f5e8ba0"
+      },
+      {
+        "path": "qml/QtQuick/Layouts/plugins.qmltypes",
+        "size": 20303,
+        "sha256": "59f413c264c612c7e10df5c7f8c13b0f02c83774b0f29c9a82cbe6ea0660d5f9"
+      },
+      {
+        "path": "qml/QtQuick/Layouts/qmldir",
+        "size": 250,
+        "sha256": "be7bc0d0defd3037fd4493987ade323210f191bad527255eb32d1df15b1b8edf"
+      },
+      {
+        "path": "qml/QtQuick/Layouts/qquicklayoutsplugin.dll",
+        "size": 31456,
+        "sha256": "5c8c06b787fe9901c3cdf6d47b5418ac9365cd25dfa08c8014d635e3326d65f9"
+      },
+      {
+        "path": "qml/QtQuick/Shapes/plugins.qmltypes",
+        "size": 16532,
+        "sha256": "04cf5fc3da1bbdbca18d14284ab42049c5da1d430714fa8eeac0670997363105"
+      },
+      {
+        "path": "qml/QtQuick/Shapes/qmldir",
+        "size": 207,
+        "sha256": "de2dab12c07574207db93315ebf5bd6ec6656d1aa506df756328f73342b2a7f9"
+      },
+      {
+        "path": "qml/QtQuick/Shapes/qmlshapesplugin.dll",
+        "size": 31456,
+        "sha256": "7f68d5dafafca0b1268f3334df89e7f596ffb8c1854f015c8cdcbf6a47c88437"
+      },
+      {
+        "path": "qml/QtQuick/Templates/plugins.qmltypes",
+        "size": 260008,
+        "sha256": "a7434eb058c9eb5e550ad3ecef03aed199db8397ebe21c42ca3d77bc5da42359"
+      },
+      {
+        "path": "qml/QtQuick/Templates/qmldir",
+        "size": 254,
+        "sha256": "acb0a8aebbcc9f8c4af567294f599aeed625cf378e790fba4fd024b10391be17"
+      },
+      {
+        "path": "qml/QtQuick/Templates/qtquicktemplates2plugin.dll",
+        "size": 31968,
+        "sha256": "10b5116777795d6c9e5c2d4591300412cbc40574dd6d030df7ba2b0e048b51a0"
+      },
+      {
+        "path": "qml/QtQuick/Window/qmldir",
+        "size": 213,
+        "sha256": "cf518c3574e25f91acaec7ad8831e28c18fccfe15411672ea56809b2eb94077c"
+      },
+      {
+        "path": "qml/QtQuick/Window/quickwindow.qmltypes",
+        "size": 215,
+        "sha256": "a96c7bf5832767bdc9d91e2290a3920aec3abfbf2e3814bce38b49483f16f84a"
+      },
+      {
+        "path": "qml/QtQuick/Window/quickwindowplugin.dll",
+        "size": 32480,
+        "sha256": "7e849409f7b9ee430dcc05a9b5ff564b6085486739cf9f9f47464bebeed7e63b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/AbstractButton.qml",
+        "size": 561,
+        "sha256": "5f25819786382927d780a6b5a2b7c03a32c61178e5414f488f7e1a3905491412"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Action.qml",
+        "size": 211,
+        "sha256": "b458b122b7f11edf54c2be5452c501590ce78143faf4de2d1c5b0d651adaedc4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ActionGroup.qml",
+        "size": 216,
+        "sha256": "df3d6ec96ad33d36f7e1d651457a1ea6a49f687e7af47868f9546482b346c48e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ApplicationWindow.qml",
+        "size": 305,
+        "sha256": "85842243642b31825032ead6fdf922d704b51bd7e6bd3f5742126460f04dc8c6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/BusyIndicator.qml",
+        "size": 934,
+        "sha256": "ea5f95ace79cda59b8a9b53aa90b9043c98a4c620297961def0cc4f94b1674dd"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Button.qml",
+        "size": 1927,
+        "sha256": "85faa6d482a67cf9394de727abae8bcf4c717a37c02c266b17aae8deeee8ffce"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ButtonGroup.qml",
+        "size": 216,
+        "sha256": "e7335aae72f3b5ab7482e3c230595ce9e5faf2689af37c29e60087ea98283b06"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Calendar.qml",
+        "size": 216,
+        "sha256": "612e8507f9de54fe3abfaf71622c763054b6a7abaec9a8bf1bdccdb8f67e232d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/CalendarModel.qml",
+        "size": 201,
+        "sha256": "f5603ffac82dc59d74a8c89015ef2ea141c300beca1b95cfedcdaffbdf0877fa"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/CheckBox.qml",
+        "size": 2356,
+        "sha256": "82f34e380c06238cc94c7592dce6e17f917900a3c9b0c4020e6d29d8c5d940b3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/CheckDelegate.qml",
+        "size": 2812,
+        "sha256": "3aab407e474467e53c2f457a85da4da80b5567aa9bc284e1d60ca48124ebf29c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ComboBox.qml",
+        "size": 4263,
+        "sha256": "4efe0c51ac943be70ad87c2917c41498aec29def1a04fe5ceadbf33041165346"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Container.qml",
+        "size": 556,
+        "sha256": "d2da8eec749fdac41ea8dda13edc3c62c9b3dfc2bae192468a8592d1f9ab0df9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Control.qml",
+        "size": 554,
+        "sha256": "127501b4b0385f6d31fc19130bb9d94249c610df36ad5d943ef29a135d189dde"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/DayOfWeekRow.qml",
+        "size": 1126,
+        "sha256": "642a3042db9249944da27bacddb76d88f0fc2f357f89169c2bba5883ed82bc09"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/DelayButton.qml",
+        "size": 2493,
+        "sha256": "fca6af9de0b6976d732f203767bcf4475dabf3ecdb89863349a51f0412a5c5f0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Dial.qml",
+        "size": 1928,
+        "sha256": "6bf3feb7961f14fe5972131e06fe066766ea2a40a6dfc86565c90bd6500be075"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Dialog.qml",
+        "size": 1694,
+        "sha256": "ac8c32f5b0f8ad5960ca9b546f5f2702cf931238dddd47aa9897a593c082bb5e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/DialogButtonBox.qml",
+        "size": 1341,
+        "sha256": "6c7e55279effd43c85f63fa9331d22c20d21e5815f143ab37c15d9fdba4d6649"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Drawer.qml",
+        "size": 1753,
+        "sha256": "985a0b05c77905f47e6ba0c947dfab6a6b0228a54616089c6e289a2521f2b210"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Frame.qml",
+        "size": 712,
+        "sha256": "cfde087189fc2b5d0cf44dec4f09127fec927421c288383e9968f9d200819ee6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/GroupBox.qml",
+        "size": 1338,
+        "sha256": "423451204d384b7126ea3afdae3659219b1d228460fa730cde9bda4dab64d5d4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/HorizontalHeaderView.qml",
+        "size": 1515,
+        "sha256": "a20e12d2e657e69060ec6b823bd111c4689e45553be5bdea2c492fe6f0200499"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ItemDelegate.qml",
+        "size": 1617,
+        "sha256": "214aa637fd80ebbe65c9b695047093e5e07dcc96da93d469deffc25b4741ce0b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Label.qml",
+        "size": 336,
+        "sha256": "b9d39a0b40f5cb60161517ee58a5305d68d26e147685a3dbb5b12e622945dce7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Menu.qml",
+        "size": 1438,
+        "sha256": "00c7a49e6a50c4e5a6e8fc98d392acc30de83483dd47486ef8d619ab6750a716"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/MenuBar.qml",
+        "size": 1027,
+        "sha256": "54797b5488ed7456d05cbf8301ca778621892b3b0af9cb8ad63a5996effbad03"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/MenuBarItem.qml",
+        "size": 1324,
+        "sha256": "94113232b1dc2d3c961d757c82339ca7cd486933bd9b8cbc1054effe0f3c5f46"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/MenuItem.qml",
+        "size": 2717,
+        "sha256": "c9b1e22f238bf97a400faac8bba6706a7357726a4f2c8f8fb244c075e6328881"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/MenuSeparator.qml",
+        "size": 772,
+        "sha256": "eacc98fffc00abab53ba267d66560b45b062f0c3f4ccfdb345cdbc0e3c471936"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/MonthGrid.qml",
+        "size": 1193,
+        "sha256": "43a4472b431cffba430eff9f768594ad8e14cc5996916412737c7ff701581894"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Page.qml",
+        "size": 950,
+        "sha256": "28fb312ef9c7e14deec164577679fdc79aaa3c3ceb870bfa4dab29db73f4c652"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/PageIndicator.qml",
+        "size": 1142,
+        "sha256": "978bdc7bd76df7f7fe3b42adb489543d08cb30ddaa827416ddccf5ee966e5b88"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Pane.qml",
+        "size": 677,
+        "sha256": "3298dff606702e5c5ff2d10c6e7ec809c60a634c2b66c36f1553e9076660594c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/plugins.qmltypes",
+        "size": 13700,
+        "sha256": "47a1e4149b71610f79c633c1ed17ad374541244cf79a956a9d0eaab56a1bf2db"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Popup.qml",
+        "size": 938,
+        "sha256": "e43023866cb468757a598177d04ec4b3097323e2f763e982beba305b2c2e549e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ProgressBar.qml",
+        "size": 1071,
+        "sha256": "988b5563ba4db763cbf33cf8037b6528f4d7817bda0655ced468bb7cd268c3f1"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/qmldir",
+        "size": 4107,
+        "sha256": "dc9cd336d78fe9af54f1dbee3fcbccb86f2a9393b088afc169614b2626ac2f5c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/qtquickcontrols2basicstyleplugin.dll",
+        "size": 32480,
+        "sha256": "fea9c3f25c3ab78719548f38c77afd428a3431f009fd044cc527283b626b62b7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/RadioButton.qml",
+        "size": 2043,
+        "sha256": "8c4700f6f454730fe19f072c6f921ac5f1ccc3e04f5c24cc08cbdf18c780668e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/RadioDelegate.qml",
+        "size": 2499,
+        "sha256": "9a9d794d56af96a21361fb29c98ad775ac618598ef8f3a83903000c7e2261ad9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/RangeSlider.qml",
+        "size": 3335,
+        "sha256": "bdbead55f5a49eddd6c61d7749d361dcc5a1e07aa4b4b53159fd79f71b8cc0b7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/RoundButton.qml",
+        "size": 1963,
+        "sha256": "dfd0aa2e498e8d12d9a5093bf9627b103bbe6e7aff231e5450a3df2167606f7a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ScrollBar.qml",
+        "size": 1533,
+        "sha256": "f199cf86d387cea7009aaa11f2e6367c0b33f84d0111f4bb5ea5af843833423d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ScrollIndicator.qml",
+        "size": 1302,
+        "sha256": "cfb20b93a3558ddede35fe3c9fedc7d17039e28ab8dfd2c4244b563f97b094e0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ScrollView.qml",
+        "size": 1071,
+        "sha256": "78356a078eb1c0d3ca46e83e2aaae2fe02845f213cd6e4c46dfa1e151cf2d276"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SelectionRectangle.qml",
+        "size": 815,
+        "sha256": "29c1329550838c46adb7cc3683ae2968db3fa67c146847f63dd778429795daae"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Slider.qml",
+        "size": 2253,
+        "sha256": "2af56aafda0a9575cd651668918f816b42a5ef66485a4edd9f5dd9c728905cc0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SpinBox.qml",
+        "size": 3504,
+        "sha256": "eb01ac7454d58bc81baa0cad22442e574e32118205c88ac8d0efc5d4876219d4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SplitView.qml",
+        "size": 935,
+        "sha256": "5d9570da4f3c81bfa6d6b84970deabbceec30773372b3dae52b89a5b4a3975c6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/StackView.qml",
+        "size": 1214,
+        "sha256": "98a088aa1b04dabdd010922be24691f9a36a9416edc1b897c40bd32e38f010c9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SwipeDelegate.qml",
+        "size": 1592,
+        "sha256": "791e31c6ef1e86c1187bc11ab88ba25f6ecafcb132f1d2e7a3f1a893d8f74abb"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SwipeView.qml",
+        "size": 1172,
+        "sha256": "b992594d41a79afec3f40eb253701029e841273a7c69f510d555d9378e0ecee3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Switch.qml",
+        "size": 2277,
+        "sha256": "9920acf5932bd16003fcaab07850ab3594d3e9e6f1ef764d8ac992bd861a3755"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/SwitchDelegate.qml",
+        "size": 2819,
+        "sha256": "eab165c82b3b39c92f008de7dc27e40365d20d0ce384a3440613d3cff89d7eb9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TabBar.qml",
+        "size": 1154,
+        "sha256": "8fbcf176c1f4daf4ca4e9a8b00fba8d7ac441e05e4e275d24c472b19208bbc49"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TabButton.qml",
+        "size": 1317,
+        "sha256": "c16e3ae3c4bb05fba3bc8ae55cfc272dcf0145afd0b6e0995d456b2bcfe0f20b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TableViewDelegate.qml",
+        "size": 3261,
+        "sha256": "34ba25f414983132fdbbbbc8dce9aa7d41593989b8debdaa2a9570dfff4996af"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TextArea.qml",
+        "size": 1637,
+        "sha256": "087a43001e0d64235219347849515a5712fa9d95d90d93a4ae781cb281a136c3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TextField.qml",
+        "size": 1895,
+        "sha256": "8cc91bcebda17c5a6079d05e5de45670eb494a68b1422d1e403f50cff02836b7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ToolBar.qml",
+        "size": 855,
+        "sha256": "14ae9903513b69c62627bd3e1cb0acb1f611e19aee409297887659597a6233e3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ToolButton.qml",
+        "size": 1328,
+        "sha256": "4a0acfa77d931f042b736c2104e84a26437cbef6b355608faabc93104b8fda8e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ToolSeparator.qml",
+        "size": 838,
+        "sha256": "506775120cefee574ccd79596b5cea40c9cb61b65914eb0d07beeca0d3f32d80"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/ToolTip.qml",
+        "size": 1109,
+        "sha256": "5dbdb5032d6d830e00454ad6c448dba9499c51e1130295ceedd2a67fb0b12799"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/TreeViewDelegate.qml",
+        "size": 4061,
+        "sha256": "1484ee0152420f67e0535ecd0f31720da46cc9baec3b57f629155b0e64401a05"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/Tumbler.qml",
+        "size": 1803,
+        "sha256": "226db2e956bf71d99c1848e48c45867f4500368c2306ff10e8287492a062b917"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/VerticalHeaderView.qml",
+        "size": 1506,
+        "sha256": "1e8b6ac222f9b63a397b410f3a0c81ed67144a2f73ec00e12ecbc433ea76205e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/WeekNumberColumn.qml",
+        "size": 1132,
+        "sha256": "41d1b700e9c24d941c7ec7936f40cc467c0b1e2f481938f09bfdceb3905d624c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ApplicationWindow.qml",
+        "size": 367,
+        "sha256": "33e1319df6998bdf1f54b22a0d9a76cf995f92c29db7beebab6d862610fba6ae"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/BusyIndicator.qml",
+        "size": 1192,
+        "sha256": "fceeb43589c66acdf27627849d802603c15b2c58d13eb3da0f5cf109fd82c880"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Button.qml",
+        "size": 1282,
+        "sha256": "9c610d137c3eb12d307edbdbb3f94f366e85bdaadcd63356e248b9e18b0cc0e6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/CheckBox.qml",
+        "size": 1572,
+        "sha256": "a4e7e1588f6d6587e71b811ba5ecd9d9ccbf61ce9836c312a073be1e59c09256"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/CheckDelegate.qml",
+        "size": 1996,
+        "sha256": "5e3cd849a8f7cc487e0000088df7d4bfbebb13748bdb475483da6017c1aa0bbf"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ComboBox.qml",
+        "size": 5064,
+        "sha256": "5fa95a2a939e4c6293c6a82ec7afdf3367db0b30bf73a7e64ef8c54f9ec6a066"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/DelayButton.qml",
+        "size": 2873,
+        "sha256": "87282871918d33a1f979c1e15fab1f2542aef90901e1f11f3742655d906b05fb"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Dial.qml",
+        "size": 1500,
+        "sha256": "20106ec6d2dc0dd8cf961245d5a7195e49d00bd1db821a99eb3644514ccac5bc"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Dialog.qml",
+        "size": 1978,
+        "sha256": "8e1d47e35348f79e4958a572397ae04db33b393a481f48376e92dd236e4e4926"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/DialogButtonBox.qml",
+        "size": 1240,
+        "sha256": "1272dd67c9366f282d76dbc0fe2c1786ecce55d7b57f959df253a34922b482c8"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Drawer.qml",
+        "size": 2115,
+        "sha256": "50d18e848581f4ae00e76c6d3934a22db15bee41e0b12d8a42ca6070a4138ab2"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Frame.qml",
+        "size": 810,
+        "sha256": "4190062ee286905d99ffea7e3773cc3d85e15e61602c9fe6212f2a2170e40470"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/GroupBox.qml",
+        "size": 1477,
+        "sha256": "697ebff3a5074ac782229804a663d21233cd5df773ad6409ce6b0ecf81380f84"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/HorizontalHeaderView.qml",
+        "size": 1817,
+        "sha256": "7582ce3317ebcd36752f2531d2427630c7f44b685792c5de0e05918174086512"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ItemDelegate.qml",
+        "size": 1577,
+        "sha256": "b292fd7c256acc8b18fd3ea43d842ce8185323cf984ae92a065416a5baa7c143"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Label.qml",
+        "size": 405,
+        "sha256": "3e35c2074a073dcf700c404bfb2b5779bca4bf95a7bb280a9586fb555c73bdd3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Menu.qml",
+        "size": 1710,
+        "sha256": "19b3c8f984618305400c71472577a72c82b9d38b7f26aa989553d8ce5cd94e33"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/MenuBar.qml",
+        "size": 1401,
+        "sha256": "a874aacb47d2f406247df6540872d874327da8c3e244a560b3d62ee7b0609d45"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/MenuBarItem.qml",
+        "size": 1396,
+        "sha256": "4e55352728aea6bfac5ca6694516d35e13ee5622b9db2447f63df43a50f3bae6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/MenuItem.qml",
+        "size": 2630,
+        "sha256": "0a4ffdd92b8919b28b78c54337ac8eae68312c04a80d381bbe86c199af8e6f49"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/MenuSeparator.qml",
+        "size": 846,
+        "sha256": "ae59964c358d71ff245797e29aa1090d9a2646619035d1593b659f497a6dc65f"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Page.qml",
+        "size": 1019,
+        "sha256": "8f5af4c2f03fb1fc6ed0c5caadb40c66b61ed8cd11f61d1faeaa1ecdd6cd6502"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/PageIndicator.qml",
+        "size": 1206,
+        "sha256": "7c774e6f607f2d1599eebe6d568ec4ca54506db4cd41f6dbbbbc4e58c9c2989b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Pane.qml",
+        "size": 745,
+        "sha256": "9f1dabd011b110d3b9c373f6c92caba3b37f6a9890ffedc46f82dde2c3289552"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/plugins.qmltypes",
+        "size": 5174,
+        "sha256": "dafa478869532ac4728ec08f96ac0d0627e0954cc21155bcd9a006699eff39cb"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Popup.qml",
+        "size": 963,
+        "sha256": "d788ebde7e64c34703dc5462cb9e14b2bd806daaa7ad47060c1938ba8f6647de"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ProgressBar.qml",
+        "size": 2763,
+        "sha256": "afe94d0aef4bb67ceca52c639e566cf05ba7361ae83447a4daee9b00087fb5ed"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/qmldir",
+        "size": 3457,
+        "sha256": "846118ebce9bf3f1de7ab5e0756dc3ef1bc07f04095fe63eb97bb0f158d64218"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/qtquickcontrols2fusionstyleplugin.dll",
+        "size": 32480,
+        "sha256": "0876e1038daa2c5b97c3318316c16bc0ec99e19af13b177deb727d2585e8e7ae"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/RadioButton.qml",
+        "size": 1522,
+        "sha256": "8880057a98d05df877e6b34673a5914019147e4ea3d87a241e325966714bcaae"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/RadioDelegate.qml",
+        "size": 1996,
+        "sha256": "3dac808b1fc435a4053c48f02a3f2721fe4150daa9d159d3222ad8bdc03fcc0d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/RangeSlider.qml",
+        "size": 2175,
+        "sha256": "bf6cd106d66fe0d076f6ef4886cd953ad257243ff4e2bb052f7f27ce57c3f7f0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/RoundButton.qml",
+        "size": 2478,
+        "sha256": "869f8e6b54746e3ab1f603c1ae2fb6d500ab1c90ff7ba15d0874166326a0e2ce"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ScrollBar.qml",
+        "size": 1602,
+        "sha256": "b8576428b79dffcd20bfc680fb2b55a02a30b6e9b8e4ed7a51041e90f7caaac0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ScrollIndicator.qml",
+        "size": 1371,
+        "sha256": "f871b598c1ae0995b0121be36153af771d65e4e6ed8d7f543acefa74717f7b7a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ScrollView.qml",
+        "size": 1071,
+        "sha256": "d9213c84b8b2aac429181119efc1a9f867646abd8d3d40d740b0540709c5b450"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/SelectionRectangle.qml",
+        "size": 966,
+        "sha256": "62ee10921745a6b8e486809ff112506090b5dc7e89c7c00981dad622023b5e19"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Slider.qml",
+        "size": 1351,
+        "sha256": "17d5b3b7b05a7c2aafac4552fc5c73c60e437cd03beedf2175f275d1b9e60250"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/SpinBox.qml",
+        "size": 5132,
+        "sha256": "e056e7a455fa6f9d15e4b037cb8cc71f90dcc388e53e2c279eb0475be82918f7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/SplitView.qml",
+        "size": 976,
+        "sha256": "167c3f33ad52d84b498aa76488954f212fe3be323db6cb6469e35c05440fef1e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/SwipeDelegate.qml",
+        "size": 1684,
+        "sha256": "92424e8ac0662886a3d2aeeea5eb020ed79af2a0ffc3991cde77680ee587f59d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Switch.qml",
+        "size": 1512,
+        "sha256": "1da9e3b8adf87f63b2bc40c16b44ac7238242e47b024212dc91fbbea6f5451dc"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/SwitchDelegate.qml",
+        "size": 2074,
+        "sha256": "eebb3fc095b04ddf21f7ae80e2449781d7ef808f729c541f19a1604108e8d504"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/TabBar.qml",
+        "size": 1457,
+        "sha256": "2c86c2b8b5b8c77e02d5a61bad25898f32b19a6a9a7bb1ca4c67a415f7712dca"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/TabButton.qml",
+        "size": 2184,
+        "sha256": "bb09b0a26de48e97d038603aae13d1534ec366aaf63628012972a8853e1210de"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/TextArea.qml",
+        "size": 1748,
+        "sha256": "9fa4588fea4c3f2312f500a72f57d04f1a17740ba68959d22dda331e62380d2e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/TextField.qml",
+        "size": 1733,
+        "sha256": "29351ab668c4ab11b464db83778dba5c79307bb2f3e8c084a9ae0541e832fd2c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ToolBar.qml",
+        "size": 1725,
+        "sha256": "f7ba9c421fc092933cd04bfa624d0b83ed4352823571e2d7531d5d78ce891567"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ToolButton.qml",
+        "size": 1269,
+        "sha256": "02b204b8605620f49a05ad54350abe0ee2368d5d75d2bc41cb4c268092f7b124"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ToolSeparator.qml",
+        "size": 1093,
+        "sha256": "592f1d4a4ddf61d25310bdebe33c80373e6cedfbfa86c02fb31a5d42810975c3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/ToolTip.qml",
+        "size": 1399,
+        "sha256": "146a13a880beaacb0750ddf80d4ef1a392dfa57d3b46f0cc0b23a217679126a3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/TreeViewDelegate.qml",
+        "size": 3958,
+        "sha256": "a6d5a6760729b68c443639c823bbf7498b5a52d1568a818b92182de6a33f9379"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/Tumbler.qml",
+        "size": 1653,
+        "sha256": "354924d68d2451f5fb488f366a0e17e97e0320eceb5ad75a3061d326522fe4bc"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/VerticalHeaderView.qml",
+        "size": 1776,
+        "sha256": "fa0df04f90c915f1b3a0db7da69610f6dc027a54e5569e08b51330177356c8d1"
+      },
+      {
+        "path": "qml/QtQuick/Controls/impl/plugins.qmltypes",
+        "size": 45243,
+        "sha256": "56bb810234fe58b911cf1819a776356554914bc68384b34e28fc1219a9ca1381"
+      },
+      {
+        "path": "qml/QtQuick/Controls/impl/qmldir",
+        "size": 312,
+        "sha256": "bd12109174c6e0d6dde0f3a94cc91368eda41efaecd8adc5b5a00dc167e7cb75"
+      },
+      {
+        "path": "qml/QtQuick/Controls/impl/qtquickcontrols2implplugin.dll",
+        "size": 31456,
+        "sha256": "7e03b7b5f5008c14ab09fbeab187658fdd0a9202d802e8878c29110240ffb058"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ApplicationWindow.qml",
+        "size": 335,
+        "sha256": "4ef85be2cb13539bcf0d1a56c93063c4d6498a58394e3e9030029ab70206436d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/BusyIndicator.qml",
+        "size": 995,
+        "sha256": "01eddbf63950d459c086aeb39593da7554b183f23121e043e52b26e096997720"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Button.qml",
+        "size": 3443,
+        "sha256": "cd6ebb42987ff33fafe963c8f98360e1d6ea4a8d2038d39d77680aa18e09cd0b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/CheckBox.qml",
+        "size": 2019,
+        "sha256": "a57724ff019008e441c7bbaa311b7d1aa70045f890a37f329513569af9c1e790"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/CheckDelegate.qml",
+        "size": 2398,
+        "sha256": "f6a78026b95824cff6c0855b2295c293cabd172851369b0696da0995dcff25e0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ComboBox.qml",
+        "size": 5022,
+        "sha256": "ef7c303d74c0a4f74c6e56c1f82765e4be660bf7d8037d3a25c3b0dc82a3daf6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/DelayButton.qml",
+        "size": 2906,
+        "sha256": "581f671f9e989827aab708b11e12e473d2cc25863199a39515de04d1997e1d12"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Dial.qml",
+        "size": 1887,
+        "sha256": "5677453fcf47ee199d273a38f0fc280f42f814d52b4b4f4c7cb0315ffb82aaa6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Dialog.qml",
+        "size": 3522,
+        "sha256": "4ae1e89f67b6d661149e7f77c3fc70d3cf7f076fa629222e04c0ea4f5fe39527"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/DialogButtonBox.qml",
+        "size": 1671,
+        "sha256": "02bfad26ad70e3965af9426ba3227ee6485a3d4d66de488a2f2691683df1d465"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Drawer.qml",
+        "size": 2506,
+        "sha256": "08675be7bdcb412adcdee3984562b0fc6fa172b95b31f3de35a4d7faac6ebedc"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Frame.qml",
+        "size": 1224,
+        "sha256": "a63f82b081b022639dc8f737e70bbe3e493da9b1b8e3d7f53eb975bf770a3e0e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/GroupBox.qml",
+        "size": 1963,
+        "sha256": "d434f447b9106afaae89bfd4c24e3c39cf500251265c24d4f40566dc69c151dd"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/HorizontalHeaderView.qml",
+        "size": 1637,
+        "sha256": "644993daac7f405a3919a03891b92283efaa71be2c49defa163667c26c50a1a6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ItemDelegate.qml",
+        "size": 1903,
+        "sha256": "b1294a456491b4b66b77e21b2f0f0ac58d319dab00c4db92aea1283477d04139"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Label.qml",
+        "size": 368,
+        "sha256": "40e4bb6f9367c1ef8f210993a5ab4a5363060031678e8fdd8da08e16950bedd3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Menu.qml",
+        "size": 2676,
+        "sha256": "fb976e346d35eb4dc33d43d8f54574f0a4b4b4b08be4e84a04ba66914366718c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/MenuBar.qml",
+        "size": 1106,
+        "sha256": "a7b573865ec431c880e250ecc8558919b8b00baf466ba304668fa66399075e3a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/MenuBarItem.qml",
+        "size": 1762,
+        "sha256": "2686a1299273a71b98b083928cacf25b08a7f0d200b304a04082abe7c25ccc15"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/MenuItem.qml",
+        "size": 3106,
+        "sha256": "798811a61d640d6c2c7b841ccab4db67998f8322e4e5a81d73ba91f5ec04fede"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/MenuSeparator.qml",
+        "size": 760,
+        "sha256": "e5ae1431bd6b51a3abaa09ad0621bdbfe8a8bed36bf14211185bda9bb7279d11"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Page.qml",
+        "size": 1182,
+        "sha256": "d37920cf46a6a6c9066338fd7044aaa640c8fdd19325babe2752dc1305c4d346"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/PageIndicator.qml",
+        "size": 1413,
+        "sha256": "04cd9b621135585eca13e664c82fa2f2a11911af2258591e8e676af100a2b898"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Pane.qml",
+        "size": 1124,
+        "sha256": "35edb1d723d82c8ee641dde621cbbf2dc376da1c156f4d06ebfed027675484cf"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/plugins.qmltypes",
+        "size": 22076,
+        "sha256": "f8910911728e0c79dd0a74466cb5ccef8a7d9e2525fe9a37f434932c455f87bd"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Popup.qml",
+        "size": 2031,
+        "sha256": "d8f14b656e47db8a68396cfe39df2085d6aa4c16af2095f544feb999679ef516"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ProgressBar.qml",
+        "size": 1175,
+        "sha256": "04dc9d1c59620806ba411cd066d58329f3c9822f5c1ddec231011da3ac18c427"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/qmldir",
+        "size": 3583,
+        "sha256": "ab07c0d72fadc1ddbde8087e1225981edae4019c970e4f92f63b10e90d11bd0d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/qtquickcontrols2materialstyleplugin.dll",
+        "size": 32480,
+        "sha256": "66eebc867cd1fb649896338776df4f183ca916afd226e01f1ed715846640e3aa"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/RadioButton.qml",
+        "size": 2009,
+        "sha256": "fbec66323a91343a2509ece80bc7e31dee37c9d08935ca8eebbaacddccd3e1f9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/RadioDelegate.qml",
+        "size": 2385,
+        "sha256": "5de5ec78ccbd1c8ea0e7ad108690ee17da2641f131efaec175ab7df628f55a84"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/RangeSlider.qml",
+        "size": 5905,
+        "sha256": "229b687f4453e195ae127f0f107f0100be7c3f0dfc5758c909a3b82425c0849c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/RoundButton.qml",
+        "size": 2957,
+        "sha256": "f62639f1958eb3a2d7a9f935ae6854d2de1da0ab2583a7e47d67df91f0657172"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ScrollBar.qml",
+        "size": 2132,
+        "sha256": "84487e918e6cbab7e2c20a715954854995adc784eff704aee1a8cd3365149047"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ScrollIndicator.qml",
+        "size": 1318,
+        "sha256": "a047a7e37926eac126d3ed5413c7fb260a9e453ac1a03ce320b48ac875bd8a7d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ScrollView.qml",
+        "size": 1071,
+        "sha256": "d9213c84b8b2aac429181119efc1a9f867646abd8d3d40d740b0540709c5b450"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SelectionRectangle.qml",
+        "size": 881,
+        "sha256": "5c85492c197f68020fc50e91a2a51f646d2962987e647cd938d15152923ce772"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Slider.qml",
+        "size": 4921,
+        "sha256": "1bb57e2d297dc3f46668718e6ed0ccab3fbf7c0fabdcfce339555f88d62847c9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SpinBox.qml",
+        "size": 4666,
+        "sha256": "4df963a1e5440635b5779763310cdcd6b8929efae06eb9ba2792acebd3346a75"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SplitView.qml",
+        "size": 1640,
+        "sha256": "3fb3f2f1c06df3dc0aca0c6f4f9289df874c18bace8caa4b6571f06799fa1e86"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/StackView.qml",
+        "size": 1741,
+        "sha256": "e0bf8deab9398b9b2736de6d3bd3a235f2db7766d1fc45f88d8a11ffea664a3c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SwipeDelegate.qml",
+        "size": 2220,
+        "sha256": "00f4efda2d733fc31d8f130eeb7c0fc329a53612deadac502543754a95da00b8"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SwipeView.qml",
+        "size": 1206,
+        "sha256": "efdf9a0d93c861a54f6c13f95dca3b53a9104133bac3b80764404a87a6516c1d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Switch.qml",
+        "size": 2422,
+        "sha256": "7e51b59b872f42357dc87a0548d1a163a6245dc67fd36411420a65052eef22b8"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/SwitchDelegate.qml",
+        "size": 2437,
+        "sha256": "f2bba7c6de8fdefff508905089f0d0f198e5390f49d78ebae6063839e3c3a1e2"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/TabBar.qml",
+        "size": 1808,
+        "sha256": "731b02915dbecb86790ab81ab737bd5fc9fa89286d5c1d45fcab865f70815dc5"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/TabButton.qml",
+        "size": 1541,
+        "sha256": "9ae1bfeb62d2f194c936fa42ac0e68aad3451b9f24bf701c67dad1b2658fdf22"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/TextArea.qml",
+        "size": 4280,
+        "sha256": "e1aca9990f9c1dd0fd71f23828c2b822618180703708cc50a09b5b579db2450f"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/TextField.qml",
+        "size": 3744,
+        "sha256": "860e3c80281abd7f35441331e6accb0ef075ad15edc4e5bbad939df9ec8acb24"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ToolBar.qml",
+        "size": 1185,
+        "sha256": "2f94eeac9fa81e7bc2fd668fcbb968cd013f42dc1329c1676b523f5081066e7f"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ToolButton.qml",
+        "size": 1922,
+        "sha256": "a1ff8b9f6ee3702456904338e5c1bb92d69ca98a8ab2a4639ce7bd6d2a07baff"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ToolSeparator.qml",
+        "size": 865,
+        "sha256": "eb219ac88ee5839ac197c0ea83dec3e8435735a2e27a735fd0bed24a47515587"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/ToolTip.qml",
+        "size": 1582,
+        "sha256": "7257168b74604576a6333f1a27234e949fb9d9276af381e46b651fc55bae6f13"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/TreeViewDelegate.qml",
+        "size": 4564,
+        "sha256": "a36c16f10554e27e7999944e765249d90dfc99e10853befb40a43f82f8096759"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/Tumbler.qml",
+        "size": 1619,
+        "sha256": "e9c7f567c586044ccbc5af7dbee0ab01229e8db352fb2ff8aa0a6b5cfb442665"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/VerticalHeaderView.qml",
+        "size": 1628,
+        "sha256": "bcc32016734780537d86d3520881bce6f17c90d6b4566f63c28b7d2b2fb8930a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ApplicationWindow.qml",
+        "size": 262,
+        "sha256": "168426a51c845acb799d55d15d66d969b6594e5fd2b321809dd7da6ad10bc837"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/Button.qml",
+        "size": 1533,
+        "sha256": "33a5c0db5101f50c9b2e02adde9765809c8607fa3bb407e29eff84ac7abab9f8"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/CheckBox.qml",
+        "size": 3100,
+        "sha256": "ce1f3c7b94ad1072722f8425f6e41c1a9fee8a4cb890fdecc266fd58dac2b886"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/CheckDelegate.qml",
+        "size": 2868,
+        "sha256": "f8af5c98ef3e8fb46251625bd24bba24d334ec8dd6a520f4bb73bb6b4e170e07"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ComboBox.qml",
+        "size": 3935,
+        "sha256": "4adece55ce31e9f3e74402839fb76f32862f5596aa05a21f784b736ae6071e97"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/DelayButton.qml",
+        "size": 2878,
+        "sha256": "e3f0faea2852ddd3483129f0296d9a99feefc178269ae5a161622f2f7f3c0be7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/Frame.qml",
+        "size": 240,
+        "sha256": "d411f02112f782803d5ab5aa18c7f50fd349ca5af09286ad22c2465907c360b4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/GroupBox.qml",
+        "size": 243,
+        "sha256": "bb648f2fc0956833fe107ae81ad0966a4d9a62f2fe9243a2500e5e67db01542d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ItemDelegate.qml",
+        "size": 389,
+        "sha256": "d8230fc09271dcc0ceac9cf412f9448fa4fc75163a78217c6f8d4ee6d2413561"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/Menu.qml",
+        "size": 2576,
+        "sha256": "a64b583f02eabb364be237408a19395b1f25452d22b95d92bfb85c846b9f9e00"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/MenuBar.qml",
+        "size": 1128,
+        "sha256": "130301a827db82edda8af624d4c529528a18a19a15d5e7c8f0319f73a73ec3c6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/MenuBarItem.qml",
+        "size": 1331,
+        "sha256": "0d2075db9b3418b265acea126dc75185cb4dcb913c16932f38b8868d65ac81af"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/MenuItem.qml",
+        "size": 2580,
+        "sha256": "c7daa5db1607281271a8d133ec7b32b1984f867b09040970d99cf5ecf19d747d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/MenuSeparator.qml",
+        "size": 747,
+        "sha256": "a8b1e029424cc9c087a29983ed5adc77f3b6c2ee91f5d31332f7d89bed38d89d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/plugins.qmltypes",
+        "size": 215,
+        "sha256": "a96c7bf5832767bdc9d91e2290a3920aec3abfbf2e3814bce38b49483f16f84a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ProgressBar.qml",
+        "size": 246,
+        "sha256": "a83164e21d1bb74e1bbae6ca7e49f8601a11a708144d12a18842753a3bae9aff"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/qmldir",
+        "size": 2048,
+        "sha256": "1a9ff69287879713a712fc0957f547238a304970c1451ea8af0e67c5282bbc98"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/qtquickcontrols2windowsstyleplugin.dll",
+        "size": 525536,
+        "sha256": "aab6b453433e2e386e3cb6da859511875f5ea7aa39561004b888282bb2279cee"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/RadioButton.qml",
+        "size": 246,
+        "sha256": "434eb58d251598f291721861820e4ce65fe8b36eca0255cdcac62c801182e5c6"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/RadioDelegate.qml",
+        "size": 454,
+        "sha256": "2c8863067cf6264249f7c0f62817eac990390de96abb7a9abc8ff7bf05a595fc"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/RangeSlider.qml",
+        "size": 4676,
+        "sha256": "5678e279ec5a244beee168baae6d2de446220a0f51bfd2d0708839fdcec4dc2b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ScrollBar.qml",
+        "size": 3752,
+        "sha256": "6f5e6c6544f0300122642f8f8951ad4947065a2df7d3c7b305981ce2a1e7cb94"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ScrollIndicator.qml",
+        "size": 1302,
+        "sha256": "900d93da9f0ca95067d70bcb64c445f159809a4935f434f304b3f6d96dbabc85"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/ScrollView.qml",
+        "size": 1400,
+        "sha256": "7b55272f3d44ec9d5535e266157ece1fff017cd1d4f92ccb613d4ce155a2221e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/SelectionRectangle.qml",
+        "size": 946,
+        "sha256": "96f82aeee30fbd3028255fc7a305b24a644e89a1facb79b3a5819370190aacba"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/Slider.qml",
+        "size": 241,
+        "sha256": "5dc118785ed47733de5e600c66dbbf7e5ac4538d34c2b259567180c6bfbb2651"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/SpinBox.qml",
+        "size": 3493,
+        "sha256": "4329284dbcfa5ba252a9eb381c8da87fb408b360aa7ab19be89b2ef39e9ac288"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/Switch.qml",
+        "size": 1412,
+        "sha256": "e9a1005f455fd98d1cf2b24f724b7640affe11497f6330b1336dd11edb9100f7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/SwitchDelegate.qml",
+        "size": 1696,
+        "sha256": "07b8b3650d954234e58ddb7322b9b91cc4924420c030cf3f2c33d443945a4bb9"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/TextArea.qml",
+        "size": 243,
+        "sha256": "0f302256f178f9f11792d3f77bd051f49a52e0b406f71fec4495011a5b5f8462"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/TextField.qml",
+        "size": 244,
+        "sha256": "a63745f7e325ae94707967d9cec4d1840c7ecfeaecd3c118c475f8d134cefce0"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/impl/plugins.qmltypes",
+        "size": 4205,
+        "sha256": "30002e27f8c263cb85584d7dd5f19475515321e0be327a124ca68913f5216021"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/impl/qmldir",
+        "size": 322,
+        "sha256": "d6e86f04ec9feaf10bfa1b03be182ebd92dfcb4aee5a837c2e8a8d485d92dfc5"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Basic/impl/qtquickcontrols2basicstyleimplplugin.dll",
+        "size": 31456,
+        "sha256": "9419bdd4092bd318eac7a732e265ad3950bf8a19d37ce025b215b17e442d01d7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/ButtonPanel.qml",
+        "size": 1528,
+        "sha256": "26ae2f2113b50dc704068ba814df1fc7f8ee6fbe59b42e400799c3dc94d30a87"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/CheckIndicator.qml",
+        "size": 2112,
+        "sha256": "8169ea708c7539aac65bed100f2118f33e2a039a21656d0782605b63d28bf490"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/plugins.qmltypes",
+        "size": 2737,
+        "sha256": "702200247ed4558e3cdec87d4048cbd235a68d1781cb6b6c9f7fde73d1422650"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/qmldir",
+        "size": 869,
+        "sha256": "b0551d554f4591100bf44ab1975b58ed76a4fd4607750b650fced2d1ad3ec4b7"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/qtquickcontrols2fusionstyleimplplugin.dll",
+        "size": 31456,
+        "sha256": "fec3c5f1fefb0341f2ddd2f27897379ea9168239e2903f867e942be63b07cf5b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/RadioIndicator.qml",
+        "size": 1529,
+        "sha256": "affe8147613ca877802b3e78ac3df05deffa8583e546c8bbd33b40ecb452b4fa"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/SliderGroove.qml",
+        "size": 2096,
+        "sha256": "e3e36cca1a6eb1c32b471184c7cf8874e2bb6fa5c1c81dcd31563800bbf0c952"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/SliderHandle.qml",
+        "size": 1576,
+        "sha256": "5d48628ab095914deb6a4fa60c62eedf6b985ce5f2f688da70903aaa2fe5a43e"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/SwitchIndicator.qml",
+        "size": 3785,
+        "sha256": "22eae89b0218751dc390bb5c4e5c5f3c97b7f2578d0c7f78f2ef1f4ea30a948c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Fusion/impl/TextFieldBackground.qml",
+        "size": 941,
+        "sha256": "414bd7e5ffb0332789581fff0a055f93c6187eaed19463f607d548d21cf5ac08"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/BoxShadow.qml",
+        "size": 1722,
+        "sha256": "7184f77e4df7a912fd84662152763db2cf9febdd15d9f514ca1bc0416da14d03"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/CheckIndicator.qml",
+        "size": 2512,
+        "sha256": "512503a79f2b618c5dce49bc8b8211b019df02f385b452604b2e9f7609acc658"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/CursorDelegate.qml",
+        "size": 990,
+        "sha256": "c7d7c54555cb7830bc3a5372518f5c42c8dd2529cd86015088a7a3fa9dd0a69d"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/ElevationEffect.qml",
+        "size": 8644,
+        "sha256": "c96e191587c58f9629f9794cd354124cc0c2a103c905cf811c4ee8e66ce6fdb2"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/plugins.qmltypes",
+        "size": 11196,
+        "sha256": "788c6032db416b280bd732812960e8ab261986f3b7fcd3b8d01c76694b9be514"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/qmldir",
+        "size": 1091,
+        "sha256": "861014f21bb3794921fc5285b54443f3a589e9b8be454d9af7af8fbc2c3351b1"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/qtquickcontrols2materialstyleimplplugin.dll",
+        "size": 31456,
+        "sha256": "a1b47e807820252fbe1d6333b11800149a6ba9ab0219ce398f985d4d407b7d51"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/RadioIndicator.qml",
+        "size": 1523,
+        "sha256": "b744854b50e2ca81d761dea1984b324f5b0dd6a7ca7bdd6af6d8e8616bbda4ea"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/RectangularGlow.qml",
+        "size": 6681,
+        "sha256": "7de16148d42c6f299888d2bcfcad77b3b0cc20ca1a70357b5a32498b9a2a3ae4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/RoundedElevationEffect.qml",
+        "size": 1763,
+        "sha256": "bb3498a1fb540fc1dffc93d4ef0117a9eb0d71069d64ffec2e9b367cad57e305"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/SliderHandle.qml",
+        "size": 1234,
+        "sha256": "6ffa0657d05ec74fd6e1b482834d7f9b7c6bf41aeb7292937c1ffba82c934643"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Material/impl/SwitchIndicator.qml",
+        "size": 4223,
+        "sha256": "2b34f992b4fad90d6aee6613cba1eca1eb7a85cfc4189895691515d234044651"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/checkmark.png",
+        "size": 200,
+        "sha256": "e5e41ac0591e82110a68f162118267e9a2ca218c1ecfe5c86e8a1ee3bdf4d98b"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/checkmark@2x.png",
+        "size": 252,
+        "sha256": "31d03a9ab468d6ede3c730bee83099c207202d3e5715735fec452fc5a4bf336a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/checkmark@3x.png",
+        "size": 321,
+        "sha256": "d8d024453ec3ba9a000acd9bd1158cbf11cfa3f44f5b836c4d625edd014039b5"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/menuarrow.png",
+        "size": 165,
+        "sha256": "68c6ee2c698caaa9ef1e35cefc862148fc3fe69938b5a04917fd91ae6dff1b09"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/menuarrow@2x.png",
+        "size": 185,
+        "sha256": "35aa2b3e9967c09aa9b94992cf90d0d3fe0a4523845fede44a74095256d3004c"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/images/menuarrow@3x.png",
+        "size": 205,
+        "sha256": "25ebf2be72c30407f571c0f261114b63427f9573750453d8bdc9427538fd46f3"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/impl/CheckIndicator.qml",
+        "size": 657,
+        "sha256": "b132c21c7fb661cf0c22a3c2674439ab249757f3b90e72c1689415b22fc3fe17"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/impl/qmldir",
+        "size": 498,
+        "sha256": "8eff4b2d81b9ae4983f66bade6cc5956d61782e8264fb082850a88d9f98c05b4"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/impl/qtquickcontrols2windowsstyleimplplugin.dll",
+        "size": 31456,
+        "sha256": "55e874048cfe3eb4eac9301b00ab9ca2fcae26f2033a3bb65a1a22b5f15271c1"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/impl/QuickControls2WindowsStyleImpl.qmltypes",
+        "size": 215,
+        "sha256": "a96c7bf5832767bdc9d91e2290a3920aec3abfbf2e3814bce38b49483f16f84a"
+      },
+      {
+        "path": "qml/QtQuick/Controls/Windows/impl/SwitchIndicator.qml",
+        "size": 2201,
+        "sha256": "4740e169f36d0d1b88e79943c29bd011dbab294971f475acfddfafbac7eac071"
+      }
+    ],
+    "host": [
+      {
+        "path": "LICENSE.txt",
+        "size": 35815,
+        "sha256": "53927bd0b739d38c87a0a82236fd9b070c2dfff11c0c119be50372005d5047ad"
+      },
+      {
+        "path": "mslink.exe",
+        "size": 159744,
+        "sha256": "7bebec29f16a62ad848e1a5ee17914937275434ffa3648e25a1b0f1e15b1fd31"
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES.txt",
+        "size": 2492,
+        "sha256": "52b5d6a0be8271813217fcffc96691def04d1c2fe2c82b0740d6543c6782cbe6"
+      },
+      {
+        "path": "使用说明.txt",
+        "size": 2183,
+        "sha256": "a61d72c1fa118ac4f175a0265f3e0edf5e2e93346b8a0f385c8527a33df3f772"
+      },
+      {
+        "path": "卸载.bat",
+        "size": 1182,
+        "sha256": "c8e0286b31a34febdcfd98f89472a48cfdd5db7adc91825a214f1f9d946340c9"
+      },
+      {
+        "path": "启动隧道.bat",
+        "size": 284,
+        "sha256": "0ee0deb0f19adc2c10d5b0c980a804b3913b47a7a78cc714c0ce6c54282833db"
+      },
+      {
+        "path": "安装.bat",
+        "size": 846,
+        "sha256": "12f814969b57c5d1fc7d11bdd4afeb8a113aefc20519d1108c71952c6949c91d"
+      },
+      {
+        "path": "console/concrt140.dll",
+        "size": 324208,
+        "sha256": "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376"
+      },
+      {
+        "path": "console/D3Dcompiler_47.dll",
+        "size": 4173928,
+        "sha256": "e994847e01a6f1e4cbdc5a864616ac262f67ee4f14db194984661a8d927ab7f4"
+      },
+      {
+        "path": "console/ministream.ico",
+        "size": 18234,
+        "sha256": "d4b14eedeb75eba0a2de7f6f1981e5109fc717880cdfcb124b47abcc0352009a"
+      },
+      {
+        "path": "console/MiniStreamHost.exe",
+        "size": 166912,
+        "sha256": "242dd39d743d513f7d0b0023945627ffe4e7e3ea61dde40f36dda5b268441eda"
+      },
+      {
+        "path": "console/msvcp140.dll",
+        "size": 557728,
+        "sha256": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9"
+      },
+      {
+        "path": "console/msvcp140_1.dll",
+        "size": 35952,
+        "sha256": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d"
+      },
+      {
+        "path": "console/msvcp140_2.dll",
+        "size": 280200,
+        "sha256": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9"
+      },
+      {
+        "path": "console/msvcp140_atomic_wait.dll",
+        "size": 50304,
+        "sha256": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479"
+      },
+      {
+        "path": "console/msvcp140_codecvt_ids.dll",
+        "size": 31872,
+        "sha256": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18"
+      },
+      {
+        "path": "console/opengl32sw.dll",
+        "size": 20639888,
+        "sha256": "b04de4541863bc7d8879040a78889c4849c1b1da2784c4630f734c146c2998ce"
+      },
+      {
+        "path": "console/Qt6Core.dll",
+        "size": 10023136,
+        "sha256": "b6c6bedca4e798f9a6cfae20946688ab0a0c3dbd7de605951b0ffb7b679e4f53"
+      },
+      {
+        "path": "console/Qt6Gui.dll",
+        "size": 9497312,
+        "sha256": "569f50c8fde5e3841197e4f44bc4673b330e2f8744391f36f0dccc17fc858f03"
+      },
+      {
+        "path": "console/Qt6Network.dll",
+        "size": 1735392,
+        "sha256": "dcd4d0951de4f8a7d8609dd2f44cb32cc7fd507c7562b635346df2de6707374b"
+      },
+      {
+        "path": "console/Qt6Svg.dll",
+        "size": 607968,
+        "sha256": "da0da4afa90789bf7f7dcc61f745308b3e02af7afb74269fc2b1ac771b1f93a3"
+      },
+      {
+        "path": "console/Qt6Widgets.dll",
+        "size": 6540512,
+        "sha256": "36cfd5321d60623047f51bc9ce34333e1d090aca7a23b45e6c8a79f92d6a1aa6"
+      },
+      {
+        "path": "console/vccorlib140.dll",
+        "size": 352384,
+        "sha256": "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd"
+      },
+      {
+        "path": "console/vcruntime140.dll",
+        "size": 124544,
+        "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+      },
+      {
+        "path": "console/vcruntime140_1.dll",
+        "size": 49792,
+        "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+      },
+      {
+        "path": "console/vcruntime140_threads.dll",
+        "size": 38528,
+        "sha256": "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa"
+      },
+      {
+        "path": "sunshine/sunshine.exe",
+        "size": 70910996,
+        "sha256": "a8ddf74e93297529ca5aa9c59234a7043b94587e8d11ea24c521fa69d6f59fd3"
+      },
+      {
+        "path": "sunshine/zlib1.dll",
+        "size": 127291,
+        "sha256": "11cd91171765cd65f1c3362e3df67e5f5a618a6b88c8cdec899b802eaf1c7b0d"
+      },
+      {
+        "path": "_internal/gui-action.ps1",
+        "size": 3501,
+        "sha256": "bd129f7a64da48ae97b6cb4d30f5c49187452e5979b673fde0da2162e4de01af"
+      },
+      {
+        "path": "_internal/install.ps1",
+        "size": 24112,
+        "sha256": "2b4e166b6eee8061170e2a63025c88ed4abe7a39e2721eb3588164d21b387082"
+      },
+      {
+        "path": "_internal/run-sunshine.ps1",
+        "size": 3777,
+        "sha256": "82a6cf9d5614c23fb518ae81461d6cf2bde2d7e47080dd7bbb90535510877dd2"
+      },
+      {
+        "path": "_internal/run-tunnel.ps1",
+        "size": 1588,
+        "sha256": "da5a15e74209d6b4159cacf5d8d3f3aee8588f14ad8c4663d056f3c28af203f9"
+      },
+      {
+        "path": "_internal/start-tunnel.ps1",
+        "size": 1699,
+        "sha256": "466b3227417d8cfb55133dc5eaab580b6a665f84240f40ae1e6b1fc292e00a6e"
+      },
+      {
+        "path": "_internal/tunnel-common.ps1",
+        "size": 7402,
+        "sha256": "de62c43cb15f543ec5463977227c023d0291ff0d9fac1257d820c42ebc568aef"
+      },
+      {
+        "path": "_internal/uninstall.ps1",
+        "size": 8744,
+        "sha256": "ddb8dab5e3ad744bec80bfbb14aed457aa9af86db6f13b443db4c8efaef1208a"
+      },
+      {
+        "path": "console/generic/qtuiotouchplugin.dll",
+        "size": 103136,
+        "sha256": "6e9784408b75adc57a28527e6ebc24baada0e90fb5bf4946ccb9798bd8784057"
+      },
+      {
+        "path": "console/iconengines/qsvgicon.dll",
+        "size": 79072,
+        "sha256": "92c6fa5cadc4161fec213f2f6cbb9d793436b222ee88369b70a97123b1e3302a"
+      },
+      {
+        "path": "console/imageformats/qgif.dll",
+        "size": 48352,
+        "sha256": "cee83c066006c46f8dee16f33e524bac12f166ac667f4a86956473e8e207d68b"
+      },
+      {
+        "path": "console/imageformats/qico.dll",
+        "size": 46816,
+        "sha256": "82afc4eb27771e452a39fdc896bc638a138a0afb820d1b813b36cabba48c178d"
+      },
+      {
+        "path": "console/imageformats/qjpeg.dll",
+        "size": 576736,
+        "sha256": "43ca4ed440f9f03e79f75fd76905e3350ec4008650d02d7041fdd2ac4043dfd2"
+      },
+      {
+        "path": "console/imageformats/qsvg.dll",
+        "size": 39648,
+        "sha256": "f613467380c982c166f573ce7e0a35243ef49a4ae253dcfa07e0f781d8f73bbe"
+      },
+      {
+        "path": "console/networkinformation/qnetworklistmanager.dll",
+        "size": 71904,
+        "sha256": "9a00977c2406a0cacfd25e24e9f32d7d2721a8e125f7576def00307a5850d067"
+      },
+      {
+        "path": "console/platforms/qwindows.dll",
+        "size": 925920,
+        "sha256": "133983755958a0f4d955b4a6f3712a014ac62351ec5edd3c32b802094f66ac96"
+      },
+      {
+        "path": "console/styles/qmodernwindowsstyle.dll",
+        "size": 218336,
+        "sha256": "750970c6a92d3af2b78c034e3b3ff379a7d61fa7b574d8c2e39f884a6bab568e"
+      },
+      {
+        "path": "console/tls/qcertonlybackend.dll",
+        "size": 103136,
+        "sha256": "9f03bd4a3fb9779439bbea7b151fbbadf556541e56a7493481a5140625c4da7f"
+      },
+      {
+        "path": "console/tls/qschannelbackend.dll",
+        "size": 259296,
+        "sha256": "33d5b218ffbe581742fd07dd2da5b7394b66f41161235e785642bbcb2b5834e2"
+      },
+      {
+        "path": "console/_internal/gui-action.ps1",
+        "size": 2521,
+        "sha256": "b885aa803859ceed178e94d41c1deba5b33ff7ee74b2fca098e12374ebcf4888"
+      },
+      {
+        "path": "sunshine/assets/apps.json",
+        "size": 411,
+        "sha256": "3b6c2715114f8c71189ab1be359eab01c391a7b0996f18a89f686b9518b7069c"
+      },
+      {
+        "path": "sunshine/assets/box.png",
+        "size": 680,
+        "sha256": "d9164ebd069b5f735eb8efc557801778498da37f572ef70e3d35604739e6c613"
+      },
+      {
+        "path": "sunshine/assets/desktop-alt.png",
+        "size": 8737,
+        "sha256": "d78b2200827aee21f1d5549e229d8629d711558348737b1dd6456ebf30b1a418"
+      },
+      {
+        "path": "sunshine/assets/desktop.png",
+        "size": 8231,
+        "sha256": "477c3fbcd1e9c796a0e23bd201220706c30cd787e5be5753f9e0d385b7577761"
+      },
+      {
+        "path": "sunshine/assets/steam.png",
+        "size": 24833,
+        "sha256": "ed59b134e64597baeb109a3567ad7c29936e77d0074398a5ad23606fb48d3108"
+      },
+      {
+        "path": "sunshine/scripts/add-firewall-rule.bat",
+        "size": 424,
+        "sha256": "adcbb93409108e06424f4d5627dadf81bfc304fb89100df116c7b674352fb8cf"
+      },
+      {
+        "path": "sunshine/scripts/autostart-service.bat",
+        "size": 87,
+        "sha256": "ffdaf0b0fe7f8744641a93a76d94c996ff38161df806e1925d9df9c63c0ae7a1"
+      },
+      {
+        "path": "sunshine/scripts/delete-firewall-rule.bat",
+        "size": 117,
+        "sha256": "65dff0d276bdae31b3775075eefb406fe3aeef659fe95fedd8dbb988b89a65c8"
+      },
+      {
+        "path": "sunshine/scripts/install-service.bat",
+        "size": 2100,
+        "sha256": "dc6060d0ca81a98449ab67335a60942a95f417cb3f6c224ce25e35faf6cfd02c"
+      },
+      {
+        "path": "sunshine/scripts/migrate-config.bat",
+        "size": 2125,
+        "sha256": "a42fce9b07984ede83c3388f84d7d3e617935d8e369847cce9002775b6bbf8ad"
+      },
+      {
+        "path": "sunshine/scripts/sunshine-setup-process.ps1",
+        "size": 28871,
+        "sha256": "d75ffc44b38f472752ea127b7104091715a1a60b04885de424d8afb74ecf7929"
+      },
+      {
+        "path": "sunshine/scripts/sunshine-setup.ps1",
+        "size": 39996,
+        "sha256": "1971339960d5c2587b53be1da72c424b3f4c075ff0bd469477061be8aaeed586"
+      },
+      {
+        "path": "sunshine/scripts/uninstall-service.bat",
+        "size": 1234,
+        "sha256": "55b09e7c2f68689c04f3333a15164a1e7daa59a15c10f73402ae834798ca6259"
+      },
+      {
+        "path": "sunshine/scripts/update-path.bat",
+        "size": 3883,
+        "sha256": "6b8473a811cc88dea26b7af9b9c446712482ee10eced74a83de06770831f481f"
+      },
+      {
+        "path": "sunshine/tools/audio-info.exe",
+        "size": 2048512,
+        "sha256": "9c0fe2c1aa46f4da88a5ada96dce20dfcc88dd3577218d6d4dea6ba8229439f3"
+      },
+      {
+        "path": "sunshine/tools/dxgi-info.exe",
+        "size": 21430784,
+        "sha256": "0c2db8fa4b3851220894088d6247bbd0eb95b302ee95b66e9d78465fd8e62367"
+      },
+      {
+        "path": "sunshine/tools/sunshinesvc.exe",
+        "size": 1553408,
+        "sha256": "7d499935afb62d192fc8590a2d32b5ebf0f5f5bea8c8c31426e886b54d6e3399"
+      },
+      {
+        "path": "sunshine/assets/web/apps.html",
+        "size": 30301,
+        "sha256": "b73825594044b8870492abb80a9660cf06b5b25625448ac9f209e6d3c83f56ba"
+      },
+      {
+        "path": "sunshine/assets/web/config.html",
+        "size": 5949,
+        "sha256": "d738ce825b1d4e6ddea432603accb79413a6f22de6f77028c36e54d1d6db78b5"
+      },
+      {
+        "path": "sunshine/assets/web/featured.html",
+        "size": 11889,
+        "sha256": "94f10b790b529d33bef8b4fea1f49b8b494aabd33dc7be46415fff0d1e1975be"
+      },
+      {
+        "path": "sunshine/assets/web/index.html",
+        "size": 6489,
+        "sha256": "4b8637a4e9696156a3cec28c00303d0c6431b086a70c52eb02d020a0444bb0f0"
+      },
+      {
+        "path": "sunshine/assets/web/logout.html",
+        "size": 1369,
+        "sha256": "07b9517d40e3c1af4a2aa2c20dc4b416004dd0c684671880e384bdd5efb7ffee"
+      },
+      {
+        "path": "sunshine/assets/web/password.html",
+        "size": 3863,
+        "sha256": "29194597193f2245f1488adaaf58d387003ee39091702a5fb4580dec0a4eca35"
+      },
+      {
+        "path": "sunshine/assets/web/pin.html",
+        "size": 3596,
+        "sha256": "ae0c2510aa3c12839d315a8dbb70d14b183406ac2c6e76d64bfbd61603aeb581"
+      },
+      {
+        "path": "sunshine/assets/web/troubleshooting.html",
+        "size": 23422,
+        "sha256": "d42d1eff22d5eac639209279d8b541b3eddd3f3187f7b5a56c0ea3ac181d1ec2"
+      },
+      {
+        "path": "sunshine/assets/web/welcome.html",
+        "size": 3347,
+        "sha256": "ecc8a6018b4ea2af5d3921a444d712ea8086ea647d11bf81cf24c153e361a45c"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0s_ps.hlsl",
+        "size": 132,
+        "sha256": "b3c44bf4515faf5aef652e3801fdd932eef5977961e7c3cabae6daa96860f06e"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0s_ps_linear.hlsl",
+        "size": 139,
+        "sha256": "60797a0ceeca3309b0ec204a6e4de5035cc71834c5b2c2b268241249137afb80"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0s_ps_perceptual_quantizer.hlsl",
+        "size": 153,
+        "sha256": "9bb078e7e264c61c146cc82568fadf850a0b22d9f5879e492a058ffe4809eae0"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0s_vs.hlsl",
+        "size": 400,
+        "sha256": "5e407ed6d5545e4258a5078d77394691f3830811fcb6869adb6e74b4eca002ff"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0_ps.hlsl",
+        "size": 126,
+        "sha256": "897bc37d0319b5400e142ee5d04c7dd260af1071040b4d8f0bb6dca90c510a3e"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0_ps_linear.hlsl",
+        "size": 133,
+        "sha256": "c0a67152c118e59c7b19bb55d180b3dbc7fc5841fc93688d799bd572f62997b8"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0_ps_perceptual_quantizer.hlsl",
+        "size": 147,
+        "sha256": "d5f937713422d2122bf57f482cf14c9b7cf70dbdb2e7a881742334e22fd951f2"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_packed_uv_type0_vs.hlsl",
+        "size": 394,
+        "sha256": "8b524db00460581242ba8bfed502d04fd6df2dc0b88e8be1cb0042a4feb9e1c1"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_planar_y_ps.hlsl",
+        "size": 97,
+        "sha256": "38a257893b34d9854a033e353584242820e586ddb2d8245fd43aae182ef38360"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_planar_y_ps_linear.hlsl",
+        "size": 104,
+        "sha256": "5778fc50bc74b44b752273a24b262ed0f960ccfa5f92c2dbf8a06589f614d43d"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_planar_y_ps_perceptual_quantizer.hlsl",
+        "size": 118,
+        "sha256": "cd21ae3a466040e6ab59713b625ee7a8edf07a83a89bdef3a044ba04e839943f"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv420_planar_y_vs.hlsl",
+        "size": 277,
+        "sha256": "a8b2c21da96418dd3e9727a2cc5916b5eff3c149963acb1c74193ca8ebb92cc5"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_ayuv_ps.hlsl",
+        "size": 88,
+        "sha256": "c5bcbf0eb1e4fe419bdbd83eb6a549401ca98c9402ea50ebefeff2130342facf"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_ayuv_ps_linear.hlsl",
+        "size": 95,
+        "sha256": "fd203562550f3337dfd259839ff0b36f7b048695a421a07b4fa78e26d0806632"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_vs.hlsl",
+        "size": 277,
+        "sha256": "a8b2c21da96418dd3e9727a2cc5916b5eff3c149963acb1c74193ca8ebb92cc5"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_y410_ps.hlsl",
+        "size": 102,
+        "sha256": "671a8b6a3283ae5af1619e28dbb62a52d7e0a4d248fa8a3acabd568ba905e466"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_y410_ps_linear.hlsl",
+        "size": 109,
+        "sha256": "675c0864f9c41771acf5e89116b01758f870d3d7e3e75e5216b23d2455319bdd"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_packed_y410_ps_perceptual_quantizer.hlsl",
+        "size": 123,
+        "sha256": "5cbc970e98e3fea7e87e44eef1873858ed0207145e2a7140fe68d1d95f744166"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_planar_ps.hlsl",
+        "size": 114,
+        "sha256": "b8dec1de1dee94470068394796936bf91a24b463389b3023bc0f1559376938db"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_planar_ps_linear.hlsl",
+        "size": 121,
+        "sha256": "92e9851ab809c0ca6606d83c12bf030d13db6d9a2c25f3ba7284ae6aaff45d58"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_planar_ps_perceptual_quantizer.hlsl",
+        "size": 135,
+        "sha256": "6702a40d63026e750bbf4c369186506476fcb07ce8781f8d8c8e6b9ffc8c7b4a"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/convert_yuv444_planar_vs.hlsl",
+        "size": 780,
+        "sha256": "e6f299ecd2f26d8668206ad0e248dc706b6b0a408f07404f0cb0f498d642b70f"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/cursor_ps.hlsl",
+        "size": 229,
+        "sha256": "3ec1efcb2157233ae997f16633383a239a8d2399ca170d3fa12a6d5c09662662"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/cursor_ps_normalize_white.hlsl",
+        "size": 396,
+        "sha256": "9609bdf0965fafce8958dcdd8ecf68c81b56f256a01962d3a90aca765ca4fe83"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/cursor_vs.hlsl",
+        "size": 277,
+        "sha256": "9d36e273933eeee6bacfc35b58832362fac9ce66945f3cab84363e43c5c5e6d7"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/base_vs.hlsl",
+        "size": 2292,
+        "sha256": "ef8a71496588f03c1f4f0d70721614a9316bfaf3e1c3af518316ce2d62a8a16a"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/base_vs_types.hlsl",
+        "size": 587,
+        "sha256": "29b1826b2ddf5d0f68c2e8d451792f14b0e6a93214cae3f64ee1c5c23cbe46d6"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/common.hlsl",
+        "size": 1235,
+        "sha256": "994090a79b7be68db00e72ed9d5dc50ca76e633e2658d84c1f1f5fa7284a3a16"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_base.hlsl",
+        "size": 35,
+        "sha256": "08c17550d9e6a4428585afed515e7f08ae5e685cc0434cf6ed9ee7845a05a07c"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_linear_base.hlsl",
+        "size": 124,
+        "sha256": "f1b1550980b607f0d57cde69feb16789cf71f16b3f6588d2eed0bb4f07c10372"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_perceptual_quantizer_base.hlsl",
+        "size": 74,
+        "sha256": "28f1df6f42f3ffbf4e321e7460b8c50d6bea0271e255f3c9c0453dad33e7395c"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_yuv420_packed_uv_ps_base.hlsl",
+        "size": 2024,
+        "sha256": "bf1ba49e77c38bc1129259f9e6e63c5deeaa77b30e50d5418b209904e64bbd70"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_yuv420_planar_y_ps_base.hlsl",
+        "size": 526,
+        "sha256": "136743a99284d18774b2b1cfcfbf9724d34e0817afb266a4fe479ab5afff7867"
+      },
+      {
+        "path": "sunshine/assets/shaders/directx/include/convert_yuv444_ps_base.hlsl",
+        "size": 997,
+        "sha256": "9dd182b1ac3ac96c65308e24ee190f21daa6c0b75a7aa2d7fc6cef06a04deeb3"
+      },
+      {
+        "path": "sunshine/assets/web/assets/apps-DjeQl0y5.js",
+        "size": 11305,
+        "sha256": "37a2d33094d1d411c38e376f715b155b95cf63eeec04e1af38ebf9ea3c19ed50"
+      },
+      {
+        "path": "sunshine/assets/web/assets/Checkbox-DUVuaVAk.js",
+        "size": 2355,
+        "sha256": "945432056626674f03b761ed48755a56282380a286b08fa30ce37b890d69868b"
+      },
+      {
+        "path": "sunshine/assets/web/assets/config-Be6hEjiR.js",
+        "size": 72946,
+        "sha256": "6a4dc1713e297fb502908bc9e1dbed7a1f633cdd08a6fb6e51ee6021aaa648cd"
+      },
+      {
+        "path": "sunshine/assets/web/assets/config-ByMCr56h.css",
+        "size": 100,
+        "sha256": "811a5266894f41deea7891f443e33b4a1db71d60124e68fd1ab44f8c5866450a"
+      },
+      {
+        "path": "sunshine/assets/web/assets/download-C00N41CV.js",
+        "size": 252,
+        "sha256": "7852c5e92b4e2791ca8155c78b4cdcfdde2a31c6c73f2f2358e20eb98ade94b8"
+      },
+      {
+        "path": "sunshine/assets/web/assets/external-link-kMaZrGpA.js",
+        "size": 271,
+        "sha256": "9b8b4830e3ee347ae9296a9d0e224655d276fc290dd5ec849376ca162d803676"
+      },
+      {
+        "path": "sunshine/assets/web/assets/featured-Be4_TtrE.js",
+        "size": 26935,
+        "sha256": "57ce4ffda7dd8678505f8d535d0c2315e568beb60f8077654ed0751c0aba19e6"
+      },
+      {
+        "path": "sunshine/assets/web/assets/fetch_utils-COCp1DR8.js",
+        "size": 394,
+        "sha256": "d0672ecac76afbab3ccda3fbea8ab3dadd2ac4127c9b2a82d418043df7d69b28"
+      },
+      {
+        "path": "sunshine/assets/web/assets/file-text-uKISzAQu.js",
+        "size": 405,
+        "sha256": "7c2d007e28448d241e68a2ee345d240254b11037b840a29d0ddede80dd03128c"
+      },
+      {
+        "path": "sunshine/assets/web/assets/gamepad-2-CH-kKcrZ.js",
+        "size": 641,
+        "sha256": "fdb9d5d58bbf9d08dd89c5c61e781aef28c64de0ae1a8f4ac1e2b552ca866d61"
+      },
+      {
+        "path": "sunshine/assets/web/assets/index-BedmhrDM.js",
+        "size": 48907,
+        "sha256": "a3f19ab50f5cfb83d851a09c524a31b8aeb533eff566cbdd1c51e78bc07a1823"
+      },
+      {
+        "path": "sunshine/assets/web/assets/logo-sunshine-45-2HJRdqau.css",
+        "size": 282530,
+        "sha256": "43b141f0963c257c79fa59ffe54e296a8d1095df14c6fa5ef876497f085a5b13"
+      },
+      {
+        "path": "sunshine/assets/web/assets/logo-sunshine-45-jSIapha2.js",
+        "size": 382267,
+        "sha256": "7ba5b261fcda8d014bb719935999af84b30aa5d52a5c5acc0321b808616a042b"
+      },
+      {
+        "path": "sunshine/assets/web/assets/logout-BX7snxS0.js",
+        "size": 175,
+        "sha256": "609729fe5753dbe5375af143b3038faa203ee6723407030f0a246dcc18077ef4"
+      },
+      {
+        "path": "sunshine/assets/web/assets/monitor-BeD3xYpa.js",
+        "size": 279,
+        "sha256": "1d75eeb21713b88ff6d979825f8add75b42076f3c8efc5458c31f1fc359aadc4"
+      },
+      {
+        "path": "sunshine/assets/web/assets/Navbar-Dibp9hT2.js",
+        "size": 5585,
+        "sha256": "29d770a6a09c57981b6b32facc7269c4fba1c29838f3966d491f66dc1c67ba5b"
+      },
+      {
+        "path": "sunshine/assets/web/assets/Navbar-SNHnNuEx.css",
+        "size": 318,
+        "sha256": "c58cf5eab34b554313ad178152643abbb7c829e90854318da9fdc9377509b4fa"
+      },
+      {
+        "path": "sunshine/assets/web/assets/NavbarSimple-BMWya-LV.js",
+        "size": 691,
+        "sha256": "8dce5bfe9cc657712825dbcf609014f5631159db5c96eb058c053b7975e38cb8"
+      },
+      {
+        "path": "sunshine/assets/web/assets/Notification-CkJkKBnN.js",
+        "size": 2384,
+        "sha256": "ac8595fb942c2012bacf4e34082f67f5c25f4c541c191267371bdd7d11807ec1"
+      },
+      {
+        "path": "sunshine/assets/web/assets/Notification-DmToSpaP.css",
+        "size": 189,
+        "sha256": "940d9c9b05f1c3acfbae40bb33eb2c362cd7894cd2ec7e34b8be40e9b1efde67"
+      },
+      {
+        "path": "sunshine/assets/web/assets/password-B9oiTv5N.js",
+        "size": 714,
+        "sha256": "dfc27ae2ad6650a9bbd908229ae341ae4d62c87799cf8418a56084cdcd216109"
+      },
+      {
+        "path": "sunshine/assets/web/assets/pin-BeRaTpxk.js",
+        "size": 2651,
+        "sha256": "414f8a889c910f61886700e6dfcd9d701265c1d8fe27380cf08c5aace408052b"
+      },
+      {
+        "path": "sunshine/assets/web/assets/ResourceCard-BiQzsCtb.js",
+        "size": 2430,
+        "sha256": "e8e1636ee99e9c420eec34f7bc5c721880a8d225f20c56b6aa7e41a846cdc339"
+      },
+      {
+        "path": "sunshine/assets/web/assets/rotate-ccw-eOcd-nKf.js",
+        "size": 220,
+        "sha256": "562747580c4d998bb141cde6f543aec2ab651923147b5752aa73eba8800cdf50"
+      },
+      {
+        "path": "sunshine/assets/web/assets/save-Xs6Ko-C-.js",
+        "size": 347,
+        "sha256": "435de6e2dfc8cf2e51866cc4b85f1f1961c6063c791ee7ea92a37de1bc895a26"
+      },
+      {
+        "path": "sunshine/assets/web/assets/SimpleIcon-GjJFNaNU.js",
+        "size": 3491,
+        "sha256": "e33bf6c0619a51eaf1dfc69d8cfa8820729d9610ec814d3131034d09a14a626f"
+      },
+      {
+        "path": "sunshine/assets/web/assets/sunshine_version-_Y49s21u.js",
+        "size": 1030,
+        "sha256": "da7bc978d95fdf888d2f3394e33cacfc717a9c5a6fb23d17a9aaaef403bf5c26"
+      },
+      {
+        "path": "sunshine/assets/web/assets/trash-hacRL4Qy.js",
+        "size": 588,
+        "sha256": "e1aac58fdabd701348700e9c3d84d0ac3dc4a0483dd53fb5295ac88f9f0234b8"
+      },
+      {
+        "path": "sunshine/assets/web/assets/troubleshooting-gFkdktK-.js",
+        "size": 14119,
+        "sha256": "4f1ad95877b86c3f176ecb5a4a73f9967f5b62d39ff454d084fcbeec01a0dabf"
+      },
+      {
+        "path": "sunshine/assets/web/assets/welcome-D0ZmWQXD.js",
+        "size": 843,
+        "sha256": "b5e0e45763f3ad4bcc9dc9520551026dc9429b1cc91ff39201ac2416beeb76de"
+      },
+      {
+        "path": "sunshine/assets/web/assets/x-jwKGGgAH.js",
+        "size": 174,
+        "sha256": "015d804caf38e7e4758be63770b8d85a10e497dc2d846de9615b85666129f219"
+      },
+      {
+        "path": "sunshine/assets/web/images/logo-libvirtualhid.svg",
+        "size": 1508,
+        "sha256": "cb8a6d6aed25fa5e4c91f3d43b58038dd7880e3c8b80632c17f56aeedbe3b99e"
+      },
+      {
+        "path": "sunshine/assets/web/images/logo-sunshine-16.png",
+        "size": 643,
+        "sha256": "e93a8da6f56c14f50f4390a5c6ae77ec916b59e8889c4c059d9e60dc35e77c62"
+      },
+      {
+        "path": "sunshine/assets/web/images/logo-sunshine-45.png",
+        "size": 1607,
+        "sha256": "03c4d786461fb6e602817d6ef49664c77c2efb41b050dbf3b520744b96ae2a30"
+      },
+      {
+        "path": "sunshine/assets/web/images/logo-sunshine.svg",
+        "size": 2165,
+        "sha256": "2a47de79ed6bcd5364ffd66adca4cf89da08265462cc5ebc73c59fcc7a66cfa4"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-locked-16.png",
+        "size": 650,
+        "sha256": "723011254a9d6d577e535c01870cf93315f4ece8ed01e111e3115f883605db53"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-locked-45.png",
+        "size": 1980,
+        "sha256": "df76e3be5ebfca84b56ef5b0bdb5ec1ec2f115cbeb65ba0066683fbb52f7dd62"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-locked.ico",
+        "size": 118386,
+        "sha256": "8b6233e53e6264ce03a53b8e1882e606c0544434264ebb550e750f7f3147b911"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-locked.png",
+        "size": 12555,
+        "sha256": "d2957aea96b07d9459075ebd5885cb6a9873fb242be57627ab52201b7c10293c"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-locked.svg",
+        "size": 4125,
+        "sha256": "6111572504558e3dd753f02515a1c7f792f6223306918e558d4ca05dcf048aee"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-pausing-16.png",
+        "size": 681,
+        "sha256": "8c6ada890ef98a773c47f0d036eb52036a76d7fb4fc90f7d61acd8cf64329515"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-pausing-45.png",
+        "size": 1868,
+        "sha256": "60ec827649aa0b06b4da91c061be3862d4ea391b245183be752fa147859157ba"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-pausing.ico",
+        "size": 108264,
+        "sha256": "af794c692373a02ebf31ecc0b3e530a3080bafb64c1ea6438effbdada25a270f"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-pausing.png",
+        "size": 10968,
+        "sha256": "af0365e5c6e69e13093a241314ca93417de4a9399869fdd37af70bd946a5e5b6"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-pausing.svg",
+        "size": 3987,
+        "sha256": "e60611c1c2d69836420f5867c68a154a37c68c96e3e1762acdce2b65a9a8460e"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-playing-16.png",
+        "size": 687,
+        "sha256": "50e86c6535f46fd779a030a2627a937f422d115769584905f9277ff766c80d03"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-playing-45.png",
+        "size": 2044,
+        "sha256": "5714884416fe42890da4a8e5f36d3ae35f9cc2e32b06c85c2a84a1804854e792"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-playing.ico",
+        "size": 120138,
+        "sha256": "d37313ec452a1a682ca45a797927060616319b07a1ad177ee6c1cf11d379f9f5"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-playing.png",
+        "size": 12100,
+        "sha256": "f3d46829d5fd7064774d085d7ea3ab7e6fd753aedae6360559a448c8dde62c94"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine-playing.svg",
+        "size": 4205,
+        "sha256": "b8dd9c752afb2e1f02507c7e1c5871036ba25f58c2081609efa461b4e19b0a34"
+      },
+      {
+        "path": "sunshine/assets/web/images/sunshine.ico",
+        "size": 123128,
+        "sha256": "c89e08407c0b47d4c37f4f74e26f95393b80f2313239b4a320e9a84a468b61e8"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/bg.json",
+        "size": 100374,
+        "sha256": "947460d05a2c2c2660871601d2d2e24e6ad09b95e949a7dc1ef240fd427ce6a7"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/cs.json",
+        "size": 62731,
+        "sha256": "f6ccaf4f8e370922a9035a4bc6a23dbf7575bb84d7b7421b38e19e870068bbb1"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/de.json",
+        "size": 60849,
+        "sha256": "5eee91ce1947d50e49cb85b11218905bb8584ee8e50cc626eedff1a5c7231de3"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/en.json",
+        "size": 55292,
+        "sha256": "fea758e614a526921bfa91175cf6de184bd7596c8d8105b4e9423f378e2778ed"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/en_GB.json",
+        "size": 54382,
+        "sha256": "bf876fb233949f976d3f720fda650ddc3e91b378ef7d0bab39f4fbd9a1232109"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/en_US.json",
+        "size": 55292,
+        "sha256": "fea758e614a526921bfa91175cf6de184bd7596c8d8105b4e9423f378e2778ed"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/es.json",
+        "size": 61751,
+        "sha256": "f4324ab3e32f890887f452c2073c0cf016df341eac330f4985572d89cee8e9de"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/fr.json",
+        "size": 63894,
+        "sha256": "175927497b537d127a24f3a5e3d1b4ea267a9ce28b5f9bdd0c8fe81e50d5df52"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/hu.json",
+        "size": 64146,
+        "sha256": "2f7bf90137352dd92875eee605a252af2943dd85c16516f19abce567bf62755d"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/it.json",
+        "size": 60976,
+        "sha256": "cb352b64fb4fc8e1ae596347049a3ab7bcf84e4e274553a0cc1543cf0def93c0"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/ja.json",
+        "size": 72009,
+        "sha256": "326b945b7d89fd36db5657084461e4227a0a661a64214e525fab32f54499becd"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/ko.json",
+        "size": 65096,
+        "sha256": "f6288210096e7e95b00ce1105efa35a6e9ef7e814dd5d1b9fc33070933b3f6c9"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/pl.json",
+        "size": 61964,
+        "sha256": "da8dd97e70a36208304e1043c3cd1dae119f44f57fa1daad391682714b16bde2"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/pt.json",
+        "size": 60423,
+        "sha256": "cc4bcf4ed6d7e684dbbc5ad7ccbb2a76db39795d7194a2c62742d7d5536f92d2"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/pt_BR.json",
+        "size": 61593,
+        "sha256": "af302946991a90bd90f6e4b76994f830002aa5bc974909f76575d04d06fe0044"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/ru.json",
+        "size": 89016,
+        "sha256": "afd353fe28b7a6e283ac3c2fbe895cb085d1fb3dacc7d2a5ad7ae66dfc70c87d"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/sv.json",
+        "size": 57633,
+        "sha256": "99fd1b1dfbe3985cebfe7ceb79a7580091fe57ded82c0a7c9c16255a56f440e2"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/tr.json",
+        "size": 62157,
+        "sha256": "75750bd53064aeb026950deb0c716da4f4d96ff4313f1112187fa857596d2d8a"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/uk.json",
+        "size": 88744,
+        "sha256": "11a6a6a5d070908de922c19c3af8912e48530ff0d7236a736cb282645ae307fd"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/vi.json",
+        "size": 73190,
+        "sha256": "6ae63989d3974bfc157ce9ec0a8754a35c5d9abdce7a8ae5f253e91b5550f10b"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/zh.json",
+        "size": 53938,
+        "sha256": "046c9472909cd295a2617bbf58c95cb449365dc7f948d83d7e134b3da4cc6d32"
+      },
+      {
+        "path": "sunshine/assets/web/assets/locale/zh_TW.json",
+        "size": 53666,
+        "sha256": "e5305c668a265521caf8161bf20aacc2782ed9081eb0f6a6f137124491c47a05"
+      }
+    ]
+  }
+}

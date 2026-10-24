@@ -28,12 +28,26 @@ set_target_properties(mslink PROPERTIES
 
 include(CTest)
 if (BUILD_TESTING)
-    # This white-box test includes relay.cpp to exercise the production packet-info
-    # helpers; do not also link mslink_core into this executable.
+    # These white-box tests include relay.cpp to exercise production helpers
+    # and integration paths; do not also link mslink_core into these executables.
     add_executable(mslink_udp_packet_info_test tests/udp_packet_info_test.cpp)
     target_include_directories(mslink_udp_packet_info_test PRIVATE include)
     target_compile_definitions(mslink_udp_packet_info_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     target_link_libraries(mslink_udp_packet_info_test PRIVATE ws2_32 bcrypt)
     add_test(NAME udp_reply_source COMMAND mslink_udp_packet_info_test)
+
+    add_executable(mslink_queue_frame_test tests/relay_queue_frame_test.cpp)
+    target_include_directories(mslink_queue_frame_test PRIVATE include)
+    target_compile_definitions(mslink_queue_frame_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_link_libraries(mslink_queue_frame_test PRIVATE ws2_32 bcrypt)
+    add_test(NAME relay_queue_frame COMMAND mslink_queue_frame_test)
+
+    add_executable(mslink_handshake_integration_test tests/relay_handshake_integration_test.cpp)
+    target_include_directories(mslink_handshake_integration_test PRIVATE include)
+    target_compile_definitions(mslink_handshake_integration_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_link_libraries(mslink_handshake_integration_test PRIVATE ws2_32 bcrypt)
+    add_test(NAME relay_handshake_integration COMMAND mslink_handshake_integration_test)
+    set_tests_properties(relay_handshake_integration PROPERTIES TIMEOUT 120)
+
     add_test(NAME relay_selftest COMMAND mslink selftest)
 endif()

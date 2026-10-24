@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "channel": "stable",
-  "created_utc": "2026-10-23T16:08:45.537200+00:00",
+  "created_utc": "2026-10-24T03:56:12.428975+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49316836,
-      "sha256": "34190d674b49cc89b4dc2f7799f616a99230840b77a5e3b41ea01da8953ff959"
+      "size": 49336648,
+      "sha256": "958f5a86c0714b32bf0b7b88723a525c061709d1e7ede9a9699b0ed564d9ed9d"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63484322,
-      "sha256": "465e31a02faef1786f442309547d4f7cc017d439793d726482cd5589d4da21bf"
+      "size": 63492283,
+      "sha256": "1cdbcfd8af4f549efe4f170d74fc922d2d3d032ab9efba0041232064dc838fc5"
     },
     {
-      "name": "MiniStream-2.1.2-Source.zip",
-      "size": 2707170,
-      "sha256": "061a9e723a80d325d66a1247dbe800b6c62e0de747b89b77ec7838499b431045"
+      "name": "MiniStream-2.1.3-Source.zip",
+      "size": 2763045,
+      "sha256": "17cc4c6c485c50260a504198f1bae61584f3b58223edd7fabbea083da46d6b75"
     }
   ],
   "sources": {
@@ -37,12 +37,56 @@
   },
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
-  "verification": [
-    "CMake/CTest: 2/2",
-    "Local address source preservation: 60/60",
-    "UDP burst: 100/100",
-    "Authenticated forwarding probes recovered to UDP on affected multi-interface host"
-  ],
+  "verification": {
+    "version": "2.1.3",
+    "passed": true,
+    "checked_utc": "2026-10-24",
+    "results": [
+      {
+        "name": "mslink CMake Release and CTest",
+        "status": "passed",
+        "evidence": "4/4: udp_reply_source, relay_queue_frame, relay_handshake_integration, relay_selftest"
+      },
+      {
+        "name": "stdin credential startup and command-line inspection",
+        "status": "passed",
+        "evidence": "12/12; host starts and listens with --password-stdin; process command line contains no password; empty stdin and conflicting options rejected"
+      },
+      {
+        "name": "controller credential migration",
+        "status": "passed",
+        "evidence": "Isolated real-code harness: plaintext migration, DPAPI reload, atomic write failure, preserved custom settings"
+      },
+      {
+        "name": "controller and host console builds",
+        "status": "passed",
+        "evidence": "MSVC 14.44 / Qt 6.9.3; Windows file versions 2.1.3.0"
+      },
+      {
+        "name": "isolated application launch",
+        "status": "passed",
+        "evidence": "Client UI Preview starts without reading real configuration; host console renders all three pages and shows dashes without live telemetry"
+      },
+      {
+        "name": "Inno installers",
+        "status": "passed",
+        "evidence": "MiniStream-Client-Setup.exe and MiniStream-Host-Setup.exe compiled successfully"
+      },
+      {
+        "name": "PowerShell 5.1 syntax",
+        "status": "passed",
+        "evidence": "tunnel-common, run-tunnel, start-tunnel and install scripts parsed successfully with UTF-8 BOM"
+      }
+    ],
+    "not_covered": [
+      "Full elevated install.ps1/task/firewall execution; non-admin syntax and ACL helper checks only",
+      "Clean Windows 10/11 installation and uninstall",
+      "All GPU and driver combinations",
+      "High-bitrate weak-network and long-duration WAN media sessions",
+      "Full independent security audit",
+      "Authenticode signing; installers remain unsigned"
+    ]
+  },
   "limits": [
     "Clean Win10/Win11 installation and all driver combinations not comprehensively covered",
     "Long-duration cross-network media/input testing remains ongoing",
@@ -117,8 +161,8 @@
       },
       {
         "path": "MiniStream.exe",
-        "size": 2985984,
-        "sha256": "fd4027dce8f4a4af44d29035d86f1db32ab9cdcf82ec0cb532668602cd9d4db5"
+        "size": 3037184,
+        "sha256": "7941fe7027bf222de98d6cf3e4fa7043995861ab66009044bef2b91d7227f144"
       },
       {
         "path": "ministream.ico",
@@ -1794,8 +1838,8 @@
       },
       {
         "path": "mslink.exe",
-        "size": 137216,
-        "sha256": "4eeed4bd2ebc00c3ecda903aeb0dcf532e970fd65a3c8c71b061eface54a8059"
+        "size": 159744,
+        "sha256": "7bebec29f16a62ad848e1a5ee17914937275434ffa3648e25a1b0f1e15b1fd31"
       },
       {
         "path": "THIRD_PARTY_NOTICES.txt",
@@ -1840,7 +1884,7 @@
       {
         "path": "console/MiniStreamHost.exe",
         "size": 166912,
-        "sha256": "37662f7f605e248e36448028b561e711ef4433edd2147ed19e3c0383b72690ed"
+        "sha256": "242dd39d743d513f7d0b0023945627ffe4e7e3ea61dde40f36dda5b268441eda"
       },
       {
         "path": "console/msvcp140.dll",
@@ -1929,13 +1973,13 @@
       },
       {
         "path": "_internal/gui-action.ps1",
-        "size": 3255,
-        "sha256": "5e46f2139ccbc704cf48061a81eb2fcbae6f48b69cca1cf4336395ff766383cf"
+        "size": 3501,
+        "sha256": "bd129f7a64da48ae97b6cb4d30f5c49187452e5979b673fde0da2162e4de01af"
       },
       {
         "path": "_internal/install.ps1",
-        "size": 23811,
-        "sha256": "fcb9f67bef1e10f5214786cce0a0d4c148fe408f9964f657be44f25d0b19441d"
+        "size": 24112,
+        "sha256": "2b4e166b6eee8061170e2a63025c88ed4abe7a39e2721eb3588164d21b387082"
       },
       {
         "path": "_internal/run-sunshine.ps1",
@@ -1944,18 +1988,18 @@
       },
       {
         "path": "_internal/run-tunnel.ps1",
-        "size": 1733,
-        "sha256": "68d223f1108f4662ff64a76a51c572f4a952b336aae50fa0f0697b1f1d88a310"
+        "size": 1588,
+        "sha256": "da5a15e74209d6b4159cacf5d8d3f3aee8588f14ad8c4663d056f3c28af203f9"
       },
       {
         "path": "_internal/start-tunnel.ps1",
-        "size": 1741,
-        "sha256": "90a798c2da8223128a1c67b1cd90c46c4353859675efab13dbcd8b57ec6cce68"
+        "size": 1699,
+        "sha256": "466b3227417d8cfb55133dc5eaab580b6a665f84240f40ae1e6b1fc292e00a6e"
       },
       {
         "path": "_internal/tunnel-common.ps1",
-        "size": 5298,
-        "sha256": "ed1c48b3e78b76a705b8d8897630c683c0a8f04b877b85f1ea0904a27d89aa30"
+        "size": 7402,
+        "sha256": "de62c43cb15f543ec5463977227c023d0291ff0d9fac1257d820c42ebc568aef"
       },
       {
         "path": "_internal/uninstall.ps1",

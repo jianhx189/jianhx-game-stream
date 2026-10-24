@@ -1,6 +1,6 @@
 # 当前版本构建指南 / Current build guide
 
-本文适用于 2.1.2。仓库早期根 CMake 客户端不是当前发布主控端；本机旧 `文档/BUILD.md` 已作为历史材料保留，维护者应以本文和 DEVELOPMENT 为准。
+本文适用于 2.1.3。仓库早期根 CMake 客户端不是当前发布主控端；旧原型的构建方式见 `文档/历史构建指南-旧原型.md`，维护者应以本文和 DEVELOPMENT 为准。
 
 ## Moonlight 主控端
 
@@ -25,6 +25,8 @@ nmake /NOLOGO
 
 本机已有静态库，因此增量构建使用 `D:\MiniStreamDev\build` 对 `..\app\app.pro` qmake 后 `nmake /f Makefile.Release`。产物 `build/release/Moonlight.exe` 在发布输入重命名为 `MiniStream.exe`。部署 Qt/QML/SDL/FFmpeg/OpenSSL 等依赖，保留许可。主控端版本来自 `app/version.txt`。
 
+主控端凭据使用 Windows DPAPI：`app.pro` 仅在 win32 链接 `crypt32`，`app/mslinkbridge.cpp` 负责 `dpapi:v1:` 加解密与旧明文 ini 的原子迁移（`QSaveFile`）。修改该文件或口令字段后要重新构建并使用隔离的 `MINISTREAM_UI_PREVIEW=1` 配置验证迁移，不要读写真实的 `mslink.ini`。非 Windows 构建走降级桩，发布主控端仍只支持 Windows x64。
+
 ## mslink 和回归
 
 ```powershell
@@ -33,7 +35,17 @@ cmake --build build/mslink --config Release
 ctest --test-dir build/mslink -C Release --output-on-failure
 ```
 
-本地中文目录映射为 `源码/mslink`。CTest 包含源地址保持与隧道自检；额外网卡测试需传入实际可达本机地址对。不能因为同机跨接口模拟被 Windows 路由阻止就宣称远程路径不通。
+本地中文目录映射为 `源码/mslink`。CTest 共四项：`udp_reply_source`（回包源地址）、`relay_queue_frame`（4 MiB 队列与 64 KiB 帧边界，白盒包含 `relay.cpp`）、`relay_handshake_integration`（慢速/非法对端等待时的非阻塞握手、单认证客户端、超长帧与快速停止；测试超时 120 秒）、`relay_selftest`（隧道自检）。2.1.3 的本机结果为 4/4，但这只是回环与白盒验证；额外网卡测试需传入实际可达本机地址对，不能因为同机跨接口模拟被 Windows 路由阻止就宣称远程路径不通。
+
+修改 `relay.cpp`、`relay.h` 或 `sequence_window.h` 后，独立 mslink 与主控端内嵌 Relay 都要重建（主控端把 `src/mslink` 放在完整树根 `mslink`）。`app/mslink/relay.h` 只是转发头，禁止维护第二份定义。
+
+手工验证口令传递（口令只从 stdin 读，不进入命令行）：
+
+```powershell
+'YourTestPassword123' | .\mslink.exe host --tcp 14738 --udp 14739 --password-stdin --target 127.0.0.1
+```
+
+空 stdin、`--password` 与 `--password-stdin` 同时出现都应退出并报错；`构建产物/mslink-robustness/stdin_check.py` 是这类检查的现成脚本（使用独立端口，不占用 14738/14739 的真实会话）。
 
 ## 被控端控制台
 
@@ -49,6 +61,10 @@ nmake /NOLOGO
 ## 安装包与发布
 
 当前 Inno 脚本的 source/output 是本机交付路径；换机需修改顶部路径，不要把私人配置补进包。Client 输入为完整运行目录；Host 输入包括 Sunshine、mslink、console 和 `_internal`，排除 Sunshine config、ini、日志、转储和运行状态。微软 redist 位于 `构建产物/prerequisites`。
+
+Host 安装器的口令流程：向导页收集口令并写入 `mslink-host.ini`，`install.ps1` 从受限 ini 读取后以标准输入传给隧道，计划任务只保留 `--password-stdin`。新安装校验 12–64 字符（字母、数字、`_ . @ -`）；检测到已有 ini 时允许旧口令原样保留并提示更换。安装脚本对 ini、`安装信息.txt` 和安装日志调用 `Protect-MiniStreamFile`，ACL 仅 SYSTEM / Administrators / 安装用户；安装日志不写入口令。
+
+两端安装包必须重新编译后才计算 SHA256，不能沿用 2.1.2 的哈希。中断的编译会留下不完整的 EXE；本轮文档更新不代表安装包已重新构建，最终结果以发布清单生成时的记录为准。
 
 ```powershell
 & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 源码/安装包脚本/MiniStream-Client.iss

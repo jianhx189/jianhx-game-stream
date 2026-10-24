@@ -83,11 +83,6 @@ static bool set_nonblocking(SOCKET s) {
     return ::ioctlsocket(s, FIONBIO, &nb) == 0;
 }
 
-static bool set_blocking(SOCKET s) {
-    u_long nb = 0;
-    return ::ioctlsocket(s, FIONBIO, &nb) == 0;
-}
-
 // ---------------------------------------------------------------------------
 //  放大套接字缓冲区
 // ---------------------------------------------------------------------------
@@ -215,13 +210,19 @@ struct OutQueue {
 
     bool empty() const { return items.empty(); }
 
-    void push(const void* data, size_t len) {
+    // 容量预留和入队是一个原子动作：预留失败时队列保持原样。
+    // offset 表示调用方已经直接发出、无需再入队的前缀。
+    bool push(const void* data, size_t len, size_t offset = 0) {
+        if (offset > len) return false;
+        const size_t pending = len - offset;
+        if (pending > kMaxQueueBytes || totalBytes > kMaxQueueBytes - pending) return false;
         Item it;
-        it.data.assign(static_cast<const uint8_t*>(data),
-                       static_cast<const uint8_t*>(data) + len);
+        const uint8_t* p = static_cast<const uint8_t*>(data);
+        it.data.assign(p + offset, p + len);
         it.offset = 0;
         items.push_back(std::move(it));
-        totalBytes += len;
+        totalBytes += pending;
+        return true;
     }
 
     // 尝试发送队列头部数据。返回：0=全部发完，1=部分发送（需等可写），-1=错误关闭。
@@ -254,77 +255,54 @@ struct OutQueue {
         }
         return 0;
     }
-
-    bool overLimit() const { return totalBytes > kMaxQueueBytes; }
 };
 
-// P1-1: 发送原始字节（不加帧头）。用于本地程序与 Sunshine 之间的直接转发。
-// 如果 socket 非阻塞且队列不为空，先入队；否则尝试直接发送，发不完入队。
-// 返回 true=数据已完整入队或直接发完，false=连接错误需关闭。
-static bool send_raw_queued(SOCKET s, OutQueue& oq, const void* data, size_t len) {
+// P1-1: 发送一段连续字节。能直接发完就直接发；遇到 WSAEWOULDBLOCK
+// 时把尚未发送的剩余部分作为一个整体入队。返回 false 表示连接错误或
+// 队列容量不足，调用方必须关闭对应流/隧道；不会静默丢弃数据。
+static bool send_blob_queued(SOCKET s, OutQueue& oq, const uint8_t* data, size_t len) {
     if (!sock_valid(s)) return false;
+    if (len == 0) return true;
 
     // 先尝试冲刷已有队列
     if (!oq.empty()) {
         int rc = oq.flush(s);
         if (rc < 0) return false;
         if (rc == 1) {
-            // 队列还没发完，新数据直接入队
-            oq.push(data, len);
-            if (oq.overLimit()) {
-                logf("警告：原始字节发送队列超过 4MB，关闭连接重建");
-                return false;
-            }
-            return true;
+            // 队列还没发完，新数据整体入队；失败时队列保持原样。
+            return oq.push(data, len);
         }
     }
 
     // 队列为空，尝试直接发送
-    const char* p = static_cast<const char*>(data);
     size_t sent = 0;
     while (sent < len) {
-        int n = ::send(s, p + sent, int(len - sent), 0);
+        int n = ::send(s, reinterpret_cast<const char*>(data) + sent, int(len - sent), 0);
         if (n > 0) { sent += size_t(n); continue; }
         if (n == 0) return false;
         int err = ::WSAGetLastError();
         if (err == WSAEWOULDBLOCK) {
-            oq.push(p + sent, len - sent);
-            return true;
+            // 只把未发送的部分挂回队列，offset 指向已发送前缀。
+            return oq.push(data, len, sent);
         }
         return false;
     }
     return true;
 }
 
+// P1-1: 发送原始字节（不加帧头）。用于本地程序与 Sunshine 之间的直接转发。
+static bool send_raw_queued(SOCKET s, OutQueue& oq, const void* data, size_t len) {
+    return send_blob_queued(s, oq, static_cast<const uint8_t*>(data), len);
+}
+
 // P1-1: 发送 TCP 帧（加 8 字节帧头）。仅用于两个 mslink 之间的隧道通信。
-// 如果 socket 非阻塞且队列不为空，先入队；否则尝试直接发送，发不完入队。
-// 返回 true=数据已完整入队或直接发完，false=连接错误需关闭。
+// 整帧先拼成一个连续缓冲区再交给 send_blob_queued，保证队列里不会出现
+// 「只有帧头没有 payload」的半帧；超过单帧上限直接拒绝。
 static bool send_tcp_frame_queued(SOCKET s, OutQueue& oq, uint16_t type, uint16_t streamId,
                                   const void* payload, size_t payloadLen) {
     if (!sock_valid(s)) return false;
+    if (payloadLen > kMaxTcpFrame) return false;
 
-    // 先尝试冲刷已有队列
-    if (!oq.empty()) {
-        int rc = oq.flush(s);
-        if (rc < 0) return false;
-        if (rc == 1) {
-            uint8_t hdr[8];
-            uint32_t len = uint32_t(payloadLen);
-            hdr[0] = uint8_t(len & 0xFF); hdr[1] = uint8_t((len >> 8) & 0xFF);
-            hdr[2] = uint8_t((len >> 16) & 0xFF); hdr[3] = uint8_t((len >> 24) & 0xFF);
-            hdr[4] = uint8_t(type & 0xFF); hdr[5] = uint8_t((type >> 8) & 0xFF);
-            hdr[6] = uint8_t(streamId & 0xFF); hdr[7] = uint8_t((streamId >> 8) & 0xFF);
-            oq.push(hdr, sizeof(hdr));
-            if (payloadLen) oq.push(payload, payloadLen);
-            if (oq.overLimit()) {
-                logf("警告：隧道发送队列超过 4MB，关闭连接重建");
-                return false;
-            }
-            return true;
-        }
-    }
-
-    // 队列为空，尝试直接发送
     uint8_t hdr[8];
     uint32_t len = uint32_t(payloadLen);
     hdr[0] = uint8_t(len & 0xFF); hdr[1] = uint8_t((len >> 8) & 0xFF);
@@ -332,41 +310,14 @@ static bool send_tcp_frame_queued(SOCKET s, OutQueue& oq, uint16_t type, uint16_
     hdr[4] = uint8_t(type & 0xFF); hdr[5] = uint8_t((type >> 8) & 0xFF);
     hdr[6] = uint8_t(streamId & 0xFF); hdr[7] = uint8_t((streamId >> 8) & 0xFF);
 
-    // 先发送头
-    const char* p = reinterpret_cast<const char*>(hdr);
-    size_t sent = 0;
-    while (sent < sizeof(hdr)) {
-        int n = ::send(s, p + sent, int(sizeof(hdr) - sent), 0);
-        if (n > 0) { sent += size_t(n); continue; }
-        if (n == 0) return false;
-        int err = ::WSAGetLastError();
-        if (err == WSAEWOULDBLOCK) {
-            oq.push(hdr, sizeof(hdr));
-            oq.items.back().offset = sent;
-            if (payloadLen) oq.push(payload, payloadLen);
-            return true;
-        }
-        return false;
-    }
-
-    // 发送 payload
+    std::vector<uint8_t> frame;
+    frame.reserve(sizeof(hdr) + payloadLen);
+    frame.insert(frame.end(), hdr, hdr + sizeof(hdr));
     if (payloadLen) {
-        p = static_cast<const char*>(payload);
-        sent = 0;
-        while (sent < payloadLen) {
-            int n = ::send(s, p + sent, int(payloadLen - sent), 0);
-            if (n > 0) { sent += size_t(n); continue; }
-            if (n == 0) return false;
-            int err = ::WSAGetLastError();
-            if (err == WSAEWOULDBLOCK) {
-                oq.push(payload, payloadLen);
-                oq.items.back().offset = sent;
-                return true;
-            }
-            return false;
-        }
+        const uint8_t* p = static_cast<const uint8_t*>(payload);
+        frame.insert(frame.end(), p, p + payloadLen);
     }
-    return true;
+    return send_blob_queued(s, oq, frame.data(), frame.size());
 }
 
 // 旧接口保留（同步阻塞版本，仅用于握手阶段）
@@ -382,7 +333,7 @@ static bool send_all(SOCKET s, const void* data, size_t len) {
 
 static bool send_tcp_frame(SOCKET s, uint16_t type, uint16_t streamId,
                            const void* payload, size_t payloadLen) {
-    if (!sock_valid(s)) return false;
+    if (!sock_valid(s) || payloadLen > kMaxTcpFrame) return false;
     uint8_t hdr[8];
     uint32_t len = uint32_t(payloadLen);
     hdr[0] = uint8_t(len & 0xFF); hdr[1] = uint8_t((len >> 8) & 0xFF);
@@ -394,35 +345,81 @@ static bool send_tcp_frame(SOCKET s, uint16_t type, uint16_t streamId,
     return true;
 }
 
-// P1-2: FrameReader 保留剩余数据，修复 TCP 粘包
+// P1-2: FrameReader 保留剩余数据，修复 TCP 粘包；同时把单帧长度限制在
+// kMaxTcpFrame，收到 8 字节头即可拒绝超长帧，缓冲区保持有界。
 struct FrameReader {
     std::vector<uint8_t> buf;
-    size_t offset = 0;  // 当前解析位置
+    size_t offset = 0;       // 当前解析位置
+    bool badFrame = false;   // 见到过非法帧头或缓冲越界，连接必须关闭
+
+    static constexpr size_t kMaxBuffered = 8 + kMaxTcpFrame + 16 * 1024;
+
+    size_t available() const { return buf.size() - offset; }
+    bool bad() const { return badFrame; }
+
+    uint32_t header_len() const {
+        return uint32_t(buf[offset]) | (uint32_t(buf[offset + 1]) << 8) |
+               (uint32_t(buf[offset + 2]) << 16) | (uint32_t(buf[offset + 3]) << 24);
+    }
 
     bool complete() const {
-        if (buf.size() - offset < 8) return false;
-        uint32_t len = uint32_t(buf[offset]) | (uint32_t(buf[offset+1]) << 8) |
-                       (uint32_t(buf[offset+2]) << 16) | (uint32_t(buf[offset+3]) << 24);
-        return buf.size() - offset >= 8 + size_t(len);
+        if (badFrame || available() < 8) return false;
+        const uint32_t len = header_len();
+        if (len > kMaxTcpFrame) return false;
+        return available() >= 8 + size_t(len);
     }
     size_t want() const {
-        if (buf.size() - offset < 8) return 8 - (buf.size() - offset);
-        uint32_t len = uint32_t(buf[offset]) | (uint32_t(buf[offset+1]) << 8) |
-                       (uint32_t(buf[offset+2]) << 16) | (uint32_t(buf[offset+3]) << 24);
-        size_t total = 8 + size_t(len);
-        size_t avail = buf.size() - offset;
-        return total > avail ? total - avail : 0;
+        if (badFrame || available() < 8) return badFrame ? 0 : 8 - available();
+        const uint32_t len = header_len();
+        if (len > kMaxTcpFrame) return 0;
+        const size_t total = 8 + size_t(len);
+        return total > available() ? total - available() : 0;
+    }
+    // 追加收到的字节。返回 false 表示数据非法，调用方必须关闭连接。
+    bool feed(const void* data, size_t len) {
+        if (badFrame) return false;
+        if (len == 0) return true;
+        if (available() >= 8 && header_len() > kMaxTcpFrame) {
+            badFrame = true;
+            buf.clear();
+            offset = 0;
+            return false;
+        }
+        // 丢弃已经消费的前缀，保证缓冲区大小只和未处理数据有关。
+        if (offset > 0) {
+            buf.erase(buf.begin(), buf.begin() + offset);
+            offset = 0;
+        }
+        if (len > kMaxBuffered || available() > kMaxBuffered - len) {
+            badFrame = true;
+            buf.clear();
+            offset = 0;
+            return false;
+        }
+        const uint8_t* p = static_cast<const uint8_t*>(data);
+        buf.insert(buf.end(), p, p + len);
+        if (available() >= 8 && header_len() > kMaxTcpFrame) {
+            badFrame = true;
+            buf.clear();
+            offset = 0;
+            return false;
+        }
+        return true;
     }
     bool pop(uint16_t& type, uint16_t& streamId, std::vector<uint8_t>& payload) {
         if (!complete()) return false;
-        uint32_t len = uint32_t(buf[offset]) | (uint32_t(buf[offset+1]) << 8) |
-                       (uint32_t(buf[offset+2]) << 16) | (uint32_t(buf[offset+3]) << 24);
+        uint32_t len = header_len();
         type = uint16_t(buf[offset+4] | (buf[offset+5] << 8));
         streamId = uint16_t(buf[offset+6] | (buf[offset+7] << 8));
         payload.assign(buf.begin() + offset + 8, buf.begin() + offset + 8 + len);
         offset += 8 + len;
         // 如果全部消费完，清空 buffer 重置 offset
         if (offset >= buf.size()) {
+            buf.clear();
+            offset = 0;
+        } else if (available() >= 8 && header_len() > kMaxTcpFrame) {
+            // 同一批数据里紧跟合法帧的超长头也必须立刻拒绝，不能等下一次 recv。
+            badFrame = true;
             buf.clear();
             offset = 0;
         }
@@ -432,6 +429,7 @@ struct FrameReader {
     void reset() {
         buf.clear();
         offset = 0;
+        badFrame = false;
     }
 };
 
@@ -638,8 +636,26 @@ struct Relay::Impl {
     };
     std::map<uint16_t, HostStream> hostStreams;
 
-    struct HostFlow { SOCKET up = INVALID_SOCKET; uint64_t lastMs = 0; bool viaTcp = false; };
+    struct HostFlow { SOCKET up = INVALID_SOCKET; uint64_t lastMs = 0; bool viaTcp = false; uint16_t targetPort = 0; };
     std::map<uint16_t, HostFlow> hostFlows;
+
+    // 未完成握手的连接。host_loop 用 WSAPoll 同时驱动它们，任何一条
+    // 慢连接都不会阻塞已经认证的会话，也不会阻塞 accept。
+    static constexpr size_t kMaxPendingHandshakes = 8;
+    static constexpr uint64_t kHandshakeTimeoutMs = 5000;
+    struct PendingHandshake {
+        enum class State { WaitToken, AwaitFlush, Closing };
+        SOCKET sock = INVALID_SOCKET;
+        FrameReader in;
+        OutQueue outQ;
+        sockaddr_in from{};
+        uint32_t nonce = 0;
+        uint64_t deadlineMs = 0;
+        State state = State::WaitToken;
+        uint8_t key[32] = {};
+    };
+    std::map<SOCKET, PendingHandshake> pendingHandshakes;
+    std::mutex pendingMtx;
 
     // P1-4: 会话密钥
     uint8_t sessionKey[32] = {};
@@ -647,6 +663,81 @@ struct Relay::Impl {
 
     // P1-4: UDP 序号防重放窗口（每个 flowId 记录最近收到的 seq）
     std::map<uint16_t, SequenceWindow> udpLastSeq;
+
+    // ---- 抗丢包：1+1 冗余发送 ----------------------------------------------
+    // 副本与原包使用同一个 (flowId, seq)：接收端现有的 64 包防重放窗口本来就会丢弃
+    // 重复 seq，所以不需要任何协议变更，也不需要旧版本对端配合。
+    // 只有通过认证、已经发出的数据报才会进入队列，未认证流量无法被放大。
+    static constexpr size_t kMaxPendingDups = 256;   // 上限保护（约 300 KB 内存）
+    struct PendingUdpDup {
+        uint64_t dueMs = 0;
+        SOCKET sock = INVALID_SOCKET;
+        sockaddr_in to{};
+        UdpReplyRoute route{};
+        bool hasRoute = false;
+        bool useSendMsg = false;
+        uint8_t type = kUdpData;
+        uint16_t flowId = 0;
+        uint32_t seq = 0;
+        std::vector<uint8_t> payload;
+    };
+    std::deque<PendingUdpDup> dupQueue;
+
+    UdpRedundancy redundancy_mode() const {
+        return mode == Mode::Host ? hcfg.udpRedundancy : ccfg.udpRedundancy;
+    }
+    uint16_t redundancy_gap_ms() const {
+        const uint16_t g = mode == Mode::Host ? hcfg.udpRedundancyGapMs : ccfg.udpRedundancyGapMs;
+        return g > 50 ? 50 : g;
+    }
+    // Control 模式只保护非视频流：视频占绝对多数带宽，复制它等于上行翻倍。
+    bool redundancy_for(uint16_t targetPort) const {
+        switch (redundancy_mode()) {
+            case UdpRedundancy::All:     return true;
+            case UdpRedundancy::Control: return targetPort != kVideoTargetPort;
+            default:                     return false;
+        }
+    }
+    void queue_udp_duplicate(SOCKET sock, const sockaddr_in& to, const UdpReplyRoute* route,
+                             bool useSendMsg, uint8_t ptype, uint16_t flowId, uint32_t seq,
+                             const void* payload, size_t len, uint16_t targetPort) {
+        if (!redundancy_for(targetPort)) return;
+        if (dupQueue.size() >= kMaxPendingDups) dupQueue.pop_front();
+        PendingUdpDup d;
+        d.dueMs = now_ms() + redundancy_gap_ms();
+        d.sock = sock;
+        d.to = to;
+        d.hasRoute = route != nullptr;
+        if (route) d.route = *route;
+        d.useSendMsg = useSendMsg;
+        d.type = ptype;
+        d.flowId = flowId;
+        d.seq = seq;
+        const uint8_t* src = static_cast<const uint8_t*>(payload);
+        d.payload.assign(src, src + len);
+        dupQueue.push_back(std::move(d));
+    }
+    void pump_udp_duplicates(uint64_t now) {
+        while (!dupQueue.empty() && dupQueue.front().dueMs <= now) {
+            PendingUdpDup& d = dupQueue.front();
+            if (send_udp_packet(d.sock, d.to, d.type, d.flowId, d.seq, sessionKey,
+                                d.payload.data(), d.payload.size(),
+                                d.hasRoute ? &d.route : nullptr,
+                                d.useSendMsg ? hostUdpIo.send : nullptr)) {
+                stat([](RelayStats& s) { s.udpRedundantSent++; });
+            }
+            dupQueue.pop_front();
+        }
+    }
+    // 有待发副本时把 poll 超时收紧到副本到期时刻，保证副本间隔（默认 2 ms）足够精确。
+    int poll_timeout_ms() const {
+        if (dupQueue.empty()) return 20;
+        const uint64_t now = now_ms();
+        const uint64_t due = dupQueue.front().dueMs;
+        if (due <= now) return 0;
+        const uint64_t wait = due - now;
+        return wait > 20 ? 20 : int(wait);
+    }
 
     // ---- 统计 ----
     template <typename F> void stat(F fn) {
@@ -672,10 +763,17 @@ struct Relay::Impl {
 
     bool client_connect_tunnel();
     void client_close_streams();
-    void client_handle_frame(uint16_t type, uint16_t sid, const std::vector<uint8_t>& pl);
+    bool client_handle_frame(uint16_t type, uint16_t sid, const std::vector<uint8_t>& pl);
+    bool process_client_frames();
+    void client_drop_tunnel(const char* why);
 
     void host_accept_tunnel();
-    void host_handle_frame(uint16_t type, uint16_t sid, const std::vector<uint8_t>& pl);
+    bool host_handle_frame(uint16_t type, uint16_t sid, const std::vector<uint8_t>& pl);
+    bool process_host_frames();
+    void host_drop_tunnel(const char* why);
+    bool host_process_pending_locked(std::map<SOCKET, PendingHandshake>::iterator it, short revents);
+    void host_promote_pending_locked(std::map<SOCKET, PendingHandshake>::iterator it);
+    void host_close_pending_locked();
     void host_close_all();
 };
 
@@ -781,11 +879,15 @@ bool Relay::Impl::client_connect_tunnel() {
     auto read_frame = [&](int timeoutMs) -> bool {
         const uint64_t deadline = now_ms() + uint64_t(timeoutMs);
         while (now_ms() < deadline) {
-            if (tcpIn.complete()) return tcpIn.pop(type, sid, pl);
+            if (tcpIn.bad()) return false;
+            if (tcpIn.complete()) {
+                if (!tcpIn.pop(type, sid, pl)) return false;
+                return !tcpIn.bad();
+            }
             uint8_t tmp[1024];
             int n = ::recv(tunnelTcp, (char*)tmp, sizeof(tmp), 0);
             if (n <= 0) return false;
-            tcpIn.buf.insert(tcpIn.buf.end(), tmp, tmp + n);
+            if (!tcpIn.feed(tmp, size_t(n))) return false;
         }
         return false;
     };
@@ -861,15 +963,44 @@ void Relay::Impl::client_close_streams() {
     clientStreams.clear();
 }
 
-void Relay::Impl::client_handle_frame(uint16_t type, uint16_t sid,
+void Relay::Impl::client_drop_tunnel(const char* why) {
+    if (sock_valid(tunnelTcp)) logf("客户端：%s", why);
+    sock_close(tunnelTcp);
+    tcpIn.reset();
+    tunnelOutQ = OutQueue{};
+    client_close_streams();
+    set_tunnel_up(false);
+}
+
+bool Relay::Impl::process_client_frames() {
+    uint16_t t = 0, sid = 0;
+    std::vector<uint8_t> pl;
+    while (tcpIn.complete()) {
+        if (!tcpIn.pop(t, sid, pl)) return false;
+        if (!client_handle_frame(t, sid, pl)) return false;
+    }
+    return !tcpIn.bad();
+}
+
+bool Relay::Impl::client_handle_frame(uint16_t type, uint16_t sid,
                                       const std::vector<uint8_t>& pl) {
     switch (type) {
         case kTcpStreamData: {
             auto it = clientStreams.find(sid);
             if (it == clientStreams.end()) break;
             // P1-1: 用原始字节发送（不加帧头），给本地 Moonlight
-            if (!pl.empty() && send_raw_queued(it->second.sock, it->second.outQ, pl.data(), pl.size()))
+            if (!pl.empty()) {
+                if (!send_raw_queued(it->second.sock, it->second.outQ, pl.data(), pl.size())) {
+                    // 本地流溢出/断开：关闭对应流，并尽力通知对端。通知失败视为隧道故障。
+                    const uint16_t id = it->second.id;
+                    sock_close(it->second.sock);
+                    clientStreams.erase(it);
+                    if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamClose, id, nullptr, 0))
+                        return false;
+                    break;
+                }
                 stat([&](RelayStats& s) { s.tcpBytesDown += pl.size(); });
+            }
             break;
         }
         case kTcpStreamClose: {
@@ -891,15 +1022,14 @@ void Relay::Impl::client_handle_frame(uint16_t type, uint16_t sid,
             break;
         }
         case kTcpPing:
-            send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPong, 0, nullptr, 0);
-            break;
-        case kTcpPong: {
+            return send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPong, 0, nullptr, 0);
+        case kTcpPong:
             record_pong();
             break;
-        }
         default:
             break;
     }
+    return true;
 }
 
 void Relay::Impl::client_loop() {
@@ -913,6 +1043,7 @@ void Relay::Impl::client_loop() {
     uint64_t lastSweepMs = now_ms();
 
     while (!stopReq.load()) {
+        pump_udp_duplicates(now_ms());
         if (!sock_valid(tunnelTcp)) {
             set_tunnel_up(false);
             client_close_streams();
@@ -956,7 +1087,7 @@ void Relay::Impl::client_loop() {
         }
 
         if (fds.empty()) break;
-        int rc = ::WSAPoll(fds.data(), ULONG(fds.size()), 20);
+        int rc = ::WSAPoll(fds.data(), ULONG(fds.size()), poll_timeout_ms());
         if (rc < 0) { ::Sleep(10); continue; }
 
         for (size_t i = 0; i < entries.size(); ++i) {
@@ -967,10 +1098,7 @@ void Relay::Impl::client_loop() {
                 if (fds[i].revents & POLLWRNORM) {
                     int rc2 = tunnelOutQ.flush(tunnelTcp);
                     if (rc2 < 0) {
-                        logf("客户端：隧道发送队列错误，断开重连");
-                        sock_close(tunnelTcp);
-                        client_close_streams();
-                        set_tunnel_up(false);
+                        client_drop_tunnel("隧道发送队列错误，断开重连");
                         break;
                     }
                 }
@@ -979,18 +1107,16 @@ void Relay::Impl::client_loop() {
                 uint8_t tmp[8192];
                 int n = ::recv(tunnelTcp, (char*)tmp, sizeof(tmp), 0);
                 if (n <= 0) {
-                    logf("客户端：隧道断开，1 秒后重连");
-                    sock_close(tunnelTcp);
-                    client_close_streams();
-                    set_tunnel_up(false);
+                    client_drop_tunnel("隧道断开，1 秒后重连");
                     break;
                 }
-                tcpIn.buf.insert(tcpIn.buf.end(), tmp, tmp + n);
-                uint16_t t = 0, sid2 = 0;
-                std::vector<uint8_t> pl;
-                while (tcpIn.complete()) {
-                    if (!tcpIn.pop(t, sid2, pl)) break;
-                    client_handle_frame(t, sid2, pl);
+                if (!tcpIn.feed(tmp, size_t(n))) {
+                    client_drop_tunnel("收到非法或超长 TCP 帧，断开重连");
+                    break;
+                }
+                if (!process_client_frames()) {
+                    client_drop_tunnel("隧道帧处理失败，断开重连");
+                    break;
                 }
             } else if (e.kind == kTcpListen) {
                 sockaddr_in from{};
@@ -1004,7 +1130,8 @@ void Relay::Impl::client_loop() {
                 uint8_t pb[2] = { uint8_t(port & 0xFF), uint8_t((port >> 8) & 0xFF) };
                 if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamOpen, sid2, pb, sizeof(pb))) {
                     sock_close(c);
-                    continue;
+                    client_drop_tunnel("隧道发送队列溢出/错误，断开重连");
+                    break;
                 }
                 ClientStream cs;
                 cs.sock = c; cs.id = sid2; cs.targetPort = port;
@@ -1012,6 +1139,7 @@ void Relay::Impl::client_loop() {
                 stat([](RelayStats& s) { s.tcpStreamsOpened++; });
                 logf("客户端：Moonlight 连入本机 %u -> 隧道流 #%u", port, sid2);
             } else if (e.kind == kUdpListen) {
+                bool tunnelOk = true;
                 for (;;) {
                     uint8_t buf[kMaxUdpPayload + 64];
                     sockaddr_in from{};
@@ -1048,14 +1176,28 @@ void Relay::Impl::client_loop() {
                             stat([](RelayStats& s) { s.udpPacketsUp++; });
                         } else {
                             stat([](RelayStats& s) { s.udpDropped++; });
+                            tunnelOk = false;
+                            break;
                         }
-                    } else if (send_udp_packet(udpTunnel, serverUdpAddr, kUdpData, it->second.id,
-                                               ++udpSeq, sessionKey, pkt, size_t(n) + 2)) {
-                        udpBytesUp.fetch_add(uint64_t(n) + 2);
-                        stat([](RelayStats& s) { s.udpPacketsUp++; });
                     } else {
-                        stat([](RelayStats& s) { s.udpDropped++; });
+                        const uint32_t seq = ++udpSeq;
+                        const uint16_t logicalPort = udpListenPorts[e.index];
+                        if (send_udp_packet(udpTunnel, serverUdpAddr, kUdpData, it->second.id,
+                                            seq, sessionKey, pkt, size_t(n) + 2)) {
+                            udpBytesUp.fetch_add(uint64_t(n) + 2);
+                            stat([](RelayStats& s) { s.udpPacketsUp++; });
+                            // 抗丢包：同一 (flowId, seq) 再发一份副本；接收端按防重放窗口去重
+                            queue_udp_duplicate(udpTunnel, serverUdpAddr, nullptr, false,
+                                                kUdpData, it->second.id, seq,
+                                                pkt, size_t(n) + 2, logicalPort);
+                        } else {
+                            stat([](RelayStats& s) { s.udpDropped++; });
+                        }
                     }
+                }
+                if (!tunnelOk) {
+                    client_drop_tunnel("隧道发送队列溢出/错误，断开重连");
+                    break;
                 }
             } else if (e.kind == kStream) {
                 auto it = clientStreams.find(uint16_t(e.index));
@@ -1064,9 +1206,13 @@ void Relay::Impl::client_loop() {
                 if (fds[i].revents & POLLWRNORM) {
                     int rc2 = it->second.outQ.flush(it->second.sock);
                     if (rc2 < 0) {
-                        send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamClose, it->second.id, nullptr, 0);
+                        const uint16_t id = it->second.id;
                         sock_close(it->second.sock);
                         clientStreams.erase(it);
+                        if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamClose, id, nullptr, 0)) {
+                            client_drop_tunnel("隧道发送队列溢出/错误，断开重连");
+                            break;
+                        }
                         continue;
                     }
                 }
@@ -1075,11 +1221,18 @@ void Relay::Impl::client_loop() {
                 uint8_t buf[8192];
                 int n = ::recv(it->second.sock, (char*)buf, sizeof(buf), 0);
                 if (n <= 0) {
-                    send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamClose, it->second.id, nullptr, 0);
+                    const uint16_t id = it->second.id;
                     sock_close(it->second.sock);
                     clientStreams.erase(it);
+                    if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamClose, id, nullptr, 0)) {
+                        client_drop_tunnel("隧道发送队列溢出/错误，断开重连");
+                        break;
+                    }
                 } else if (send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpStreamData, it->second.id, buf, size_t(n))) {
                     stat([&](RelayStats& s) { s.tcpBytesUp += size_t(n); });
+                } else {
+                    client_drop_tunnel("隧道发送队列溢出/错误，断开重连");
+                    break;
                 }
             } else if (e.kind == kUdpTunnel) {
                 for (;;) {
@@ -1118,6 +1271,7 @@ void Relay::Impl::client_loop() {
                         if(udpViaTcp.load() && ++udpRecoverHits>=3){udpViaTcp.store(false);udpRecoverHits=0;logf("UDP recovered after three authenticated ACKs");}
                         continue;
                     }
+                    if(udpLastSeq[fid].duplicate(seq)){stat([](RelayStats& s){s.udpDuplicates++;});continue;}
                     if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
                     udpDataReceived.fetch_add(1);lastAuthenticatedUdpMs.store(now_ms());lastUdpAckMs=now_ms();udpDirectOk.store(true);
@@ -1183,9 +1337,14 @@ void Relay::Impl::client_loop() {
         if (now_ms() - lastPingMs > 1000) {
             lastPingMs = now_ms();
             pingSentMs.store(now_ms());
-            send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPing, 0, nullptr, 0);
-            const auto report=telemetry_json();
-            send_tcp_frame_queued(tunnelTcp,tunnelOutQ,kTcpTelemetry,0,report.data(),report.size());
+            if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPing, 0, nullptr, 0)) {
+                client_drop_tunnel("控制帧发送失败，断开重连");
+            } else {
+                const auto report = telemetry_json();
+                if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpTelemetry, 0, report.data(), report.size())) {
+                    client_drop_tunnel("控制帧发送失败，断开重连");
+                }
+            }
         }
         stat([&](RelayStats& s){s.activeTcpStreams=uint32_t(clientStreams.size());s.activeUdpFlows=uint32_t(clientFlows.size());s.queuedBytes=tunnelOutQ.totalBytes;});
         if (now_ms() - lastSweepMs > 30000) {
@@ -1266,85 +1425,183 @@ bool Relay::Impl::start_host(const HostConfig& cfg, std::string& err) {
 }
 
 void Relay::Impl::host_accept_tunnel() {
-    sockaddr_in from{};
-    int fl = sizeof(from);
-    SOCKET c = ::accept(hTcpListen, (sockaddr*)&from, &fl);
-    if (!sock_valid(c)) return;
-    // Windows 上 accept() 出来的 socket 会继承监听口的非阻塞模式，
-    // 必须显式设回阻塞，否则下面的 recv 立刻返回 WSAEWOULDBLOCK 被误判成
-    // "对端断开"，隧道永远建立不起来（自检实测：WSA 10053）。
-    set_blocking(c);
-    DWORD tmo = 5000;
-    ::setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tmo, sizeof(tmo));
-    ::setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tmo, sizeof(tmo));
-    tune_buffers(c, "被控端隧道 TCP");
+    for (;;) {
+        sockaddr_in from{};
+        int fl = sizeof(from);
+        SOCKET c = ::accept(hTcpListen, (sockaddr*)&from, &fl);
+        if (!sock_valid(c)) return;
 
-    uint32_t nonce = uint32_t(now_ms()) ^ (uint32_t)(uintptr_t)&nonce;
-    if (nonce == 0) nonce = 1;
-    uint8_t nb[4] = { uint8_t(nonce & 0xFF), uint8_t((nonce >> 8) & 0xFF),
-                      uint8_t((nonce >> 16) & 0xFF), uint8_t((nonce >> 24) & 0xFF) };
-    if (!send_tcp_frame(c, kTcpHello, 0, nb, 4)) { sock_close(c); return; }
-    logf("被控端：新连接 %s:%u 已发送 nonce（0x%08X）", inet_ntoa(from.sin_addr), ntohs(from.sin_port), nonce);
+        // 单客户端：已有认证会话时直接拒绝新连接，本轮不做接管。
+        if (sock_valid(hTunnel)) {
+            logf("被控端：已有认证会话，拒绝新连接 %s:%u", inet_ntoa(from.sin_addr), ntohs(from.sin_port));
+            sock_close(c);
+            continue;
+        }
 
-    FrameReader fr;
-    uint16_t type = 0, sid = 0;
-    std::vector<uint8_t> pl;
-    const uint64_t deadline = now_ms() + 5000;
-    while (now_ms() < deadline && !fr.complete()) {
+        {
+            std::lock_guard<std::mutex> lk(pendingMtx);
+            if (pendingHandshakes.size() >= kMaxPendingHandshakes) {
+                logf("被控端：未认证握手已达上限 %u，拒绝新连接",
+                     unsigned(kMaxPendingHandshakes));
+                sock_close(c);
+                continue;
+            }
+            // Windows 上 accept() 出来的 socket 会继承监听口的非阻塞模式，
+            // 这里保持非阻塞，握手完全由 WSAPoll 驱动，不再阻塞事件循环。
+            set_nonblocking(c);
+            tune_buffers(c, "被控端隧道 TCP");
+
+            PendingHandshake p;
+            p.sock = c;
+            p.from = from;
+            p.nonce = uint32_t(now_ms()) ^ uint32_t(uintptr_t(&from));
+            if (p.nonce == 0) p.nonce = 1;
+            p.deadlineMs = now_ms() + kHandshakeTimeoutMs;
+
+            uint8_t nb[4] = { uint8_t(p.nonce & 0xFF), uint8_t((p.nonce >> 8) & 0xFF),
+                              uint8_t((p.nonce >> 16) & 0xFF), uint8_t((p.nonce >> 24) & 0xFF) };
+            if (!send_tcp_frame_queued(p.sock, p.outQ, kTcpHello, 0, nb, sizeof(nb))) {
+                logf("被控端：发送非阻塞握手 nonce 失败（WSA=%d）", ::WSAGetLastError());
+                sock_close(p.sock);
+                continue;
+            }
+            pendingHandshakes.emplace(c, std::move(p));
+        }
+        logf("被控端：新连接 %s:%u 已发送 nonce（非阻塞握手）",
+             inet_ntoa(from.sin_addr), ntohs(from.sin_port));
+    }
+}
+
+void Relay::Impl::host_close_pending_locked() {
+    for (auto& kv : pendingHandshakes) sock_close(kv.second.sock);
+    pendingHandshakes.clear();
+}
+
+// 返回 true 表示该 pending 仍保留；false 表示已关闭或已提升为会话（均已从 map 移除）。
+bool Relay::Impl::host_process_pending_locked(
+        std::map<SOCKET, PendingHandshake>::iterator it, short revents) {
+    PendingHandshake& p = it->second;
+    auto drop = [&](const char* why) -> bool {
+        if (why) logf("被控端：%s", why);
+        sock_close(p.sock);
+        pendingHandshakes.erase(it);
+        return false;
+    };
+
+    if (now_ms() > p.deadlineMs) return drop("未认证握手超时（5 秒），关闭连接");
+
+    if (!p.outQ.empty()) {
+        int rc = p.outQ.flush(p.sock);
+        if (rc < 0) return drop("未认证握手发送失败（连接已断开）");
+    }
+
+    if (p.state == PendingHandshake::State::WaitToken) {
+        if (!(revents & (POLLRDNORM | POLLHUP | POLLERR))) return true;
+
         uint8_t tmp[512];
-        int n = ::recv(c, (char*)tmp, sizeof(tmp), 0);
-        if (n <= 0) { sock_close(c); return; }
-        fr.buf.insert(fr.buf.end(), tmp, tmp + n);
-    }
-    if (!fr.complete()) {
-        logf("被控端：等待握手 token 超时（缓冲 %u 字节，WSA=%d）",
-             unsigned(fr.buf.size()), ::WSAGetLastError());
-        sock_close(c);
-        return;
-    }
-    if (!fr.pop(type, sid, pl) || type != kTcpHelloAck || pl.size() < 16) {
-        logf("被控端：握手帧非法（type=%u size=%u）", unsigned(type), unsigned(pl.size()));
-        sock_close(c);
-        return;
+        int n = ::recv(p.sock, (char*)tmp, sizeof(tmp), 0);
+        if (n <= 0) return drop("未认证握手读取失败");
+        if (!p.in.feed(tmp, size_t(n)))
+            return drop("未认证握手帧非法或超长");
+
+        if (!p.in.complete()) return true;
+
+        uint16_t type = 0, sid = 0;
+        std::vector<uint8_t> pl;
+        if (!p.in.pop(type, sid, pl) || p.in.bad() ||
+            type != kTcpHelloAck || pl.size() < 16)
+            return drop("握手帧非法（类型、长度或后续帧头不符）");
+
+        uint8_t expect[16];
+        make_token(hcfg.password, p.nonce, expect);
+        uint8_t diff = 0;
+        for (int i = 0; i < 16; ++i) diff |= uint8_t(pl[i] ^ expect[i]);
+        const uint8_t good = (diff == 0) ? 1 : 0;
+
+        if (!send_tcp_frame_queued(p.sock, p.outQ, kTcpHelloAck, 0, &good, 1))
+            return drop("发送认证结果失败");
+
+        if (!good) {
+            logf("被控端：隧道认证失败（密码不一致）");
+            p.state = PendingHandshake::State::Closing;
+            int rc = p.outQ.flush(p.sock);
+            if (rc < 0 || p.outQ.empty()) {
+                sock_close(p.sock);
+                pendingHandshakes.erase(it);
+                return false;
+            }
+            return true;
+        }
+
+        derive_session_key(hcfg.password, p.nonce, p.key);
+        if (!send_tcp_frame_queued(p.sock, p.outQ, kTcpSessionKey, 0, p.key, 32))
+            return drop("发送会话密钥失败");
+        p.state = PendingHandshake::State::AwaitFlush;
+
+        int rc = p.outQ.flush(p.sock);
+        if (rc < 0) return drop("发送会话密钥失败（连接已断开）");
+        if (p.outQ.empty()) {
+            host_promote_pending_locked(it);
+            return false;
+        }
+        return true;
     }
 
-    uint8_t expect[16];
-    make_token(hcfg.password, nonce, expect);
-    uint8_t diff = 0;
-    for (int i = 0; i < 16; ++i) diff |= uint8_t(pl[i] ^ expect[i]);
-    uint8_t good = (diff == 0) ? 1 : 0;
-    send_tcp_frame(c, kTcpHelloAck, 0, &good, 1);
-    if (!good) {
-        logf("被控端：隧道认证失败（密码不一致）");
-        sock_close(c);
-        return;
+    // AwaitFlush / Closing：必须先把手里的 HelloAck/SessionKey 全部发完，
+    // 才能把 socket 交给数据阶段或关闭，避免半帧/缺密钥。
+    if (!p.outQ.empty()) return true;
+
+    if (p.state == PendingHandshake::State::Closing) {
+        sock_close(p.sock);
+        pendingHandshakes.erase(it);
+        return false;
     }
 
-    // P1-4: 认证成功，生成并发送会话密钥
-    derive_session_key(hcfg.password, nonce, sessionKey);
-    if (!send_tcp_frame(c, kTcpSessionKey, 0, sessionKey, 32)) {
-        logf("被控端：发送会话密钥失败");
-        sock_close(c);
-        return;
-    }
+    host_promote_pending_locked(it);
+    return false;
+}
+
+void Relay::Impl::host_promote_pending_locked(
+        std::map<SOCKET, PendingHandshake>::iterator it) {
+    PendingHandshake& p = it->second;
+
+    hTunnel = p.sock;
+    p.sock = INVALID_SOCKET;
+    hTcpIn = std::move(p.in);
+    hTunnelOutQ = OutQueue{};
+    std::memcpy(sessionKey, p.key, 32);
     sessionValid = true;
+    set_tunnel_up(true);
+    logf("被控端：隧道已建立并认证（%s:%u）",
+         inet_ntoa(p.from.sin_addr), ntohs(p.from.sin_port));
 
-    hTunnel = c;
+    // 单认证客户端：其余还在握手的连接全部拒绝。
+    for (auto o = pendingHandshakes.begin(); o != pendingHandshakes.end();) {
+        if (o == it) { ++o; continue; }
+        logf("被控端：已有会话建立，拒绝另一个未认证连接");
+        sock_close(o->second.sock);
+        o = pendingHandshakes.erase(o);
+    }
+    pendingHandshakes.erase(it);
+}
+
+void Relay::Impl::host_drop_tunnel(const char* why) {
+    if (sock_valid(hTunnel)) logf("被控端：%s", why);
+    sock_close(hTunnel);
     hTcpIn.reset();
     hTunnelOutQ = OutQueue{};
+    host_close_all();
+    set_tunnel_up(false);
+}
 
-    // P1-3: 握手完成后，把隧道 socket 设为非阻塞（事件循环用）
-    if (!set_nonblocking(hTunnel)) {
-        logf("被控端：设置隧道非阻塞失败（WSA=%d）", ::WSAGetLastError());
-        sock_close(hTunnel);
-        return;
+bool Relay::Impl::process_host_frames() {
+    uint16_t t = 0, sid = 0;
+    std::vector<uint8_t> pl;
+    while (hTcpIn.complete()) {
+        if (!hTcpIn.pop(t, sid, pl)) return false;
+        if (!host_handle_frame(t, sid, pl)) return false;
     }
-    DWORD zero = 0;
-    ::setsockopt(hTunnel, SOL_SOCKET, SO_SNDTIMEO, (const char*)&zero, sizeof(zero));
-    ::setsockopt(hTunnel, SOL_SOCKET, SO_RCVTIMEO, (const char*)&zero, sizeof(zero));
-
-    set_tunnel_up(true);
-    logf("被控端：隧道已建立并认证（%s:%u）", inet_ntoa(from.sin_addr), ntohs(from.sin_port));
+    return !hTcpIn.bad();
 }
 
 void Relay::Impl::host_close_all() {
@@ -1359,7 +1616,7 @@ void Relay::Impl::host_close_all() {
     udpLastSeq.clear();
 }
 
-void Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
+bool Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
                                     const std::vector<uint8_t>& pl) {
     switch (type) {
         case kTcpStreamOpen: {
@@ -1382,9 +1639,15 @@ void Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
             if (it == hostStreams.end()) break;
             // P1-1: 用原始字节发送（不加帧头），给 Sunshine
             if (!pl.empty()) {
-                if (send_raw_queued(it->second.up, it->second.outQ, pl.data(), pl.size())) {
-                    stat([&](RelayStats& s) { s.tcpBytesUp += pl.size(); });
+                if (!send_raw_queued(it->second.up, it->second.outQ, pl.data(), pl.size())) {
+                    // 目标流溢出/断开：关闭该流并通知对端；通知失败视为隧道故障。
+                    sock_close(it->second.up);
+                    hostStreams.erase(it);
+                    if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0))
+                        return false;
+                    break;
                 }
+                stat([&](RelayStats& s) { s.tcpBytesUp += pl.size(); });
             }
             break;
         }
@@ -1405,7 +1668,7 @@ void Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
                 if (::connect(us, (sockaddr*)&ta, sizeof(ta)) != 0) { sock_close(us); break; }
                 set_nonblocking(us);
                 tune_buffers(us, "被控端上游 UDP（TCP 兜底）");
-                HostFlow hf; hf.up = us; hf.lastMs = now_ms(); hf.viaTcp = true;
+                HostFlow hf; hf.up = us; hf.lastMs = now_ms(); hf.viaTcp = true; hf.targetPort = targetPort;
                 hostFlows[sid] = hf;
                 it = hostFlows.find(sid);
                 logf("被控端：UDP 流 #%u -> %s:%u（经 TCP 兜底通道）", sid, hcfg.targetHost.c_str(), targetPort);
@@ -1423,15 +1686,15 @@ void Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
             break;
         case kTcpPong: record_pong(); break;
         case kTcpPing:
-            send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPong, 0, nullptr, 0);
-            break;
+            return send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPong, 0, nullptr, 0);
         default:
             break;
     }
+    return true;
 }
 
 void Relay::Impl::host_loop() {
-    enum Kind { kHTcpListen = 0, kHUdpListen, kHTunnel, kHStream, kHUdpFlow };
+    enum Kind { kHTcpListen = 0, kHUdpListen, kHTunnel, kHStream, kHUdpFlow, kHPending };
     struct Entry { SOCKET s; Kind kind; size_t index; };
 
     std::vector<WSAPOLLFD> fds;
@@ -1440,6 +1703,23 @@ void Relay::Impl::host_loop() {
     uint64_t lastPingMs = now_ms();
 
     while (!stopReq.load()) {
+        pump_udp_duplicates(now_ms());
+
+        // 每轮清理超时的未认证握手；它们不占用事件循环，也不影响已有会话。
+        {
+            std::lock_guard<std::mutex> lk(pendingMtx);
+            const uint64_t n = now_ms();
+            for (auto it = pendingHandshakes.begin(); it != pendingHandshakes.end();) {
+                if (n > it->second.deadlineMs) {
+                    logf("被控端：未认证握手超时（5 秒），关闭连接");
+                    sock_close(it->second.sock);
+                    it = pendingHandshakes.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
         fds.clear();
         entries.clear();
         fds.push_back({ hTcpListen, POLLRDNORM, 0 });
@@ -1451,6 +1731,15 @@ void Relay::Impl::host_loop() {
             if (!hTunnelOutQ.empty()) ev |= POLLWRNORM;
             fds.push_back({ hTunnel, ev, 0 });
             entries.push_back({ hTunnel, kHTunnel, 0 });
+        }
+        {
+            std::lock_guard<std::mutex> lk(pendingMtx);
+            for (auto& kv : pendingHandshakes) {
+                short ev = POLLRDNORM;
+                if (!kv.second.outQ.empty()) ev |= POLLWRNORM;
+                fds.push_back({ kv.first, ev, 0 });
+                entries.push_back({ kv.first, kHPending, 0 });
+            }
         }
         for (auto& kv : hostStreams) {
             if (!sock_valid(kv.second.up)) continue;
@@ -1465,7 +1754,7 @@ void Relay::Impl::host_loop() {
             entries.push_back({ kv.second.up, kHUdpFlow, kv.first });
         }
 
-        int rc = ::WSAPoll(fds.data(), ULONG(fds.size()), 20);
+        int rc = ::WSAPoll(fds.data(), ULONG(fds.size()), poll_timeout_ms());
         if (rc < 0) { ::Sleep(10); continue; }
 
         for (size_t i = 0; i < entries.size(); ++i) {
@@ -1473,14 +1762,13 @@ void Relay::Impl::host_loop() {
             const Entry& e = entries[i];
 
             if (e.kind == kHTcpListen) {
-                if (!sock_valid(hTunnel)) {
-                    host_accept_tunnel();
-                } else {
-                    sockaddr_in from{};
-                    int fl = sizeof(from);
-                    SOCKET c = ::accept(hTcpListen, (sockaddr*)&from, &fl);
-                    if (sock_valid(c)) sock_close(c);
-                }
+                host_accept_tunnel();
+            } else if (e.kind == kHPending) {
+                std::lock_guard<std::mutex> lk(pendingMtx);
+                auto it = pendingHandshakes.find(e.s);
+                if (it != pendingHandshakes.end())
+                    host_process_pending_locked(it, fds[i].revents);
+                continue;
             } else if (e.kind == kHUdpListen) {
                 for (;;) {
                     uint8_t buf[kUdpHdr + kMaxUdpPayload + 64];
@@ -1514,6 +1802,7 @@ void Relay::Impl::host_loop() {
                         continue;
                     }
 
+                    if(udpLastSeq[fid].duplicate(seq)){stat([](RelayStats& s){s.udpDuplicates++;});continue;}
                     if(!udpLastSeq[fid].accept(seq)){stat([](RelayStats& s){s.udpDropped++;});continue;}
 
                     if (!receivedRoute.valid) {
@@ -1575,7 +1864,7 @@ void Relay::Impl::host_loop() {
                         if (::connect(us, (sockaddr*)&ta, sizeof(ta)) != 0) { sock_close(us); continue; }
                         set_nonblocking(us);
                         tune_buffers(us, "被控端上游 UDP");
-                        HostFlow hf; hf.up = us; hf.lastMs = now_ms();
+                        HostFlow hf; hf.up = us; hf.lastMs = now_ms(); hf.targetPort = targetPort;
                         hostFlows[fid] = hf;
                         it = hostFlows.find(fid);
                         logf("被控端：UDP 流 #%u -> %s:%u", fid, hcfg.targetHost.c_str(), targetPort);
@@ -1587,33 +1876,24 @@ void Relay::Impl::host_loop() {
                     stat([](RelayStats& s) { s.udpPacketsUp++; });
                 }
             } else if (e.kind == kHTunnel) {
+                bool tunnelOk = true;
                 if (fds[i].revents & POLLWRNORM) {
                     int rc2 = hTunnelOutQ.flush(hTunnel);
-                    if (rc2 < 0) {
-                        logf("被控端：隧道发送队列错误，断开");
-                        sock_close(hTunnel);
-                        host_close_all();
-                        set_tunnel_up(false);
-                        break;
+                    if (rc2 < 0) tunnelOk = false;
+                }
+                if (tunnelOk && (fds[i].revents & (POLLRDNORM | POLLHUP | POLLERR))) {
+                    uint8_t tmp[8192];
+                    int n = ::recv(hTunnel, (char*)tmp, sizeof(tmp), 0);
+                    if (n <= 0) {
+                        tunnelOk = false;
+                    } else if (!hTcpIn.feed(tmp, size_t(n))) {
+                        logf("被控端：收到非法或超长 TCP 帧，断开隧道");
+                        tunnelOk = false;
                     }
                 }
-                if (!(fds[i].revents & (POLLRDNORM | POLLHUP | POLLERR))) continue;
-
-                uint8_t tmp[8192];
-                int n = ::recv(hTunnel, (char*)tmp, sizeof(tmp), 0);
-                if (n <= 0) {
-                    logf("被控端：隧道断开");
-                    sock_close(hTunnel);
-                    host_close_all();
-                    set_tunnel_up(false);
+                if (!tunnelOk) {
+                    host_drop_tunnel("隧道断开或发送队列错误，等待客户端重连");
                     break;
-                }
-                hTcpIn.buf.insert(hTcpIn.buf.end(), tmp, tmp + n);
-                uint16_t t = 0, sid2 = 0;
-                std::vector<uint8_t> pl;
-                while (hTcpIn.complete()) {
-                    if (!hTcpIn.pop(t, sid2, pl)) break;
-                    host_handle_frame(t, sid2, pl);
                 }
             } else if (e.kind == kHStream) {
                 const uint16_t sid = uint16_t(e.index);
@@ -1623,9 +1903,12 @@ void Relay::Impl::host_loop() {
                 if (fds[i].revents & POLLWRNORM) {
                     int rc2 = it->second.outQ.flush(it->second.up);
                     if (rc2 < 0) {
-                        send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0);
                         sock_close(it->second.up);
                         hostStreams.erase(it);
+                        if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0)) {
+                            host_drop_tunnel("隧道发送队列溢出/错误，断开");
+                            break;
+                        }
                         continue;
                     }
                 }
@@ -1634,45 +1917,78 @@ void Relay::Impl::host_loop() {
                 uint8_t buf[8192];
                 int n = ::recv(it->second.up, (char*)buf, sizeof(buf), 0);
                 if (n <= 0) {
-                    send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0);
                     sock_close(it->second.up);
                     hostStreams.erase(it);
+                    if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0)) {
+                        host_drop_tunnel("隧道发送队列溢出/错误，断开");
+                        break;
+                    }
                 } else if (send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamData, sid, buf, size_t(n))) {
                     stat([&](RelayStats& s) { s.tcpBytesDown += size_t(n); });
+                } else {
+                    host_drop_tunnel("隧道发送队列溢出/错误，断开");
+                    break;
                 }
             } else if (e.kind == kHUdpFlow) {
                 const uint16_t fid = uint16_t(e.index);
                 auto it = hostFlows.find(fid);
                 if (it == hostFlows.end()) continue;
 
+                bool tunnelOk = true;
                 for (;;) {
                     uint8_t buf[kMaxUdpPayload + 16];
                     int n = ::recv(it->second.up, (char*)buf, sizeof(buf), 0);
                     if (n <= 0) break;
+                    if (size_t(n) > kMaxUdpPayload) {
+                        // 超过单包上限会触发 IP 分片（任一分片丢失=整包丢失），宁可不发。
+                        stat([](RelayStats& s) { s.udpDropped++; });
+                        continue;
+                    }
                     if (it->second.viaTcp) {
-                        if (!sock_valid(hTunnel)) continue;
-                        send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpUdpDown, fid,
-                                               buf, size_t(n));
+                        if (!sock_valid(hTunnel)) { tunnelOk = false; break; }
+                        if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpUdpDown, fid,
+                                                   buf, size_t(n))) {
+                            tunnelOk = false;
+                            break;
+                        }
                     } else if (clientUdpKnown) {
+                        const uint32_t seq = ++udpSeq;
                         if (!send_udp_packet(hUdpListen, clientUdpAddr, kUdpData, fid,
-                                        ++udpSeq, sessionKey,
+                                        seq, sessionKey,
                                         buf, size_t(n), &clientUdpRoute, hostUdpIo.send)) {
                             udpReplyErrors.fetch_add(1);
                             lastUdpSendError.store(WSAGetLastError());
                             continue;
                         }
+                        // 抗丢包：下行副本（视频是丢包的主要受害者）。被控端可开关。
+                        queue_udp_duplicate(hUdpListen, clientUdpAddr, &clientUdpRoute, true,
+                                            kUdpData, fid, seq, buf, size_t(n),
+                                            it->second.targetPort);
                     } else {
                         continue;
                     }
                     udpBytesDown.fetch_add(uint64_t(n));
                     stat([](RelayStats& s) { s.udpPacketsDown++; });
                 }
+                if (!tunnelOk) {
+                    host_drop_tunnel("隧道发送队列溢出/错误，断开");
+                    break;
+                }
             }
+        }
+
+        // 处理本轮及上一轮缓冲区里已经完整到达的帧（含刚提升为会话的连接）。
+        if (sock_valid(hTunnel) && !process_host_frames()) {
+            host_drop_tunnel("隧道帧处理失败，断开");
         }
 
         if (now_ms() - lastPingMs > 1000) {
             lastPingMs = now_ms();
-            if (sock_valid(hTunnel)) {pingSentMs.store(now_ms());send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPing, 0, nullptr, 0);}
+            if (sock_valid(hTunnel)) {
+                pingSentMs.store(now_ms());
+                if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpPing, 0, nullptr, 0))
+                    host_drop_tunnel("控制帧发送失败，断开");
+            }
         }
         bool anyFallback=false;for(const auto& flow:hostFlows)anyFallback|=flow.second.viaTcp;hostFallback.store(anyFallback);
         stat([&](RelayStats& s){s.activeTcpStreams=uint32_t(hostStreams.size());s.activeUdpFlows=uint32_t(hostFlows.size());s.queuedBytes=hTunnelOutQ.totalBytes;});
@@ -1690,6 +2006,10 @@ void Relay::Impl::host_loop() {
     sock_close(hTunnel);
     sock_close(hTcpListen);
     sock_close(hUdpListen);
+    {
+        std::lock_guard<std::mutex> lk(pendingMtx);
+        host_close_pending_locked();
+    }
     set_tunnel_up(false);
 }
 
@@ -1713,6 +2033,9 @@ std::string Relay::Impl::telemetry_json() const {
       <<",\"udp_hello_received\":"<<udpHelloReceived.load()<<",\"udp_hello_ack_sent\":"<<udpHelloAckSent.load()
       <<",\"udp_session_rejected\":"<<udpSessionRejected.load()<<",\"udp_reply_errors\":"<<udpReplyErrors.load()
       <<",\"udp_reply_route_pinned\":"<<(udpReplyRoutePinned.load()?"true":"false")
+      <<",\"udp_redundancy\":"<<json_quote(udp_redundancy_name(redundancy_mode()))
+      <<",\"udp_redundancy_gap_ms\":"<<redundancy_gap_ms()
+      <<",\"udp_redundant_sent\":"<<s.udpRedundantSent<<",\"udp_duplicate_received\":"<<s.udpDuplicates
       <<",\"peer_report_age_ms\":"<<(peerAt?n-peerAt:UINT64_MAX)<<",\"peer_report_json\":"<<json_quote(peer)
       <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null")<<"}";
     return o.str();
@@ -1783,6 +2106,11 @@ void Relay::Impl::stop_impl() {
     // P1-3: 取消阻塞：shutdown 所有 socket 唤醒 WSAPoll
     if (sock_valid(tunnelTcp)) ::shutdown(tunnelTcp, SD_BOTH);
     if (sock_valid(hTunnel)) ::shutdown(hTunnel, SD_BOTH);
+    {
+        std::lock_guard<std::mutex> lk(pendingMtx);
+        for (auto& kv : pendingHandshakes)
+            if (sock_valid(kv.second.sock)) ::shutdown(kv.second.sock, SD_BOTH);
+    }
     if (sock_valid(udpTunnel)) ::shutdown(udpTunnel, SD_BOTH);
     if (th.joinable()) th.join();
     if (statsTh.joinable()) statsTh.join();

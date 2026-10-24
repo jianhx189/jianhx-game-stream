@@ -29,9 +29,7 @@ try {
         throw "找不到 $exe"
     }
 
-    $arguments = Get-MslinkHostArguments -Settings $settings
-    $proc = Start-Process -FilePath $exe -ArgumentList $arguments `
-        -WorkingDirectory $TargetDir -WindowStyle Hidden -PassThru
+    $proc = Start-MslinkTunnel -Settings $settings
 
     # 留一个 PID 文件，排障时能直接看出“隧道到底起没起”
     try {

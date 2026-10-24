@@ -78,9 +78,12 @@ function Get-MslinkHostSettings {
     if (-not $password) {
         throw 'mslink-host.ini 里缺少 password（远控端要填同样的口令）'
     }
-    # 口令会进入计划任务的命令行，限制在安全字符集，避免引号/空格/XML 转义问题
+    # 新安装至少 12 字符；升级保留旧口令，但提醒用户更换。
     if ($password -notmatch '^[A-Za-z0-9_.@-]{1,64}$') {
         throw 'password 只支持字母、数字和 _ . @ - ，长度 1-64（不要用空格、引号、中文）'
+    }
+    if ($password.Length -lt 12) {
+        Write-Warning '现有隧道口令少于 12 字符；为兼容升级暂时保留，请安排更换。'
     }
 
     $target = [string]$cfg['target']
@@ -100,7 +103,7 @@ function Get-MslinkHostSettings {
     }
 }
 
-# 生成 mslink host 的参数数组（顺序固定，便于计划任务/自检核对）
+# 口令只通过 stdin 传递，不进入命令行、计划任务 XML 或临时文件。
 function Get-MslinkHostArguments {
     param([Parameter(Mandatory = $true)]$Settings)
 
@@ -108,10 +111,40 @@ function Get-MslinkHostArguments {
         'host',
         '--tcp', [string]$Settings.TcpPort,
         '--udp', [string]$Settings.UdpPort,
-        '--password', [string]$Settings.Password,
+        '--password-stdin',
         '--target', [string]$Settings.Target,
         '--bind', [string]$Settings.Bind
     )
+}
+
+function Start-MslinkTunnel {
+    param([Parameter(Mandatory = $true)]$Settings, [switch]$Wait)
+
+    $exe = Join-Path $Settings.Root 'mslink.exe'
+    $start = New-Object System.Diagnostics.ProcessStartInfo
+    $start.FileName = $exe
+    $start.Arguments = (@(Get-MslinkHostArguments -Settings $Settings) | ForEach-Object {
+        if ($_ -match '[\s"]') { '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' } else { $_ }
+    }) -join ' '
+    $start.WorkingDirectory = $Settings.Root
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = -not $Wait
+    $start.RedirectStandardInput = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $start
+    if (-not $process.Start()) { throw '无法启动 mslink.exe' }
+    try {
+        $process.StandardInput.WriteLine([string]$Settings.Password)
+        $process.StandardInput.Close()
+    } catch {
+        if (-not $process.HasExited) { $process.Kill() }
+        throw
+    }
+    if ($Wait) {
+        $process.WaitForExit()
+        return $process.ExitCode
+    }
+    return ,$process
 }
 
 # 以 UTF-8 带 BOM 写文本（PowerShell 5.1 / 记事本都能正确识别中文）
@@ -121,6 +154,22 @@ function Write-Utf8BomFile {
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text
     )
     [System.IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding($true)))
+}
+
+# 端口是否已在监听（用于“隧道已在运行”的友好提示）
+function Protect-MiniStreamFile {
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$UserId)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $acl = New-Object System.Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    $inherit = [System.Security.AccessControl.InheritanceFlags]::None
+    $propagation = [System.Security.AccessControl.PropagationFlags]::None
+    $allow = [System.Security.AccessControl.AccessControlType]::Allow
+    foreach ($identity in @('NT AUTHORITY\SYSTEM', 'BUILTIN\Administrators', $UserId)) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', $inherit, $propagation, $allow)
+        $acl.AddAccessRule($rule)
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
 # 端口是否已在监听（用于“隧道已在运行”的友好提示）

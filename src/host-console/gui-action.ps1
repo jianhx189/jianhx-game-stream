@@ -9,6 +9,7 @@ function Get-UpdatedSetting([string]$Path,[hashtable]$Values){
  foreach($k in $Values.Keys){$pattern='(?m)^\s*'+[regex]::Escape($k)+'\s*=.*$';$line=$k+' = '+$Values[$k];if([regex]::IsMatch($text,$pattern)){$text=[regex]::Replace($text,$pattern,$line)}else{$text+="`r`n$line`r`n"}}
  return $text
 }
+. (Join-Path $Root '_internal\tunnel-common.ps1')
 function Save-Settings {
  $paths=@((Join-Path $Root 'mslink-host.ini'),(Join-Path $Root 'sunshine\config\sunshine.conf'))
  $values=@(@{tcp_port=$TcpPort;udp_port=$UdpPort},@{ping_timeout=$TimeoutMs})
@@ -21,6 +22,9 @@ function Save-Settings {
    [IO.File]::WriteAllText(($paths[$i]+'.new'),$text,(New-Object Text.UTF8Encoding($false)))
   }
   for($i=0;$i -lt $paths.Count;$i++) { [IO.File]::Replace(($paths[$i]+'.new'),$paths[$i],($paths[$i]+'.backup'));$changed.Add($i) }
+  $userId=[Security.Principal.WindowsIdentity]::GetCurrent().Name
+  Protect-MiniStreamFile -Path $paths[0] -UserId $userId
+  Protect-MiniStreamFile -Path ($paths[0]+'.backup') -UserId $userId
  } catch {
   foreach($i in $changed) { Copy-Item -LiteralPath ($paths[$i]+'.backup') -Destination $paths[$i] -Force }
   throw

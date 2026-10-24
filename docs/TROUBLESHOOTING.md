@@ -23,6 +23,13 @@
 
 已修复案例：多网卡 wildcard 监听收包地址 A，普通 sendto 从地址 B 回包。2.1.2 改用 IP_PKTINFO。实测恢复 UDP；详见 UDP 多网卡修复说明。普通 UDP 字符串不会得到 mslink 回显，不能把静默丢弃当作端口关闭。
 
+## 口令、本地文件与握手
+
+- **主控端提示“无法用当前 Windows 用户解密”**：`mslink.ini` 中的 `dpapi:v1:` 只能用保存它的 Windows 用户解密。换用户、换机器或回退到 2.1.2 及更早版本后需要重新填写口令，这是预期行为；不要手工删除密文来“修复”。
+- **被控端读不到配置或日志**：`mslink-host.ini`、`安装信息.txt` 和安装日志的 ACL 只允许 SYSTEM、Administrators 与安装用户。其他账户读不到属于预期；分享安装目录前先删除 `安装信息.txt`。
+- **命令行看不到口令**：2.1.3 的隧道通过 `--password-stdin` 接收口令，任务计划 XML 与进程命令行都不会出现口令，安装日志也不再记录隧道/Sunshine 口令。若旧日志或截图曾经包含口令，按 SECURITY 的建议轮换。
+- **握手等待/超时**：被控端最多保留 8 个待认证握手，单个 5 秒超时。日志出现占满或超时的提示时，先确认来源地址与防火墙规则，等待超时释放；不要通过绕过认证来处理。已认证会话始终只有一个。
+
 ## 鼠标与偶发卡顿
 
 记录精确时间，确认画面/声音是否继续；区分桌面与游戏、窗口焦点、菜单、鼠标相对/绝对模式。网络 RTT/丢帧变化与解码/排队变化应分别对照。请不要只看到 TCP 或 UDP 就判断输入注入链路是否正常。
@@ -31,4 +38,4 @@
 
 ## English
 
-Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.
+Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. Passwords stored as `dpapi:v1:` can only be decrypted by the same Windows user; after a downgrade or user change, re-enter them instead of editing the ini. Host passwords arrive on standard input, so seeing none on the command line is expected. At most 8 host handshakes wait for 5 seconds each; a full queue means slow or unexpected peers and is not a reason to bypass authentication. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.

@@ -37,6 +37,4 @@ if (Test-TcpPortListening -Port $settings.TcpPort) {
     exit 0
 }
 
-$arguments = Get-MslinkHostArguments -Settings $settings
-& $exe @arguments
-exit $LASTEXITCODE
+exit (Start-MslinkTunnel -Settings $settings -Wait)

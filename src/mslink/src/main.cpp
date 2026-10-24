@@ -41,6 +41,13 @@ static void sleep_ms(int ms) { ::Sleep(DWORD(ms)); }
 
 #define STEP(...) do { fprintf(stderr, "[STEP] " __VA_ARGS__); fprintf(stderr, "\n"); fflush(stderr); } while (0)
 
+// 抗丢包副本间隔：0-50 ms，超出范围就夹紧，避免配置错误导致排队膨胀。
+static uint16_t clamp_gap(int ms) {
+    if (ms < 0) return 0;
+    if (ms > 50) return 50;
+    return uint16_t(ms);
+}
+
 static void split_kv(const std::string& s, std::map<uint16_t, uint16_t>& out) {
     // "47989=47989,48010=48051"
     size_t pos = 0;
@@ -75,11 +82,15 @@ static std::vector<uint16_t> split_ports(const std::string& s) {
 static void usage() {
     printf(
         "mslink —— 把 Moonlight/Sunshine 的 6 条流压进 1 TCP + 1 UDP\n\n"
-        "  mslink host   --tcp <端口> --udp <端口> --password <口令> [--target <Sunshine地址>]\n"
+        "  mslink host   --tcp <端口> --udp <端口> --password-stdin [--target <Sunshine地址>]\n"
         "                [--map-tcp a=b,c=d] [--map-udp a=b,c=d] [--bind 0.0.0.0]\n"
-        "  mslink client --server <地址> --tcp <端口> --udp <端口> --password <口令>\n"
+        "  mslink client --server <地址> --tcp <端口> --udp <端口> --password-stdin\n"
+        "                口令从标准输入读取一行；--password 仅为兼容保留，不建议使用\n"
         "                [--listen 127.0.0.1] [--tcp-ports 47989,47984,48010]\n"
         "                [--udp-ports 47998,47999,48000]\n"
+        "  抗丢包（两端都支持，默认 off）：\n"
+        "                [--redundancy off|control|all] [--redundancy-gap-ms 0-50]\n"
+        "                control 只复制非视频流（音频/输入），all 连视频一起复制（带宽约翻倍）\n"
         "  mslink selftest\n");
 }
 
@@ -154,6 +165,122 @@ static bool wait_true(const std::function<bool()>& fn, int timeoutMs) {
         sleep_ms(20);
     }
     return false;
+}
+
+// ---- 抗丢包回归：1+1 冗余发送 ------------------------------------------------
+// 要求同时满足三件事：
+//   1) 上行副本被被控端去重 -> 假 Sunshine 只收到 kCount 份，不是 2*kCount
+//   2) 下行副本被客户端去重 -> 应用层只看到 kCount 个不重复应答
+//   3) 两端的"已发副本"和"收到重复"计数都在增长（证明机制真的在工作）
+static bool redundancy_phase() {
+    printf("\n--- 抗丢包（1+1 冗余发送）回归 ---\n");
+    const uint16_t kFakeUdp   = 19032;
+    const uint16_t kTunnelTcp = 19030;
+    const uint16_t kTunnelUdp = 19031;
+    const uint16_t kLocalUdp  = 19033;
+    const int      kCount     = 40;
+
+    std::atomic<bool> stopEcho{false};
+    std::atomic<int>  echoOk{0};
+    std::thread echo([&] {
+        SOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (s == INVALID_SOCKET) return;
+        sockaddr_in a{};
+        a.sin_family = AF_INET;
+        a.sin_port = htons(kFakeUdp);
+        ::inet_pton(AF_INET, "127.0.0.1", &a.sin_addr);
+        if (::bind(s, (sockaddr*)&a, sizeof(a)) != 0) { ::closesocket(s); return; }
+        char buf[2048];
+        while (!stopEcho.load()) {
+            fd_set rf; FD_ZERO(&rf); FD_SET(s, &rf);
+            timeval tv{ 0, 100000 };
+            if (::select(0, &rf, nullptr, nullptr, &tv) <= 0) continue;
+            sockaddr_in from{}; int fl = sizeof(from);
+            int n = ::recvfrom(s, buf, sizeof(buf), 0, (sockaddr*)&from, &fl);
+            if (n > 0) { ::sendto(s, buf, n, 0, (sockaddr*)&from, fl); ++echoOk; }
+        }
+        ::closesocket(s);
+    });
+    sleep_ms(150);
+
+    bool pass = false;
+    {
+        Relay hostRelay;
+        Relay clientRelay;
+        std::string err;
+        HostConfig hc;
+        hc.listenTcpPort = kTunnelTcp;
+        hc.listenUdpPort = kTunnelUdp;
+        hc.password = "selftest-pw";
+        hc.targetHost = "127.0.0.1";
+        hc.udpPortMap[kLocalUdp] = kFakeUdp;
+        hc.udpRedundancy = UdpRedundancy::All;
+        hc.udpRedundancyGapMs = 2;
+        ClientConfig cc;
+        cc.serverHost = "127.0.0.1";
+        cc.serverTcpPort = kTunnelTcp;
+        cc.serverUdpPort = kTunnelUdp;
+        cc.password = "selftest-pw";
+        cc.listenAddr = "127.0.0.1";
+        cc.udpListenPorts = { kLocalUdp };
+        cc.udpRedundancy = UdpRedundancy::All;
+        cc.udpRedundancyGapMs = 2;
+
+        if (!hostRelay.start_host(hc, err)) { printf("[FAIL] 冗余回归：被控端启动失败 %s\n", err.c_str()); }
+        else if (!clientRelay.start_client(cc, err)) { printf("[FAIL] 冗余回归：客户端启动失败 %s\n", err.c_str()); hostRelay.stop(); }
+        else {
+            const bool up = wait_true([&] { return clientRelay.stats().tunnelUp && hostRelay.stats().tunnelUp; }, 5000);
+            if (!up) printf("[FAIL] 冗余回归：隧道未建立\n");
+            else {
+                // 等 UDP 探测确认，避免首批数据落进 TCP 兜底通道
+                wait_true([&] { return clientRelay.udpDirectOk(); }, 3000);
+
+                SOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                DWORD tmo = 300;
+                ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tmo, sizeof(tmo));
+                sockaddr_in a{};
+                a.sin_family = AF_INET;
+                a.sin_port = htons(kLocalUdp);
+                ::inet_pton(AF_INET, "127.0.0.1", &a.sin_addr);
+                for (int i = 0; i < kCount; ++i) {
+                    const uint32_t payload = uint32_t(0x5100 + i);
+                    ::sendto(s, (const char*)&payload, sizeof(payload), 0, (sockaddr*)&a, sizeof(a));
+                    sleep_ms(2);
+                }
+                std::set<uint32_t> got;
+                int duplicateReplies = 0;
+                const uint64_t deadline = nowMs() + 1500;
+                while (nowMs() < deadline) {
+                    uint32_t v = 0;
+                    const int n = ::recv(s, (char*)&v, sizeof(v), 0);
+                    if (n != int(sizeof(v))) continue;
+                    if (!got.insert(v).second) ++duplicateReplies;
+                }
+                ::closesocket(s);
+
+                const RelayStats cs = clientRelay.stats();
+                const RelayStats hs = hostRelay.stats();
+                const bool uplinkDeduped = echoOk.load() == kCount;
+                const bool downlinkDeduped = int(got.size()) == kCount && duplicateReplies == 0;
+                const bool countersMoving = cs.udpRedundantSent > 0 && hs.udpRedundantSent > 0 &&
+                                            hs.udpDuplicates > 0 && cs.udpDuplicates > 0;
+                printf("%s 上行副本被去重：假 Sunshine 收到 %d/%d 份\n",
+                       uplinkDeduped ? "[ OK ]" : "[FAIL]", echoOk.load(), kCount);
+                printf("%s 下行副本被去重：应用层收到 %zu/%d 个不重复应答（重复 %d）\n",
+                       downlinkDeduped ? "[ OK ]" : "[FAIL]", got.size(), kCount, duplicateReplies);
+                printf("%s 副本计数：客户端已发 %llu / 收到重复 %llu；被控端已发 %llu / 收到重复 %llu\n",
+                       countersMoving ? "[ OK ]" : "[FAIL]",
+                       (unsigned long long)cs.udpRedundantSent, (unsigned long long)cs.udpDuplicates,
+                       (unsigned long long)hs.udpRedundantSent, (unsigned long long)hs.udpDuplicates);
+                pass = up && uplinkDeduped && downlinkDeduped && countersMoving;
+            }
+        }
+        clientRelay.stop();
+        hostRelay.stop();
+    }
+    stopEcho.store(true);
+    echo.join();
+    return pass;
 }
 
 int run() {
@@ -333,12 +460,13 @@ int run() {
     STEP("stopping host relay");
     hostRelay.stop();
     STEP("relays stopped");
+    const bool redundancyPass = redundancy_phase();
     gStop.store(true);
     tcpSrv.join();
     udpSrv.join();
     ::WSACleanup();
 
-    const bool ok = tunnelUp && tcpPass && udpPass && burstPass && windowPass && telemetryPass;
+    const bool ok = tunnelUp && tcpPass && udpPass && burstPass && windowPass && telemetryPass && redundancyPass;
     printf("\n=== 自检结果：%s ===\n", ok ? "全部通过" : "存在失败项");
     return ok ? 0 : 2;
 }
@@ -387,9 +515,30 @@ int main(int argc, char** argv) {
     };
     auto geti = [&](const char* k) -> int { return atoi(get(k).c_str()); };
 
-    const std::string password = get("password");
+    if (opt.count("password") && opt.count("password-stdin")) {
+        printf("--password 与 --password-stdin 不能同时使用\n");
+        return 1;
+    }
+    std::string password = get("password");
+    if (opt.count("password-stdin")) {
+        char buffer[257];
+        if (!fgets(buffer, sizeof(buffer), stdin)) {
+            printf("无法从标准输入读取口令\n");
+            return 1;
+        }
+        password = buffer;
+        SecureZeroMemory(buffer, sizeof(buffer));
+        while (!password.empty() && (password.back() == '\r' || password.back() == '\n')) password.pop_back();
+        if (password.size() > 256) {
+            SecureZeroMemory(&password[0], password.size());
+            printf("标准输入口令超过 256 字节\n");
+            return 1;
+        }
+    } else if (!password.empty()) {
+        fprintf(stderr, "警告：--password 会暴露在进程命令行，建议使用 --password-stdin\n");
+    }
     if (password.empty()) {
-        printf("必须提供 --password（与被控端一致）\n\n");
+        printf("必须提供 --password-stdin（推荐）或 --password，且口令不能为空\n\n");
         usage();
         return 1;
     }
@@ -406,6 +555,11 @@ int main(int argc, char** argv) {
         hc.targetHost = get("target", "127.0.0.1");
         split_kv(get("map-tcp"), hc.tcpPortMap);
         split_kv(get("map-udp"), hc.udpPortMap);
+        if (!parse_udp_redundancy(get("redundancy", "off"), hc.udpRedundancy)) {
+            printf("--redundancy 只支持 off / control / all\n");
+            return 1;
+        }
+        hc.udpRedundancyGapMs = clamp_gap(atoi(get("redundancy-gap-ms", "2").c_str()));
         if (!hc.listenTcpPort || !hc.listenUdpPort) {
             printf("必须提供 --tcp 和 --udp 端口\n");
             return 1;
@@ -423,6 +577,11 @@ int main(int argc, char** argv) {
         cc.serverUdpPort = uint16_t(geti("udp"));
         cc.password = password;
         cc.listenAddr = get("listen", "127.0.0.1");
+        if (!parse_udp_redundancy(get("redundancy", "off"), cc.udpRedundancy)) {
+            printf("--redundancy 只支持 off / control / all\n");
+            return 1;
+        }
+        cc.udpRedundancyGapMs = clamp_gap(atoi(get("redundancy-gap-ms", "2").c_str()));
         const std::string tp = get("tcp-ports");
         const std::string up = get("udp-ports");
         if (!tp.empty()) cc.tcpListenPorts = split_ports(tp);

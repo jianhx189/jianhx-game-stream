@@ -17,8 +17,13 @@ parser.add_argument('--cf-project',default='jianhx-game-stream')
 args=parser.parse_args()
 ROOT=args.root.resolve();TAG='v'+args.version
 if args.proxy:os.environ['HTTPS_PROXY']=os.environ['HTTP_PROXY']=args.proxy
-secrets=json.loads(getpass.getpass('Release credentials JSON (hidden): '))
-gh=secrets.pop('github');cf_token=secrets.pop('cloudflare');account=secrets.pop('account');del secrets
+secret_json=os.environ.pop('MINISTREAM_RELEASE_CREDENTIALS',None)
+if secret_json is None:
+    secrets=json.loads(getpass.getpass('Release credentials JSON (hidden): '))
+else:
+    secrets=json.loads(secret_json)
+gh=secrets.pop('github');cf_token=secrets.pop('cloudflare');account=secrets.pop('account','');del secrets,secret_json
+os.environ.pop('GITHUB_TOKEN',None);os.environ.pop('CLOUDFLARE_API_TOKEN',None)
 
 def request(url,method='GET',data=None,token=gh,ctype='application/json',missing=False):
     raw=data if isinstance(data,bytes) else (json.dumps(data,ensure_ascii=False).encode() if data is not None else None)
@@ -42,6 +47,10 @@ def cf(path,method='GET',data=None,token=None,ctype='application/json'):
     return response['result']
 
 user=request('https://api.github.com/user');api()
+if not account:
+    accounts=cf('/accounts?per_page=50')
+    if len(accounts)!=1:raise RuntimeError('Cloudflare token must identify exactly one account or provide account')
+    account=accounts[0]['id']
 project_path=f'/accounts/{account}/pages/projects/{args.cf_project}'
 cf(project_path)
 print('AUTHENTICATED',user['login'],'GitHub and Cloudflare',flush=True)
@@ -57,7 +66,7 @@ for item in manifest['files']:
 
 def gather():
     items={}
-    for name in ('README.md','README_EN.md','LICENSE','CHANGELOG.md','SECURITY.md','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md'):
+    for name in ('README.md','README_EN.md','LICENSE','CHANGELOG.md','SECURITY.md','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','manifest.json'):
         items[name]=(ROOT/name).read_bytes()
     allowed={'.md','.py','.yml','.yaml','.html','.css','.js','.svg','.ico','.jpg','.png','.xml','.txt','.json','.cpp','.h','.qml','.qrc','.pro','.manifest','.iss','.ps1'}
     for directory in ('docs','tools','.github','web'):
@@ -94,7 +103,7 @@ def commit_files(items,message):
     return commit['sha']
 
 items=gather()
-source_commit=commit_files({k:v for k,v in items.items() if not k.startswith('web/dist/')},'release: MiniStream '+args.version+' with UDP source fix and bilingual documentation')
+source_commit=commit_files({k:v for k,v in items.items() if not k.startswith('web/dist/')},'release: MiniStream '+args.version+' transport robustness and credential protection')
 notes=(ROOT/'docs/RELEASE_NOTES.md').read_text(encoding='utf-8')
 notes+='\n\n### SHA-256\n'+''.join(f"- `{x['name']}` ({x['size']} bytes): `{x['sha256']}`\n" for x in manifest['files'])
 release=next((r for r in api('/releases?per_page=100') if r['tag_name']==TAG),None)

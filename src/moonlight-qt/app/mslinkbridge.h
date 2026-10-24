@@ -6,6 +6,10 @@
 //   2) 手动：QML 里用 MslinkTunnel 单例填服务器地址/端口/口令，连接成功后
 //            自动写回 mslink.ini，下次启动即自动连（普通用户不需要碰文件）
 //
+//  口令落盘：ini 里存的是当前 Windows 用户的 DPAPI 密文（dpapi:v1:<base64>），
+//  旧版明文 ini 会在主配置载入时原子迁移。注意这只是「本机同一用户可解」的
+//  静态保护，不是端到端加密，运行期口令仍在内存里（见 mslinkcredentials.h）。
+//
 //  Moonlight 里添加主机填 127.0.0.1 即可（本程序已在本地监听全部端口）。
 // =============================================================================
 #pragma once
@@ -55,7 +59,8 @@ class MslinkTunnel : public QObject {
     Q_PROPERTY(bool    udpViaTcp   READ udpViaTcp   NOTIFY stateChanged)
 
     // MiniStream：自动配对用。被控端 Sunshine 管理网页（47990）的 Basic Auth 凭据，
-    // 由被控端安装时生成，装主控端时填一次，口令存进 mslink.ini。
+    // 由被控端安装时生成，装主控端时填一次，口令以 DPAPI 密文存进 mslink.ini。
+    // 注意：password / sunshinePassword 属性返回的是解密后的明文，QML 用它回填输入框。
     Q_PROPERTY(QString sunshineUser     READ sunshineUser     NOTIFY configChanged)
     Q_PROPERTY(QString sunshinePassword READ sunshinePassword NOTIFY configChanged)
     Q_PROPERTY(QString listenAddress    READ listenAddress    NOTIFY configChanged)
@@ -115,7 +120,9 @@ signals:
     void stateChanged();
 
 private:
-    void persistConfig();
+    // 用 DPAPI 加密后经 QSaveFile 原子写回 ini。失败返回 false，并把原因写进
+    // m_lastError（QML 的 lastError 属性）——此时磁盘上的文件保持原样。
+    bool persistConfig();
     QString iniPath() const;
 
     QString m_server;
@@ -123,6 +130,9 @@ private:
     int     m_udpPort = 0;
     QString m_password;
     QString m_lastError;
+    // 配置落盘失败（DPAPI 加密或写 ini）时置位：即使隧道连通，也不让状态定时器
+    // 把这条 lastError 清掉，用户还能在界面上看到「配置没保存」。
+    bool    m_configSaveFailed = false;
     QTimer  m_statusTimer;
     bool    m_wasRunning = false;
     bool    m_connecting = false;
