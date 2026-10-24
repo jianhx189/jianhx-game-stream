@@ -17,7 +17,7 @@
   /* 下载按钮：从最新 Release 的资产列表里取真实下载地址 */
   const info = document.getElementById('release-info');
   const links = Array.from(document.querySelectorAll('[data-file]'));
-  const RELEASES = 'https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.2';
+  const RELEASES = 'https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.3';
   const english = document.documentElement.lang.startsWith('en');
 
   if (!links.length) return;
@@ -27,13 +27,13 @@
       a.href = RELEASES;
       a.removeAttribute('aria-disabled');
     });
-    if (info) info.textContent = english ? 'MiniStream 2.1.2 · checksums and release notes on GitHub.' : 'MiniStream 2.1.2 正式版 · 校验值与说明见 GitHub Releases。';
+    if (info) info.textContent = english ? 'MiniStream 2.1.3 · checksums and release notes on GitHub.' : 'MiniStream 2.1.3 正式版 · 校验值与说明见 GitHub Releases。';
   };
 
   fetch(new URL('release.json', document.baseURI))
     .then(r => (r.ok ? r.json() : null))
     .then(rel => {
-      if (!rel || rel.tag_name !== 'v2.1.2' || !rel.assets || !rel.assets.length) { fallback(); return; }
+      if (!rel || rel.tag_name !== 'v2.1.3' || !rel.assets || !rel.assets.length) { fallback(); return; }
       const byName = {};
       rel.assets.forEach(a => { byName[a.name] = a; });
 
