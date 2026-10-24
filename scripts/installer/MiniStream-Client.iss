@@ -1,4 +1,4 @@
-﻿; =============================================================================
+; =============================================================================
 ; MiniStream-Client.iss —— MiniStream 主控端（Moonlight）Inno Setup 安装包
 ; 用 ISCC.exe 编译（本文件保存为 UTF-8 带 BOM）
 ; =============================================================================
@@ -8,7 +8,7 @@
 [Setup]
 AppId={{3C8E5A2B-1D4F-4B7C-9E2A-6D8F0A1B2C02}
 AppName=MiniStream 主控端
-AppVersion=2.1.4
+AppVersion=2.2.0
 AppPublisher=jianhx2026
 AppCopyright=Powered by jianhx2026
 ArchitecturesAllowed=x64compatible

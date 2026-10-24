@@ -108,11 +108,12 @@ CenteredGridView {
     }
 
     header: Item {
+        Theme { id: headerTheme }
         width: pcGrid.width; height: pcGrid.height < 400 ? 106 : 138
         Column { x: 16; y: 16; width: parent.width-32; spacing: 8
-            Text { text: "我的电脑"; color: "#e7efe8"; font.pixelSize: pcGrid.width < 600 ? 24 : 30; font.bold: true }
-            Text { width: parent.width; elide: Text.ElideRight; text: "选择一台设备，继续你的桌面与游戏。"; color: "#acbdb0"; font.pixelSize: 13 }
-            Text { width: parent.width; elide: Text.ElideRight; text: MslinkTunnel.tunnelUp ? "隧道已认证 · 主机在线与配对状态见设备卡片" : "尚未建立隧道 · 局域网主机也可单独添加"; color: "#8abda0"; font.pixelSize: 11 }
+            Text { text: "我的电脑"; color: headerTheme.text; font.pixelSize: pcGrid.width < 600 ? 24 : 30; font.bold: true }
+            Text { width: parent.width; elide: Text.ElideRight; text: "选择一台设备，继续你的桌面与游戏。"; color: headerTheme.textSecondary; font.pixelSize: 13 }
+            Text { width: parent.width; elide: Text.ElideRight; text: MslinkTunnel.tunnelUp ? "隧道已认证 · 主机在线与配对状态见设备卡片" : "尚未建立隧道 · 局域网主机也可单独添加"; color: MslinkTunnel.tunnelUp ? headerTheme.success : headerTheme.primary; font.pixelSize: 11 }
         }
     }
     model: computerModel
@@ -126,11 +127,11 @@ CenteredGridView {
 
         property alias pcContextMenu : pcContextMenuLoader.item
 
-        Rectangle { id: deviceTile; x: 20; y: 22; width: 60; height: 60; radius: 16; color: "#304b3b"
+        Rectangle { id: deviceTile; x: 20; y: 22; width: 60; height: 60; radius: 16; color: cardTheme.surfaceAlt; border.color: cardTheme.border; border.width: 1
             Image { anchors.centerIn: parent; width: 44; height: 44; source: "qrc:/res/brand.svg" }
         }
-        Rectangle { anchors.right: parent.right; anchors.rightMargin: 18; y: 24; width: statusText.implicitWidth + 20; height: 28; radius: 14; color: "#263d30"
-            Text { id: statusText; anchors.centerIn: parent; color: model.online ? "#bce5a0" : "#acbdb0"; font.pixelSize: 11; text: model.statusUnknown ? "检查中" : !model.online ? "离线" : model.paired ? "在线 · 已配对" : "在线 · 待配对" }
+        Rectangle { anchors.right: parent.right; anchors.rightMargin: 18; y: 24; width: statusText.implicitWidth + 20; height: 28; radius: 14; color: Qt.rgba((model.online ? cardTheme.success : cardTheme.textTertiary).r, (model.online ? cardTheme.success : cardTheme.textTertiary).g, (model.online ? cardTheme.success : cardTheme.textTertiary).b, 0.1); border.color: model.online ? cardTheme.success : cardTheme.border
+            Text { id: statusText; anchors.centerIn: parent; color: model.online ? cardTheme.success : cardTheme.textTertiary; font.pixelSize: 11; text: model.statusUnknown ? "检查中" : !model.online ? "离线" : model.paired ? "在线 · 已配对" : "在线 · 待配对" }
         }
         Text { x: 20; y: 108; width: parent.width - 40; text: model.name || "未命名电脑"; color: cardTheme.text; font.pixelSize: 23; font.bold: true; elide: Text.ElideRight }
         Text { x: 20; y: 148; width: parent.width - 40; text: model.online ? (model.paired ? "点击查看应用与桌面" : "点击开始安全配对") : "请确认被控端在线与连接路径可用"; color: cardTheme.textSecondary; font.pixelSize: 11; wrapMode: Text.Wrap }

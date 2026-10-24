@@ -17,6 +17,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QVariantList>
 #include <QVariantMap>
 
 namespace MslinkBridge {
@@ -34,6 +35,9 @@ bool tunnelUp();
 // 供 UI/日志展示的一行状态
 QString statusText();
 
+// 有界遥测历史/事件（schema/events/history），不含设备名与对端信息
+QVariantMap historySnapshot();
+
 } // namespace MslinkBridge
 
 // =============================================================================
@@ -42,6 +46,8 @@ QString statusText();
 class MslinkTunnel : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantMap telemetry READ telemetry NOTIFY stateChanged)
+    Q_PROPERTY(QVariantList history READ history NOTIFY stateChanged)
+    Q_PROPERTY(QVariantList events  READ events  NOTIFY stateChanged)
     Q_PROPERTY(QString server     READ server     NOTIFY configChanged)
     Q_PROPERTY(int     tcpPort    READ tcpPort    NOTIFY configChanged)
     Q_PROPERTY(int     udpPort    READ udpPort    NOTIFY configChanged)
@@ -71,6 +77,12 @@ public:
     static MslinkTunnel* get();
 
     QVariantMap telemetry() const;
+    // 最近 300 个约 1 秒采样点 / 最近 100 条事件；缓存 1 秒，QML 同时读两个属性也只解析一次。
+    QVariantList history() const;
+    QVariantList events() const;
+    Q_INVOKABLE QVariantMap metricsSnapshot() const;
+    Q_INVOKABLE QString formatBytes(qint64 bytes) const;
+    Q_INVOKABLE QString formatRate(qint64 bytesPerSecond) const;
     Q_INVOKABLE QString exportDiagnostics();
     QString server() const     { return m_server; }
     int     tcpPort() const    { return m_tcpPort; }
@@ -137,6 +149,8 @@ private:
     bool    m_wasRunning = false;
     bool    m_connecting = false;
     qint64  m_connectDeadlineMs = 0;   // 连接超时时刻（QDateTime::currentMSecsSinceEpoch）
+    mutable QVariantMap m_historyCache;
+    mutable qint64      m_historyCacheMs = 0;
 
     // 自动配对
     QString m_sunshineUser = QStringLiteral("admin");

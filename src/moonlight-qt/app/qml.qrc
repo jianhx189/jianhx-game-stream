@@ -23,5 +23,9 @@
         <file>gui/Theme.qml</file>
         <file>gui/BrandButton.qml</file>
         <file>gui/StreamMenuWindow.qml</file>
+        <file>gui/ExperienceView.qml</file>
+        <file>gui/MetricCard.qml</file>
+        <file>gui/SignalBadge.qml</file>
+        <file>gui/TrendChart.qml</file>
     </qresource>
 </RCC>

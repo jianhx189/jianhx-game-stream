@@ -427,6 +427,12 @@ QString statusText() {
     return text;
 }
 
+QVariantMap historySnapshot() {
+    if (!g_started || !g_relay) return {};
+    return QJsonDocument::fromJson(
+        QByteArray::fromStdString(g_relay->history_json())).object().toVariantMap();
+}
+
 } // namespace MslinkBridge
 
 // =============================================================================
@@ -743,8 +749,46 @@ QVariantMap MslinkTunnel::telemetry() const {
     if(!MslinkBridge::g_relay || !MslinkBridge::g_started)return {};
     return QJsonDocument::fromJson(QByteArray::fromStdString(MslinkBridge::g_relay->telemetry_json())).object().toVariantMap();
 }
+
+QVariantMap MslinkTunnel::metricsSnapshot() const {
+    if (!MslinkBridge::g_relay || !MslinkBridge::g_started) return {};
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (m_historyCacheMs && now >= m_historyCacheMs && now - m_historyCacheMs < 900 && !m_historyCache.isEmpty())
+        return m_historyCache;
+    m_historyCache = MslinkBridge::historySnapshot();
+    m_historyCacheMs = now;
+    return m_historyCache;
+}
+
+QVariantList MslinkTunnel::history() const {
+    return metricsSnapshot().value(QStringLiteral("history")).toList();
+}
+
+QVariantList MslinkTunnel::events() const {
+    return metricsSnapshot().value(QStringLiteral("events")).toList();
+}
+
+QString MslinkTunnel::formatBytes(qint64 bytes) const {
+    const double value = bytes < 0 ? 0.0 : double(bytes);
+    if (value >= 1024.0 * 1024.0)
+        return QString::number(value / (1024.0 * 1024.0), 'f', value >= 100.0 * 1024.0 * 1024.0 ? 0 : 1) + QStringLiteral(" MB");
+    if (value >= 1024.0)
+        return QString::number(value / 1024.0, 'f', value >= 100.0 * 1024.0 ? 0 : 1) + QStringLiteral(" KB");
+    return QString::number(qint64(value)) + QStringLiteral(" B");
+}
+
+QString MslinkTunnel::formatRate(qint64 bytesPerSecond) const {
+    return formatBytes(bytesPerSecond) + QStringLiteral("/s");
+}
+
 QString MslinkTunnel::exportDiagnostics() {
-    auto data=QJsonObject::fromVariantMap(telemetry());data.remove("device_name");data.remove("peer_report_json");
+    auto data=QJsonObject::fromVariantMap(telemetry());
+    const QVariantMap hist=metricsSnapshot();
+    for (const char* key : {"schema","events","history"}) {
+        const QString k=QString::fromLatin1(key);
+        if (hist.contains(k)) data.insert(k,QJsonValue::fromVariant(hist.value(k)));
+    }
+    data.remove("device_name");data.remove("peer_report_json");
     const QString directory=QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)+"/MiniStream";QDir().mkpath(directory);
     const QString path=directory+"/diagnostics-"+QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss")+".json";
     QSaveFile file(path);if(!file.open(QIODevice::WriteOnly))return QStringLiteral("诊断保存失败");file.write(QJsonDocument(data).toJson());return file.commit()?path:QStringLiteral("诊断保存失败");

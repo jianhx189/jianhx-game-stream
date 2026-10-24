@@ -55,6 +55,11 @@ constexpr int      kUdpFlowIdleMs   = 120000;      // UDP 流表空闲回收（2
 // 因为视频占绝大多数带宽，静音复制会让上行带宽翻倍。
 constexpr uint16_t kVideoTargetPort = 47998;
 
+// 遥测历史/事件都只驻留内存，不写磁盘；数量上限保证 JSON 大小有界。
+constexpr size_t   kTelemetryHistoryMax  = 300;   // 最近 300 个约 1 秒采样点
+constexpr size_t   kTelemetryEventMax    = 100;   // 最近 100 条事件
+constexpr uint64_t kTelemetrySampleMinMs = 1000;  // 历史采样最小间隔
+
 // ---- 抗丢包：1+1 冗余发送 --------------------------------------------------
 // 做法：把同一个 UDP 数据报按同一 (flowId, seq) 发送两份，副本延迟 gap 毫秒。
 // 接收侧不需要任何协议变更：现有 64 包防重放窗口本来就会丢弃重复 seq，
@@ -180,6 +185,8 @@ struct RelayStats {
 };
 
 // ---- 运行主体 ---------------------------------------------------------------
+struct RelayTestPeer;
+
 class Relay {
 public:
     Relay();
@@ -192,6 +199,8 @@ public:
     bool running() const;
     RelayStats stats() const;
     std::string telemetry_json() const;
+    // 内存中的有界历史与事件（schema/events/history），不含设备名与 peer 信息。
+    std::string history_json() const;
 
     // 传入非空回调即可收到运行日志（默认打到 stderr）
     void set_log_sink(void (*sink)(const char* line, void* ctx), void* ctx);
@@ -202,6 +211,7 @@ public:
 
     struct Impl;
 private:
+    friend struct RelayTestPeer;
     std::unique_ptr<Impl> impl_;
 };
 

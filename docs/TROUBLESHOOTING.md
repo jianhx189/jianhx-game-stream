@@ -15,6 +15,22 @@
 
 媒体项为“—”时，再检查 `peer_report_age_ms` 与 `media_age_ms`；超过 5 秒或未启动媒体时不应继续显示旧帧率。当前只有一个认证会话，配对列表不是在线数量。
 
+## 遥测页面：空曲线、缺指标、事件不刷新
+
+2.2 的主控端「体验监测」和被控端「连接质量 / 媒体会话」都直接消费真实采样，以下现象多数是预期行为：
+
+- **趋势图空白**：历史只保留最近 300 个约 1 秒采样点（约 5 分钟），刚启动、刚重连或断线期间没有点。主控端可切 60/300 秒窗口；被控端读的是安装根目录 `mslink-status.jsonl` 的尾部，文件被清空或后台未更新时同样为空。不要用截图或旧日志推断当前曲线。
+- **只有一部分卡片是“—”**：媒体类指标依赖主控端正在串流并回传，未开始串流、两端版本不一致或超过 5 秒无新报告都会显示“—”。隧道 RTT 与队列等隧道指标不需要媒体即可有值。
+- **事件表不刷新**：事件最多 100 条，同类别同文案 1 秒内只记一次；稳定运行时不产生新事件是正常的。只有真实状态变化（连接、认证拒绝、回包错误、媒体开始/结束）才写入。
+- **队列接近 4 MiB**：发送队列是隧道内存排队，达到上限时整帧会被拒绝并计入错误，不会静默截断。先看吞吐是否被限速或链路拥塞，再看是否需要降低码率。
+- **主控端显示“当前采样未触发提示阈值”**：说明没有越过 1 MiB 队列、2% 丢帧、30 ms 排队、16 ms 解码这四条经验线，不是“体验评分通过”。
+- **旧后台 + 新界面**：2.2 页面需要同轮构建的 `mslink`；只替换 GUI 或只替换隧道都会让新字段缺失。用状态文件 PID、路径与 `updated_unix_ms` 核对，必要时结束旧进程后重启。
+- **导出的诊断包含设备名或地址**：导出只做有限脱敏，分享前人工检查域名、IPv6、设备名和路径。
+
+## 复现弱网行为
+
+本机可用 `tools/mslink_weaknet_e2e.py` 复现受控损伤（延迟、抖动、丢包、重排、限速、UDP 阻断、恢复、30 秒中断），结果写入 `构建产物/mslink-e2e/latest.json`。它只改中间链路，不修改隧道；判物理 UDP 看代理侧 UDP data 包增量。注意它是单机回环、对称损伤、回显为自造数据、无 GPU 解码呈现，不能据此判断真实跨公网游戏是否流畅，也不能替代真实转发链路抓包。
+
 ## 为什么进入 TCP 兼容通道
 
 客户端 2.5 秒内没有确认 UDP 时临时回退，仍会持续探测。先看 `udp_probe_sent`、`udp_probe_ack`、`udp_last_send_error`、`udp_data_received`；不要仅凭 `udp_auth_rejected=0` 判断没有收到包。
@@ -40,4 +56,4 @@
 
 ## English
 
-Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. Two 2.1.3 regressions are fixed in 2.1.4: saving a controller connection failed when the ini did not exist yet, and leaked listening sockets could hang the first connection after a failed start — upgrade in place if you see either. Passwords stored as `dpapi:v1:` can only be decrypted by the same Windows user; after a downgrade or user change, re-enter them instead of editing the ini. Host passwords arrive on standard input, so seeing none on the command line is expected. At most 8 host handshakes wait for 5 seconds each; a full queue means slow or unexpected peers and is not a reason to bypass authentication. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.
+Separate listening, authenticated TCP, authenticated UDP probes and actual media reporting. Check executable paths/PIDs and telemetry freshness before diagnosing a blank console. Empty trend charts are expected after start, during outages or when the host status file has not been updated: charts come from 300 in-memory one-second samples (about five minutes) or the tail of the host status file, and stale media samples (>5 s) render as a dash — no demo curves are generated. Events are capped at 100, deduplicated per category/message within a second and only appear on real state changes. A queue near 4 MiB means the tunnel is dropping whole frames rather than truncating them. "Current samples did not cross the hint thresholds" means the 1 MiB queue, 2% drop, 30 ms queueing and 16 ms decode lines were not crossed; it is not a quality score. The 2.2 pages require the matching `mslink` build; replacing only the GUI or only the tunnel leaves new fields missing. Persistent fallback needs valid-reply counters and source-endpoint inspection, not just a UDP send timeout. Two 2.1.3 regressions are fixed in 2.1.4: saving a controller connection failed when the ini did not exist yet, and leaked listening sockets could hang the first connection after a failed start — upgrade in place if you see either. Passwords stored as `dpapi:v1:` can only be decrypted by the same Windows user; after a downgrade or user change, re-enter them instead of editing the ini. Host passwords arrive on standard input, so seeing none on the command line is expected. At most 8 host handshakes wait for 5 seconds each; a full queue means slow or unexpected peers and is not a reason to bypass authentication. `tools/mslink_weaknet_e2e.py` reproduces controlled impairment locally: it is loopback, symmetric, uses synthetic echo payloads and exercises no GPU decode or presentation, so it cannot stand in for real WAN gaming or replace packet captures on the actual forwarded path. For input issues record focus/menu/mouse mode and whether video/audio continue. Share only redacted evidence and precise reproduction times.

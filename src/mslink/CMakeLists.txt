@@ -63,5 +63,12 @@ if (BUILD_TESTING)
     add_test(NAME relay_stream_open_failure COMMAND mslink_stream_open_failure_test)
     set_tests_properties(relay_stream_open_failure PROPERTIES TIMEOUT 120)
 
+    add_executable(mslink_telemetry_test tests/relay_telemetry_test.cpp)
+    target_include_directories(mslink_telemetry_test PRIVATE include)
+    target_compile_definitions(mslink_telemetry_test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_link_libraries(mslink_telemetry_test PRIVATE ws2_32 bcrypt)
+    add_test(NAME relay_telemetry COMMAND mslink_telemetry_test)
+    set_tests_properties(relay_telemetry PROPERTIES TIMEOUT 120)
+
     add_test(NAME relay_selftest COMMAND mslink selftest)
 endif()

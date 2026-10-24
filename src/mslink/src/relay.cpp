@@ -72,6 +72,59 @@ static std::string json_quote(const std::string& s) {
     for(unsigned char c:s){if(c=='"'||c=='\\'){out+='\\';out+=c;}else if(c<32){char b[7];snprintf(b,sizeof(b),"\\u%04x",c);out+=b;}else out+=c;}
     return out+'"';
 }
+// 事件文本只保留可展示内容：截断到 160 字节（不切断 UTF-8）并清掉控制字符。
+static std::string sanitize_event_text(std::string s) {
+    std::string out;
+    out.reserve(s.size());
+    for (unsigned char c : s) if (c >= 32) out += char(c);
+    if (out.size() > 160) {
+        size_t cut = 160;
+        while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) --cut;
+        out.resize(cut);
+        out += "…";
+    }
+    return out;
+}
+template <typename Range>
+static void append_events_json(std::ostringstream& o, const Range& evs) {
+    o << '[';
+    bool first = true;
+    for (const auto& e : evs) {
+        if (!first) o << ',';
+        first = false;
+        o << "{\"time_unix_ms\":" << e.timeUnixMs
+          << ",\"category\":" << json_quote(e.category)
+          << ",\"level\":" << json_quote(e.level)
+          << ",\"message\":" << json_quote(e.message) << '}';
+    }
+    o << ']';
+}
+template <typename Range>
+static void append_history_json(std::ostringstream& o, const Range& samples) {
+    o << '[';
+    bool first = true;
+    for (const auto& x : samples) {
+        if (!first) o << ',';
+        first = false;
+        o << "{\"time_unix_ms\":" << x.timeUnixMs
+          << ",\"rtt_ms\":" << x.rttMs
+          << ",\"rtt_jitter_ms\":" << x.jitterMs
+          << ",\"tcp_bytes_up\":" << x.tcpBytesUp
+          << ",\"tcp_bytes_down\":" << x.tcpBytesDown
+          << ",\"udp_bytes_up\":" << x.udpBytesUp
+          << ",\"udp_bytes_down\":" << x.udpBytesDown
+          << ",\"active_tcp_streams\":" << x.activeTcpStreams
+          << ",\"active_udp_flows\":" << x.activeUdpFlows
+          << ",\"queued_bytes\":" << x.queuedBytes
+          << ",\"reconnects\":" << x.reconnects
+          << ",\"udp_local_dropped\":" << x.drops
+          << ",\"udp_probe_sent\":" << x.probeSent
+          << ",\"udp_probe_ack\":" << x.probeAck
+          << ",\"udp_auth_rejected\":" << x.authRejected
+          << ",\"tunnel_up\":" << (x.tunnelUp ? "true" : "false") << '}';
+    }
+    o << ']';
+}
 static uint64_t unix_ms(){FILETIME ft;GetSystemTimeAsFileTime(&ft);ULARGE_INTEGER n;n.LowPart=ft.dwLowDateTime;n.HighPart=ft.dwHighDateTime;return n.QuadPart/10000-11644473600000ULL;}
 static std::string device_name(){wchar_t name[256];DWORD size=256;if(!GetComputerNameW(name,&size))return "Windows client";int count=WideCharToMultiByte(CP_UTF8,0,name,size,nullptr,0,nullptr,nullptr);std::string out(count,0);WideCharToMultiByte(CP_UTF8,0,name,size,&out[0],count,nullptr,nullptr);return out;}
 
@@ -591,6 +644,32 @@ struct Relay::Impl {
     mutable std::mutex statMtx;
     RelayStats st;
 
+    // ---- 有界遥测历史/事件 -------------------------------------------------
+    struct TelemetrySample {
+        uint64_t timeUnixMs = 0;
+        uint32_t rttMs = 0, jitterMs = 0;
+        uint64_t tcpBytesUp = 0, tcpBytesDown = 0;
+        uint64_t udpBytesUp = 0, udpBytesDown = 0;
+        uint32_t activeTcpStreams = 0, activeUdpFlows = 0;
+        uint64_t queuedBytes = 0;
+        uint64_t reconnects = 0, drops = 0;
+        uint64_t probeSent = 0, probeAck = 0, authRejected = 0;
+        bool tunnelUp = false;
+    };
+    struct TelemetryEvent {
+        uint64_t timeUnixMs = 0;
+        std::string category, level, message;
+    };
+    mutable std::mutex histMtx;
+    std::deque<TelemetrySample> history;
+    std::deque<TelemetryEvent> events;
+    uint64_t lastSampleMs = 0;
+    uint64_t prevAuthRejected = 0, prevSessionRejected = 0, prevReplyErrors = 0;
+    int prevUdpSendError = 0;
+    bool prevMediaFresh = false;
+    bool udpProbeEventLogged = false;
+    std::map<std::string, uint64_t> lastEventMs;
+
     std::atomic<uint64_t> udpBytesUp{0};
     std::atomic<uint64_t> udpBytesDown{0};
 
@@ -784,9 +863,14 @@ struct Relay::Impl {
     }
     RelayStats snapshot() const { std::lock_guard<std::mutex> lk(statMtx); return st; }
     void set_tunnel_up(bool up) {
-        tunnelUp.store(up);
+        const bool wasUp = tunnelUp.exchange(up);
         if(up)connectedAtMs.store(now_ms());else {connectedAtMs.store(0);lastPongMs.store(0);stat([&](RelayStats&){peerReport.clear();peerReportAt=0;});}
         stat([&](RelayStats& s) { s.tunnelUp = up; });
+        if (wasUp != up) {
+            udpProbeEventLogged = false;
+            record_event("tunnel", up ? "info" : "warn",
+                         up ? "隧道已建立并通过认证" : "隧道已断开");
+        }
     }
 
     bool start_client(const ClientConfig& cfg, std::string& err);
@@ -796,7 +880,13 @@ struct Relay::Impl {
     void client_loop();
     void host_loop();
     void stats_loop();
-    std::string telemetry_json() const;
+    std::string telemetry_json(bool include_events = true) const;
+    std::string history_json() const;
+    void record_event(const char* category, const char* level, const std::string& message,
+                      uint64_t atMs = 0);
+    void record_event_locked(const char* category, const char* level,
+                             const std::string& message, uint64_t atMs);
+    void sample_history(uint64_t nowMs, uint64_t unixNowMs = 0);
     void record_pong(){const auto sent=pingSentMs.load(),n=now_ms();if(sent && n>=sent){auto sample=uint32_t(n-sent),old=rttMs.exchange(sample);auto diff=sample>old?sample-old:old-sample;jitterMs.store((jitterMs.load()*3+diff)/4);lastPongMs.store(n);}}
 
     bool client_connect_tunnel();
@@ -1040,6 +1130,11 @@ void Relay::Impl::client_close_streams() {
 
 void Relay::Impl::client_drop_tunnel(const char* why) {
     if (sock_valid(tunnelTcp)) logf("客户端：%s", why);
+    if (why) {
+        const std::string reason(why);
+        record_event(reason.find("队列") != std::string::npos ? "queue" : "tunnel",
+                     "warn", reason);
+    }
     sock_close(tunnelTcp);
     tcpIn.reset();
     tunnelOutQ = OutQueue{};
@@ -1067,6 +1162,7 @@ bool Relay::Impl::client_handle_frame(uint16_t type, uint16_t sid,
             if (!pl.empty()) {
                 if (!send_raw_queued(it->second.sock, it->second.outQ, pl.data(), pl.size())) {
                     // 本地流溢出/断开：关闭对应流，并尽力通知对端。通知失败视为隧道故障。
+                    record_event("queue", "warn", "本地流发送队列溢出，已关闭该流");
                     const uint16_t id = it->second.id;
                     sock_close(it->second.sock);
                     clientStreams.erase(it);
@@ -1344,7 +1440,8 @@ void Relay::Impl::client_loop() {
 
                     if(buf[1]==kUdpHelloAck){
                         udpProbeAck.fetch_add(1);lastAuthenticatedUdpMs.store(now_ms());lastUdpAckMs=now_ms();udpDirectOk.store(true);
-                        if(udpViaTcp.load() && ++udpRecoverHits>=3){udpViaTcp.store(false);udpRecoverHits=0;logf("UDP recovered after three authenticated ACKs");}
+                        if(udpViaTcp.load() && ++udpRecoverHits>=3){udpViaTcp.store(false);udpRecoverHits=0;logf("UDP recovered after three authenticated ACKs");
+                            record_event("udp","info","UDP 回程已恢复，切回直连");}
                         continue;
                     }
                     if(udpLastSeq[fid].duplicate(seq)){stat([](RelayStats& s){s.udpDuplicates++;});continue;}
@@ -1382,6 +1479,10 @@ void Relay::Impl::client_loop() {
             if (tnow >= nextUdpHelloMs) {
                 nextUdpHelloMs = tnow + helloGap;
                 udpProbeSent.fetch_add(1);
+                if (!udpProbeEventLogged) {
+                    udpProbeEventLogged = true;
+                    record_event("udp", "info", "UDP 回程探测开始");
+                }
                 if(!send_udp_packet(udpTunnel, serverUdpAddr, kUdpHello, 0, ++udpSeq,sessionKey,nullptr,0))lastUdpSendError.store(WSAGetLastError());
                 else lastUdpSendError.store(0);
             }
@@ -1394,6 +1495,7 @@ void Relay::Impl::client_loop() {
                     udpRecoverHits = 0;
                     udpProbeStartMs = tnow;
                     logf("提示：UDP 回程应答中断，重新探测中（期间自动用 TCP 兜底）");
+                    record_event("udp", "warn", "UDP 回程应答中断，重新探测中");
                 } else {
                     udpProbeFails = 0;
                     // Recovery count is updated only by authenticated HELLO_ACK packets.
@@ -1405,6 +1507,7 @@ void Relay::Impl::client_loop() {
                 if (!udpViaTcp && tnow - udpProbeStartMs > 2500) {
                     udpViaTcp = true;
                     logf("提示：UDP 回程暂时没有应答，先走 TCP 兜底（仍在持续探测，通了会自动切回）");
+                    record_event("udp", "warn", "UDP 回程未应答，已切换 TCP 兜底");
                 }
             }
             udpModeDecided = true;
@@ -1416,7 +1519,7 @@ void Relay::Impl::client_loop() {
             if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpPing, 0, nullptr, 0)) {
                 client_drop_tunnel("控制帧发送失败，断开重连");
             } else {
-                const auto report = telemetry_json();
+                const auto report = telemetry_json(false);
                 if (!send_tcp_frame_queued(tunnelTcp, tunnelOutQ, kTcpTelemetry, 0, report.data(), report.size())) {
                     client_drop_tunnel("控制帧发送失败，断开重连");
                 }
@@ -1670,6 +1773,11 @@ void Relay::Impl::host_promote_pending_locked(
 
 void Relay::Impl::host_drop_tunnel(const char* why) {
     if (sock_valid(hTunnel)) logf("被控端：%s", why);
+    if (why) {
+        const std::string reason(why);
+        record_event(reason.find("队列") != std::string::npos ? "queue" : "tunnel",
+                     "warn", reason);
+    }
     sock_close(hTunnel);
     hTcpIn.reset();
     hTunnelOutQ = OutQueue{};
@@ -1722,6 +1830,8 @@ bool Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
                 // 打不开就明确回一条 STREAM_CLOSE，客户端不必等自己的读超时。
                 logf("被控端：流 #%u 打开失败（%s，目标 %s:%u，逻辑 %u）",
                      sid, why, hcfg.targetHost.c_str(), port, logical);
+                record_event("stream", "error",
+                             "上游流打开失败（目标端口 " + std::to_string(port) + "）");
                 if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0))
                     return false;
                 break;
@@ -1738,6 +1848,7 @@ bool Relay::Impl::host_handle_frame(uint16_t type, uint16_t sid,
             if (!pl.empty()) {
                 if (!send_raw_queued(it->second.up, it->second.outQ, pl.data(), pl.size())) {
                     // 目标流溢出/断开：关闭该流并通知对端；通知失败视为隧道故障。
+                    record_event("queue", "warn", "向上游转发失败或队列溢出，已关闭该流");
                     sock_close(it->second.up);
                     hostStreams.erase(it);
                     if (!send_tcp_frame_queued(hTunnel, hTunnelOutQ, kTcpStreamClose, sid, nullptr, 0))
@@ -2110,7 +2221,7 @@ void Relay::Impl::host_loop() {
     set_tunnel_up(false);
 }
 
-std::string Relay::Impl::telemetry_json() const {
+std::string Relay::Impl::telemetry_json(bool include_events) const {
     auto s=snapshot();auto n=now_ms();auto lastUdp=lastAuthenticatedUdpMs.load();auto connected=connectedAtMs.load();bool host=mode==Mode::Host;
     std::string peer;uint64_t peerAt;{std::lock_guard<std::mutex> lock(statMtx);peer=peerReport;peerAt=peerReportAt;}
     std::string media;uint64_t mediaAt;{std::lock_guard<std::mutex> lock(g_mediaMutex);media=g_mediaJson;mediaAt=g_mediaAt;}
@@ -2134,8 +2245,128 @@ std::string Relay::Impl::telemetry_json() const {
       <<",\"udp_redundancy_gap_ms\":"<<redundancy_gap_ms()
       <<",\"udp_redundant_sent\":"<<s.udpRedundantSent<<",\"udp_duplicate_received\":"<<s.udpDuplicates
       <<",\"peer_report_age_ms\":"<<(peerAt?n-peerAt:UINT64_MAX)<<",\"peer_report_json\":"<<json_quote(peer)
-      <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null")<<"}";
+      <<",\"media_age_ms\":"<<(mediaAt?n-mediaAt:UINT64_MAX)<<",\"media\":"<<(!host&&!media.empty()&&n-mediaAt<5000?media:"null");
+    if (include_events) {
+        std::lock_guard<std::mutex> lk(histMtx);
+        o << ",\"events\":";
+        append_events_json(o, events);
+    }
+    o << "}";
     return o.str();
+}
+
+std::string Relay::Impl::history_json() const {
+    std::lock_guard<std::mutex> lk(histMtx);
+    std::ostringstream o;
+    o << "{\"schema\":1,\"updated_unix_ms\":" << unix_ms()
+      << ",\"role\":" << json_quote(mode == Mode::Host ? "host" : "client")
+      << ",\"events\":";
+    append_events_json(o, events);
+    o << ",\"history\":";
+    append_history_json(o, history);
+    o << '}';
+    return o.str();
+}
+
+void Relay::Impl::record_event(const char* category, const char* level,
+                               const std::string& message, uint64_t atMs) {
+    std::lock_guard<std::mutex> lk(histMtx);
+    record_event_locked(category, level, message, atMs ? atMs : unix_ms());
+}
+
+void Relay::Impl::record_event_locked(const char* category, const char* level,
+                                      const std::string& message, uint64_t atMs) {
+    const std::string text = sanitize_event_text(message);
+    if (text.empty()) return;
+    const std::string key = std::string(category) + '|' + text;
+    auto seen = lastEventMs.find(key);
+    if (seen != lastEventMs.end() && atMs >= seen->second && atMs - seen->second < 1000)
+        return;
+    if (seen == lastEventMs.end() && lastEventMs.size() >= 256) {
+        auto oldest = lastEventMs.begin();
+        for (auto it = lastEventMs.begin(); it != lastEventMs.end(); ++it)
+            if (it->second < oldest->second) oldest = it;
+        lastEventMs.erase(oldest);
+    }
+    lastEventMs[key] = atMs;
+    TelemetryEvent e;
+    e.timeUnixMs = atMs;
+    e.category = category;
+    e.level = level;
+    e.message = text;
+    events.push_back(std::move(e));
+    while (events.size() > kTelemetryEventMax) events.pop_front();
+}
+
+void Relay::Impl::sample_history(uint64_t nowMs, uint64_t unixNowMs) {
+    std::lock_guard<std::mutex> lk(histMtx);
+    if (lastSampleMs != 0 && nowMs >= lastSampleMs && nowMs - lastSampleMs < kTelemetrySampleMinMs)
+        return;
+    lastSampleMs = nowMs;
+    const uint64_t unixNow = unixNowMs ? unixNowMs : unix_ms();
+
+    bool mediaFresh = false;
+    if (mode != Mode::Host) {
+        std::lock_guard<std::mutex> ml(g_mediaMutex);
+        mediaFresh = !g_mediaJson.empty() && nowMs >= g_mediaAt && nowMs - g_mediaAt < 5000;
+    }
+    if (mediaFresh != prevMediaFresh) {
+        record_event_locked("media", "info",
+                            mediaFresh ? "媒体会话已开始" : "媒体会话已结束", unixNow);
+        prevMediaFresh = mediaFresh;
+    }
+
+    const uint64_t auth = udpAuthRejected.load();
+    if (auth > prevAuthRejected)
+        record_event_locked("auth", "warn",
+                            "UDP 认证拒绝 " + std::to_string(auth - prevAuthRejected) + " 次",
+                            unixNow);
+    prevAuthRejected = auth;
+
+    const uint64_t sessionRejected = udpSessionRejected.load();
+    if (sessionRejected > prevSessionRejected)
+        record_event_locked("auth", "warn",
+                            "UDP 会话标识拒绝 " + std::to_string(sessionRejected - prevSessionRejected) + " 次",
+                            unixNow);
+    prevSessionRejected = sessionRejected;
+
+    const uint64_t replyErrors = udpReplyErrors.load();
+    if (replyErrors > prevReplyErrors)
+        record_event_locked("socket", "warn",
+                            "UDP 回包错误 " + std::to_string(replyErrors - prevReplyErrors) + " 次",
+                            unixNow);
+    prevReplyErrors = replyErrors;
+
+    const int sendError = lastUdpSendError.load();
+    if (sendError != prevUdpSendError) {
+        if (sendError != 0)
+            record_event_locked("socket", "warn",
+                                "UDP 发送错误（WSA=" + std::to_string(sendError) + "）", unixNow);
+        prevUdpSendError = sendError;
+    }
+
+    TelemetrySample smp;
+    smp.timeUnixMs = unixNow;
+    const RelayStats s = snapshot();
+    const uint64_t n = nowMs;
+    if (lastPongMs.load() && n >= lastPongMs.load() && n - lastPongMs.load() < 8000)
+        smp.rttMs = rttMs.load();
+    smp.jitterMs = jitterMs.load();
+    smp.tcpBytesUp = s.tcpBytesUp;
+    smp.tcpBytesDown = s.tcpBytesDown;
+    smp.udpBytesUp = udpBytesUp.load();
+    smp.udpBytesDown = udpBytesDown.load();
+    smp.activeTcpStreams = s.activeTcpStreams;
+    smp.activeUdpFlows = s.activeUdpFlows;
+    smp.queuedBytes = s.queuedBytes;
+    smp.reconnects = s.tunnelReconnects;
+    smp.drops = s.udpDropped;
+    smp.probeSent = udpProbeSent.load();
+    smp.probeAck = udpProbeAck.load();
+    smp.authRejected = auth;
+    smp.tunnelUp = s.tunnelUp;
+    history.push_back(std::move(smp));
+    while (history.size() > kTelemetryHistoryMax) history.pop_front();
 }
 
 // =============================================================================
@@ -2143,15 +2374,20 @@ std::string Relay::Impl::telemetry_json() const {
 // =============================================================================
 void Relay::Impl::stats_loop() {
     uint64_t prevMs = now_ms();
+    uint64_t lastLogMs = prevMs;
     RelayStats prev = snapshot();
     uint64_t prevUdpUp = udpBytesUp.load();
     uint64_t prevUdpDown = udpBytesDown.load();
 
     while (!stopReq.load()) {
-        for (int i = 0; i < 50 && !stopReq.load(); ++i) ::Sleep(100);
+        for (int i = 0; i < 10 && !stopReq.load(); ++i) ::Sleep(100);
         if (stopReq.load()) break;
 
         const uint64_t n = now_ms();
+        sample_history(n);
+        if (n - lastLogMs < 5000) continue;
+        lastLogMs = n;
+
         const double dt = double(n - prevMs) / 1000.0;
         if (dt <= 0.0) continue;
 
@@ -2223,6 +2459,7 @@ void Relay::Impl::stop_impl() {
 void Relay::stop() { impl_->stop_impl(); }
 bool Relay::running() const { return impl_->runningFlag.load(); }
 std::string Relay::telemetry_json() const {return impl_->telemetry_json();}
+std::string Relay::history_json() const {return impl_->history_json();}
 
 RelayStats Relay::stats() const {
     RelayStats s = impl_->snapshot();

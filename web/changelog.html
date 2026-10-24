@@ -1,1 +1,43 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MiniStream 2.1.4 热修复版 — 更新与下载</title><meta name="description" content="MiniStream 2.1.4 热修复：修复 2.1.3 主控首次保存失败、mslink 启动失败残留监听 socket、空口令误删凭据与上游失败等待超时。2.1.3 不建议全新安装。"><link rel="canonical" href="https://ministream.jianhx.com/changelog.html"><link rel="icon" href="assets/brand.svg"><link rel="stylesheet" href="styles.css"><script src="script.js" defer></script></head><body><header><a class="brand" href="index.html"><img src="assets/brand.svg" width="34" alt="">MiniStream</a><nav><a href="tutorial.html">使用教程</a><a href="en.html">English</a></nav><a class="nav-github" href="https://github.com/jianhx189/jianhx-game-stream">GitHub ↗</a></header><main class="wrap section tutorial"><div class="eyebrow">RELEASE / 热修复</div><h1>MiniStream 2.1.4</h1><p id="release-info" aria-live="polite">修复 2.1.3 的主控首次保存失败与启动失败残留 socket，并修正空口令与上游连接失败的处理。</p><div class="actions"><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.4">下载被控端 ↓</a><a class="button ghost" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.4">下载主控端 ↓</a></div><article><h3>这次修了什么</h3><ul><li>主控端首次连接时 <code>mslink.ini</code> 还不存在，2.1.3 保存必定失败、之后每次都要重填；2.1.4 在文件不存在时也通过 <code>QSaveFile</code> 原子创建配置。</li><li>2.1.3 的 <code>mslink</code> 启动失败会泄漏监听 socket，带 47990 的隧道回退重试可能二次 bind 并卡住首次连接；2.1.4 在失败路径关闭全部 socket、调用 <code>WSACleanup</code>，并校验 listen/bind 地址为 IPv4。</li><li>空口令会被拒绝，且不会删除已保存的 <code>dpapi:v1:</code> 密文。</li><li>上游 Sunshine 目标连接失败时发送 <code>StreamClose</code>，客户端立即结束对应流，不再等到超时。</li></ul><p><strong>安装建议：</strong>2.1.3 存在上述回归，不建议用于全新安装，新装请用 2.1.4。已安装 2.1.3 的用户覆盖升级即可，配置、隧道口令、Sunshine 配对与 DPAPI 凭据都会保留。</p></article><article><h3>安全边界</h3><p>2.1.4 沿用 2.1.3 的 DPAPI 与 ACL：只保护同一 Windows 用户可解的本地文件，程序内存中口令仍是明文，网络传输也没有因此加密。自定义隧道认证与 TCP 明文会话密钥没有变化，<strong>不是端到端加密 VPN</strong>。回退到 2.1.2 及更早版本、或更换 Windows 用户后需要重新填写口令；此前分享过隧道/Sunshine 口令的，请立即轮换。</p></article><article><h3>升级与校验</h3><p>结束当前串流，在已有安装目录覆盖升级并保留个人配置，两端建议使用相同版本。升级不会要求重新配对；回退旧版仍需重填口令。只打开新面板不会升级旧后台。</p><p>用 PowerShell 的 <code>Get-FileHash 文件名 -Algorithm SHA256</code> 与同版 <a href="https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.1.4/SHA256SUMS.txt">SHA256SUMS.txt</a> 对照。<a href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.1.4">Release</a> 同时提供构建清单和源码；哈希在 2.1.4 安装包编译完成后生成，不能沿用 2.1.3。</p></article><article><h3>验证范围</h3><p>2.1.3 已完成本机回环 CTest 4/4 与 <code>--password-stdin</code> 启动实测。2.1.4 增加启动失败重试与上游失败关闭测试并重建全部组件，<strong>最终 CTest、两端构建与安装包结果以发布清单记录为准，本页不预先宣称已通过</strong>。干净 Win10/Win11 安装、所有 GPU/驱动组合、高码率弱网与长时间跨网串流尚未验收；2.1.2 的真实转发 UDP 修复结论沿用，新的真实链路媒体串流仍需单独验收。</p><p><a href="https://github.com/jianhx189/jianhx-game-stream/blob/main/CHANGELOG.md">完整更新记录</a> · <a href="tutorial.html">教程</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/blob/main/docs/DEVELOPMENT.md">开发交接</a></p></article><article><h3>上一版 2.1.3</h3><p>引入了隧道队列/帧/握手加固、主控端 DPAPI 凭据、被控端 <code>--password-stdin</code> 与文件 ACL。该版本存在首次保存失败和启动失败残留 socket 的回归，<strong>不建议用于全新安装</strong>；已安装用户请覆盖升级到 2.1.4。2.1.2 及更早版本的安装包与校验值仍保留在对应 Release 中。</p></article></main><footer class="wrap"><a class="brand" href="index.html">MiniStream ↗</a><p>Powered by jianhx2026 · Sunshine / Moonlight · GPLv3</p><a href="https://github.com/jianhx189/jianhx-game-stream">GitHub ↗</a></footer></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="MiniStream 2.2 更新：新增真实遥测历史、事件与分端工作台，延续 2.1.4 首次保存和启动清理修复。查看验证范围与下载校验说明。">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://ministream.jianhx.com/changelog.html">
+  <link rel="icon" href="assets/brand.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+  <title>MiniStream 2.2 — 更新、验证与下载</title>
+</head>
+<body>
+  <a class="skip" href="#main">跳转到正文</a>
+  <header class="site-header"><div class="wrap header-inner">
+    <a class="brand" href="index.html" aria-label="MiniStream 首页"><img src="assets/brand.svg" width="34" height="34" alt="">MiniStream</a>
+    <button class="menu-toggle" type="button" aria-label="展开导航" aria-expanded="false" aria-controls="navigation">菜单</button>
+    <nav class="site-nav" id="navigation" aria-label="主导航"><a href="index.html#workspaces">分端工作台</a><a href="index.html#download">下载</a><a href="tutorial.html">使用教程</a><a href="changelog.html" aria-current="page">更新记录</a><a href="en.html" hreflang="en">English</a></nav>
+    <a class="nav-github" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+  </div></header>
+
+  <main id="main">
+    <section class="wrap page-hero"><div class="eyebrow">RELEASE / MINISTREAM 2.2</div><h1>更清楚地看见，<br>每一次连接。</h1><p id="release-info" aria-live="polite">MiniStream 2.2 · 下载目标 v2.2.0 · 发布清单与 SHA-256 以 GitHub Release 为准。</p><div class="actions"><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.2.0">下载被控端 ↓</a><a class="button ghost" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.2.0">下载主控端 ↓</a><a class="button ghost" href="tutorial.html">阅读教程 →</a></div></section>
+    <div class="wrap tutorial">
+      <article class="release-card"><span class="version">V2.2.0 / CURRENT</span><h2>MiniStream 2.2</h2><ul><li><strong>真实遥测历史：</strong>保留实际程序上报的趋势，帮助对照一段时间内的链路与会话状态；缺失或过期样本仍显示“—”。</li><li><strong>事件记录：</strong>把连接、服务与遥测变化放到可回看的事件中，辅助定位问题发生的时间。</li><li><strong>分端工作台：</strong>主控端聚焦设备、配对和媒体，被控端聚焦服务、链路和认证会话。</li><li><strong>延续 2.1.4 修复：</strong>包含主控首次保存失败、mslink 启动失败残留监听 socket 等问题的修复。</li></ul><p>2.2 改善的是状态可见性与工作流，不宣称因此降低延迟、提高帧率或解决所有弱网问题。</p></article>
+
+      <article><h2>下载、升级与校验</h2><p>结束当前串流并保存配置，在已有安装目录覆盖升级，两端建议使用相同版本。发布清单尚未生成时，下载按钮只进入 v2.2.0 标签页；脚本不会把旧版 release.json 资产当作 2.2 安装包。</p><p>发布文件生成后，用 PowerShell 的 <code>Get-FileHash 文件名 -Algorithm SHA256</code> 与同版 <code>SHA256SUMS.txt</code> 对照。校验值必须来自实际构建，不能沿用旧版。</p><div class="actions"><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.2.0" target="_blank" rel="noopener noreferrer">打开 v2.2.0 Release ↗</a><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">查看源代码 ↗</a></div></article>
+
+      <article><h2>验证范围</h2><table><thead><tr><th>项目</th><th>结果</th><th>边界</th></tr></thead><tbody><tr><td>本机 CTest</td><td>7 / 7 通过</td><td>仅覆盖实际自动化测试及其环境</td></tr><tr><td>弱网场景</td><td>7 类场景，50 / 50 检查通过</td><td>仅对应受控测试配置，不是所有真实链路</td></tr><tr><td>完整 Windows 虚拟机</td><td>尚未完成</td><td>未完成干净虚拟机安装验收</td></tr><tr><td>ISO / 管理员限制</td><td>尚未完成</td><td>没有 ISO 或管理员限制环境的完整验证</td></tr></tbody></table><p>不能宣称 Windows 10/11 全部系统环境、所有 GPU/驱动组合或所有游戏均已测试。高码率弱网、长时间跨网串流和实际游戏兼容性仍取决于具体设备与链路。</p></article>
+
+      <article><h2>指标与安全边界</h2><p>隧道 RTT 不是端到端操作延迟，媒体网络丢帧不是 IP 丢包率。排障时结合双端事件、RTT、抖动、网络丢帧、解码和排队时间，不用单项数据代替完整链路。</p><p>DPAPI 与文件 ACL 只降低本机文件泄露面；同一 Windows 用户仍可解密，内存中的口令仍是明文，网络传输也没有因此加密。自定义隧道认证不是经过审计的端到端加密 VPN。公网请使用可信受保护的网络路径，不要公开 Sunshine 管理页面。</p></article>
+
+      <article class="release-card previous"><span class="version">V2.1.4 / PREVIOUS HOTFIX</span><h2>2.1.4：首次保存与启动清理</h2><p>修复 2.1.3 主控端首次连接时 <code>mslink.ini</code> 不存在导致保存失败的问题，以 <code>QSaveFile</code> 原子创建配置；修复 mslink 启动失败泄漏监听 socket 与回退重试二次 bind 的问题，并改善空口令和上游 Sunshine 连接失败处理。2.2 延续这些修复。</p><p>从 2.1.3 升级前结束串流并保存配置。回退到 2.1.2 或更早版本、或更换 Windows 用户后，可能需要重新填写 DPAPI 凭据。</p></article>
+
+      <article class="release-card previous"><span class="version">V2.1.3 / EARLIER</span><h2>2.1.3：加固与已知回归</h2><p>引入隧道队列、帧和握手加固，以及主控端 DPAPI 凭据、被控端标准输入口令与文件 ACL。该版本存在首次保存失败和启动清理回归，相关问题已在 2.1.4 修复。</p></article>
+      <article><h2>真实程序截图说明</h2><p>官网当前沿用 <code>client-home.jpg</code>、<code>host-overview.jpg</code> 与 <code>client-setup.jpg</code>，作为新版真实程序的离线或测试状态展示；这些截图不表示真实游戏性能，也不构成兼容性承诺。</p><p><a href="index.html">返回首页</a> · <a href="tutorial.html#upgrade">教程与验证说明</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">仓库完整更新记录 ↗</a></p></article>
+    </div>
+  </main>
+  <footer class="wrap site-footer"><a class="brand" href="index.html">MiniStream</a><p>Sunshine / Moonlight · GPLv3<br>Powered by jianhx2026 · 个人 Windows 游戏串流项目</p><a class="footer-github" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">GitHub ↗</a><small>© 2026 MiniStream</small></footer>
+</body>
+</html>

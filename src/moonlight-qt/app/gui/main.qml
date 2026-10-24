@@ -232,81 +232,52 @@ ApplicationWindow {
     readonly property bool shortWindow: height < 620
     readonly property var liveMetrics: MslinkTunnel.telemetry
     readonly property var mediaMetrics: liveMetrics.media || ({})
+    property string workspacePage: "devices"
     function metric(value, suffix, digits) { return typeof value === "number" && isFinite(value) ? value.toFixed(digits) + suffix : "—" }
+    function showWorkspacePage(page) {
+        if (page === "experience" && stackView.depth > 1) stackView.pop(null)
+        workspacePage = page
+    }
 
     Rectangle {
         id: workspaceNav
         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-        width: window.compact ? 72 : 210; color: "#131f32"
+        width: window.compact ? 68 : 220; color: theme.toolbar
         Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: theme.borderSoft }
         ColumnLayout {
-            anchors.fill: parent; anchors.margins: window.compact ? 10 : 20; spacing: 12
-            Text { visible: !window.compact; text: "WORKSPACE"; color: theme.textTertiary; font.pixelSize: 10; font.letterSpacing: 2; Layout.topMargin: 14; Layout.bottomMargin: 12 }
-            BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: stackView.depth === 1; onClicked: { while(stackView.depth > 1) window.goBack() } }
+            anchors.fill: parent; anchors.margins: window.compact ? 10 : 20; spacing: 10
+            Text { visible: !window.compact; text: "CONTROL / 主控工作台"; color: theme.primary; font.pixelSize: 9; font.letterSpacing: 1.6; Layout.topMargin: 16; Layout.bottomMargin: 16 }
+            BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "devices"; onClicked: window.showWorkspacePage("devices") }
+            BrandButton { label: window.compact ? "" : "体验监测"; iconSource: "qrc:/res/activity.svg"; ToolTip.text: "体验监测"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "experience"; onClicked: window.showWorkspacePage("experience") }
             BrandButton { label: window.compact ? "" : "连接配置"; iconSource: "qrc:/res/network.svg"; ToolTip.text: "连接配置"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: mslinkSetupDialog.open() }
-            BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: settingsButton.clicked() }
-            BrandButton { label: window.compact ? "" : "性能与诊断"; iconSource: "qrc:/res/activity.svg"; ToolTip.text: "性能与诊断"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: diagnosticsDialog.open() }
+            BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: { window.showWorkspacePage("devices"); settingsButton.clicked() } }
             Item { Layout.fillHeight: true }
+            Rectangle { visible: !window.compact; Layout.fillWidth: true; height: 66; radius: 10; color: theme.surface; border.color: theme.borderSoft
+                Column { anchors.fill: parent; anchors.margins: 11; spacing: 4
+                    Text { text: "连接方式"; color: theme.textTertiary; font.pixelSize: 9 }
+                    Text { text: window.liveMetrics.transport === "udp" ? "UDP 实时通道" : window.liveMetrics.transport === "tcp_fallback" ? "TCP 兼容通道" : "等待连接"; color: window.tunnelConnected ? theme.success : theme.textSecondary; font.pixelSize: 11 }
+                    Text { text: "1 TCP + 1 UDP"; color: theme.textTertiary; font.pixelSize: 9 }
+                }
+            }
             Rectangle { Layout.fillWidth: true; height: 1; color: theme.borderSoft }
             BrandButton { label: window.compact ? "" : "使用教程"; iconSource: "qrc:/res/help.svg"; Layout.fillWidth: true; onClicked: Qt.openUrlExternally("https://ministream.jianhx.com/tutorial.html") }
-            Text { visible: !window.compact; text: "MiniStream 2.1 · Preview"; color: theme.textTertiary; font.pixelSize: 10 }
+            Text { visible: !window.compact; text: "MiniStream 2.2 · Workspace"; color: theme.textTertiary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Powered by jianhx2026"; color: theme.textSecondary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Sunshine / Moonlight · GPLv3"; color: theme.textTertiary; font.pixelSize: 9 }
         }
     }
 
-    Rectangle {
-        id: performanceStrip
-        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.bottom: parent.bottom
-        anchors.margins: 16; height: window.shortWindow ? 52 : (window.width < 780 ? 228 : window.width < 1100 ? 170 : 114); radius: 12; color: theme.surface; border.color: theme.borderSoft
-        ColumnLayout {
-            anchors.fill: parent; anchors.margins: 14; spacing: 12
-            RowLayout { Layout.fillWidth: true
-                Text { text: window.shortWindow ? "连接与性能 · 详情见性能与诊断" : "LIVE TELEMETRY / 连接与性能"; color: theme.textSecondary; font.pixelSize: 10; font.letterSpacing: 1 }
-                Item { Layout.fillWidth: true }
-                Text { text: window.tunnelConnected ? "● 已认证隧道 · 每秒刷新" : "○ 尚未连接"; color: window.tunnelConnected ? theme.success : theme.textTertiary; font.pixelSize: 10 }
-            }
-            GridLayout { visible: !window.shortWindow; Layout.fillWidth: true; columns: window.width < 780 ? 2 : window.width < 1100 ? 3 : 5; columnSpacing: 18; rowSpacing: 10
-                Repeater {
-                    model: [
-                        {label:"隧道 RTT", value:window.metric(window.liveMetrics.rtt_ms," ms",0)},
-                        {label:"实际帧率", value:window.metric(window.mediaMetrics.fps," FPS",1)},
-                        {label:"媒体码率", value:window.metric(window.mediaMetrics.video_mbps," Mbps",1)},
-                        {label:"网络丢帧", value:window.metric(window.mediaMetrics.network_frame_drop_percent," %",2)},
-                        {label:"解码 / 排队", value:window.metric(window.mediaMetrics.decode_ms,"",1)+" / "+window.metric(window.mediaMetrics.queue_ms," ms",1)}
-                    ]
-                    delegate: ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: (performanceStrip.width - 28 - 18 * (parent.columns - 1)) / parent.columns
-                        spacing: 5
-                        Text { text: modelData.label; color: theme.textTertiary; font.pixelSize: 10 }
-                        Text { text: modelData.value; color: theme.text; font.family: "Segoe UI"; font.pixelSize: window.compact ? 17 : 19; font.weight: Font.DemiBold }
-                    }
-                }
-            }
-        }
-    }
-
-    Dialog {
-        id: diagnosticsDialog; title: "性能与诊断"; modal: true
-        x: Math.round((window.width-width)/2); y: Math.round((window.height-height)/2); width: Math.min(620, window.width - 32)
-        standardButtons: Dialog.Close
-        background: Rectangle { color: theme.surface; radius: 12; border.color: theme.border }
-        contentItem: ColumnLayout { spacing: 18
-            Label { Layout.fillWidth: true; text: "只显示真实采样。帧率和解码数据需开始串流后才会出现，停止 5 秒后失效。网络丢帧不等于网络丢包率，隧道 RTT 也不是端到端操作延迟。"; wrapMode: Text.WordWrap; color: theme.textSecondary }
-            Label { text: "传输模式：" + (window.liveMetrics.transport || "暂无数据") + "    本地丢弃：" + (window.liveMetrics.udp_local_dropped === undefined ? "—" : window.liveMetrics.udp_local_dropped); color: theme.text }
-            Label { text: "主机处理："+window.metric(window.mediaMetrics.host_processing_ms," ms",2)+"    渲染："+window.metric(window.mediaMetrics.render_ms," ms",2); color: theme.text }
-            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "UDP 探测发送 / 有效应答："+(window.liveMetrics.udp_probe_sent || 0)+" / "+(window.liveMetrics.udp_probe_ack || 0)+"\n认证拒绝："+(window.liveMetrics.udp_auth_rejected || 0)+"    有效数据："+(window.liveMetrics.udp_data_received || 0)+"    最近发送错误："+(window.liveMetrics.udp_last_send_error || 0)+"\n距最近有效 UDP 回包："+(window.liveMetrics.udp_last_success_age_ms === null ? "尚未收到" : window.metric(window.liveMetrics.udp_last_success_age_ms / 1000," 秒",1)); color: theme.textSecondary }
-            BrandButton { label: "导出性能诊断"; accent: true; onClicked: diagnosticsResult.text = MslinkTunnel.exportDiagnostics() }
-            Label { id: diagnosticsResult; Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; color: theme.textSecondary }
-        }
+    ExperienceView {
+        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+        visible: window.workspacePage === "experience"
+        focus: visible
     }
 
     StackView {
         id: stackView
-        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: performanceStrip.top
-        anchors.leftMargin: 16; anchors.rightMargin: 16; anchors.topMargin: 8; anchors.bottomMargin: 12
-        focus: true
+        visible: window.workspacePage === "devices"
+        anchors.left: workspaceNav.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+        focus: visible
         // StackView 是 Control，会自带一层 style 的浅色 background，
         // 不覆盖的话深色主题下窗口内容区会是一片浅灰。
         background: Rectangle { color: theme.canvas }

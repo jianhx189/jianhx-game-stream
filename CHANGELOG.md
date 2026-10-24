@@ -1,5 +1,21 @@
 # Changelog / 更新记录
 
+## 2.2.0 — 体验与遥测版 / Experience and telemetry
+
+- **主控端工作台重做**：深色界面与折叠侧栏，导航为「我的设备 / 体验监测 / 连接配置 / 串流偏好 / 使用教程」。设备卡片、空状态和小屏布局沿用，新增独立「体验监测」页。
+- **体验监测（主控端新增页）**：顶部给出传输通道（`UDP · 低延迟通道`、`TCP · 兼容通道`、`正在探测 UDP`、`等待隧道连接`）与一条经验提示；四张指标卡为隧道 RTT / 抖动、实际渲染帧率（含接收帧率）、视频码率、发送队列（含 4 MiB 上限与重连次数）。趋势区可选 60 秒或 300 秒窗口，分别绘制隧道 RTT、下行吞吐（按 `udp_bytes_down` 差分）和发送队列；另有「视频体验」（网络丢帧、呈现丢帧、分辨率、媒体流 RTT）、「客户端耗时」（解码、帧排队、渲染、主机处理）、链路计数（活动 TCP/UDP 流、本地丢弃、UDP 探测/应答、认证拒绝/回包错误）与最多显示 6 条的连接事件。
+- **提示阈值**：发送队列 > 1 MiB、媒体网络丢帧 > 2%、帧排队 > 30 ms、解码 > 16 ms 会给出对应文字提示。这是启发式定位提示，不是体验评分；未触发时显示“当前采样未触发提示阈值”。
+- **被控端四页工作台**：`主机概览`（隧道往返延迟、实际渲染帧率、主机发送速率、网络丢帧率、解码耗时、帧排队耗时，以及已认证设备表的设备/传输/时长/状态）、`连接质量`（心跳抖动、活动 TCP/UDP 流、发送队列、隧道重连、本地丢弃、UDP 探测/应答、认证拒绝/回包错误，四张 1 秒采样趋势图，事件表可按「全部级别 / 提示与警告 / 仅警告」筛选）、`媒体会话`（接收帧率、实际渲染帧率、视频码率、分辨率、网络丢帧、解码/排队/渲染耗时、主机处理）、`服务与诊断`（服务启停、端口配置、事件与日志、导出诊断）。
+- **遥测有界**：隧道在内存中保留最近 **300 个约 1 秒采样点** 和 **100 条事件**；同一秒内不重复采样，长时间跳变只补一个点；同类别同文案事件 1 秒内去重，单条文案截断到 163 字节并去除换行。实时遥测 JSON 不含历史且小于 64 KiB，历史/事件 JSON 小于 128 KiB，两者都不写盘；`mslink-status.jsonl` 仍按约 1 MiB × 2 轮转。
+- **测试**：新增 `relay_telemetry`（历史与事件上限、采样节流、JSON 契约、事件不含口令/设备名/对端报告、媒体开始与结束事件），CTest 共七项，本机 7/7 通过。
+- **弱网端到端**：`tools/mslink_weaknet_e2e.py` 以真实 `mslink.exe`、假 Sunshine 和 127.0.0.1 上的双侧对称损伤代理运行 7 个场景（`baseline`、`rtt100_loss2`、`limit5`、`udp_down`、`recover`、`outage30`、`duplex`），共 50 项检查全部通过。判物理 UDP 只看代理 UDP data 包增量，不用 TCP 字节推断。
+- **弱网测试的边界**：回环单机、对称损伤、自造 UDP 回显数据而非 H.264/Opus 媒体、无 GPU 解码与呈现、不模拟 AQM、IP 分片、MTU、NAT 超时和运营商突发丢包，也不验证 Moonlight 的 FEC/NACK。它证明的是隧道在受控损伤下的 UDP 保活、回退、恢复与重连行为，不是真实跨公网游戏体验。
+- **未执行的验收**：本轮没有运行 Windows 10/11 虚拟机安装（无 Windows ISO，当前会话非管理员；Hyper-V 可用但未创建虚拟机）。不宣称干净 Win10/11、所有 GPU/驱动组合或真实长时串流通过。
+- **历史修复保留**：2.1.3 存在「`mslink.ini` 不存在时保存必定失败」与「`mslink` 启动失败残留监听 socket」两处回归，2.1.4 已修复；2.2.0 沿用 2.1.3 引入的隧道队列/帧/握手加固、DPAPI 凭据、`--password-stdin`、文件 ACL 与多网卡 UDP 修复。2.1.3 仍不建议用于全新安装，2.1.4 是上一个已发布版本。
+- **发布状态**：2.2.0 的主控端、被控端、两份安装包与源码包已在本轮构建；具体哈希与线上资产以 v2.2.0 Release 和同版 `release-manifest.json` 为准。
+
+English: Reworks the controller workspace into a dark shell with device, experience, connection, preference and help entries, and adds a real "experience" page (transport badge, RTT/jitter, rendered and received frame rate, bitrate, bounded send queue, 60/300-second RTT, downlink-throughput and queue trends, media drop/pacing/resolution/stream RTT, decode/queue/render/host timings, link counters and recent events). Heuristic hints fire above 1 MiB queued, 2% media drop, 30 ms queueing or 16 ms decoding and are explicitly not a score. The host console gains four pages (overview, connection quality, media session, service and diagnostics) fed by the same 1-second telemetry, with a level filter on events. Telemetry stays in memory: at most 300 one-second samples and 100 events, samples throttled to one per second, events deduplicated per category/message within a second and truncated to 163 bytes; live telemetry JSON excludes history and stays under 64 KiB, history JSON stays under 128 KiB, and nothing new is written to disk. A new `relay_telemetry` test brings CTest to seven cases, all passing locally. A weak-network harness drives the real binaries through a symmetric impairing proxy on 127.0.0.1 across seven scenarios (baseline, 100 ms RTT with 2% loss, 5 Mbit/s shaping, UDP blocked, recovery, 30 s outage, duplex) and passes 50/50 checks, using proxy UDP data counts rather than TCP bytes to prove physical UDP; the echo payload is synthetic, decoding and presentation are not exercised, and AQM/MTU/NAT behaviour is not modelled. No Windows 10/11 virtual machine run was performed (no ISO, non-admin session), and clean-machine, all-GPU and long real-session behaviour are still not verified. The 2.1.3 regressions (first controller save, leaked listening sockets on failed start) remain fixed as shipped in 2.1.4, whose hardening is unchanged here. The 2.2.0 applications, host console and both installers were rebuilt in this round; hashes and online assets are recorded by the v2.2.0 release and its manifest.
+
 ## 2.1.4 — 热修复版 / Hotfix
 
 - **修复 2.1.3 回归（首次连接保存）**：主控端首次连接时 `mslink.ini` 尚不存在，保存连接必定失败，之后每次都要重新填写。2.1.4 在文件不存在时同样通过 `QSaveFile` 原子创建配置，保存一次即可保留。

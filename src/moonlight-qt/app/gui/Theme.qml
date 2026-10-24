@@ -1,38 +1,29 @@
 import QtQuick
 
-// =============================================================================
-//  Theme.qml —— MiniStream 深色主题令牌
-//  所有界面配色都从这里取，避免各处散落硬编码颜色。
-// =============================================================================
 QtObject {
-    // ---- 底色 ----
-    readonly property color canvas:        "#101827"   // 窗口最底层
-    readonly property color toolbar:       "#131f32"   // 工具栏
-    readonly property color surface:       "#19273c"   // 卡片 / 弹窗
-    readonly property color surfaceAlt:    "#22324b"   // 输入框 / 次级块
-    readonly property color surfaceHover:  "#2a3e5d"   // 悬停态
+    readonly property color canvas: "#0b1020"
+    readonly property color toolbar: "#10182b"
+    readonly property color surface: "#131e33"
+    readonly property color surfaceAlt: "#1b2942"
+    readonly property color surfaceHover: "#243653"
 
-    // ---- 边框 ----
-    readonly property color border:        "#344863"
-    readonly property color borderSoft:    "#22324b"
-    readonly property color borderStrong:  "#587599"
+    readonly property color border: "#2c3c5a"
+    readonly property color borderSoft: "#20304b"
+    readonly property color borderStrong: "#4a719b"
 
-    // ---- 文字 ----
-    readonly property color text:          "#edf2fb"
-    readonly property color textSecondary: "#afbed4"
-    readonly property color textTertiary:  "#7e92af"
+    readonly property color text: "#f0f5ff"
+    readonly property color textSecondary: "#b1c2dd"
+    readonly property color textTertiary: "#7f95b7"
 
-    // ---- 强调 / 语义色 ----
-    readonly property color primary:       "#88a6ff"
-    readonly property color success:       "#54d8b4"
-    readonly property color warning:       "#f0b429"
-    readonly property color danger:        "#f87171"
-    readonly property color dangerSoft:    "#3a2226"
+    readonly property color primary: "#66c9f2"
+    readonly property color accent: "#a899ff"
+    readonly property color success: "#4ddab3"
+    readonly property color warning: "#f5bc65"
+    readonly property color danger: "#ff8296"
+    readonly property color dangerSoft: "#382036"
 
-    // ---- 圆角 ----
-    readonly property int radiusCard:      10
-    readonly property int radiusControl:   8
-
-    // ---- 字体 ----
-    readonly property string fontFamily:   "Microsoft YaHei UI"
+    readonly property int radiusCard: 12
+    readonly property int radiusControl: 7
+    readonly property string fontFamily: "Microsoft YaHei UI"
+    readonly property string monoFamily: "Cascadia Mono"
 }
