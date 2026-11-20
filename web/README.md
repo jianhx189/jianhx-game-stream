@@ -11,7 +11,7 @@ MiniStream 2.3 的静态官网，使用 HTML、CSS 与原生 JavaScript，主站
 - `styles.css` / `script.js`：全站共享样式、移动导航和下载资产选择。
 - `release.json` / `updates.json`：站点发布元数据；静态构建会同步，但发布生成流程不由官网构建脚本负责。
 
-当前下载目标为 `v2.3.0`，页面版本文案为 MiniStream 2.3。`script.js` 只从 `tag_name` 精确匹配 `v2.3.0` 的 `release.json` 中读取安装包直链；元数据缺失、请求失败或版本不匹配时统一回退到该 Release 标签页，避免把旧版资产误标为 2.3。
+当前下载目标为 `v2.3.1`，页面版本文案为 MiniStream 2.3。`script.js` 只从 `tag_name` 精确匹配 `v2.3.1` 的 `release.json` 中读取安装包直链；元数据缺失、请求失败或版本不匹配时统一回退到该 Release 标签页，避免把旧版资产误标为 2.3。
 
 ## 截图
 

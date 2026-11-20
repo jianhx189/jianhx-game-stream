@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "channel": "stable",
-  "created_utc": "2026-11-20T16:25:32.158019+00:00",
+  "created_utc": "2026-11-20T16:59:41.031068+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49382700,
-      "sha256": "f86155cd9230a160c952a94c7c75c4ad5b563b8bcf1898cd37d85bba3db7a23d"
+      "size": 49385932,
+      "sha256": "b066320a7acc72d81ea9175bd2213d8f0e214a6aa71d7181d736d9dce25f30ea"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63531475,
-      "sha256": "b9dda082608e5a2a59c583ade9de4619f686b46272d8d163cd35e9f3c2586796"
+      "size": 63534838,
+      "sha256": "22a5cb8c22a1576b1934fe1adc21243ed6428f516b6a90a3ee53b63c01aafaf9"
     },
     {
-      "name": "MiniStream-2.3.0-Source.zip",
-      "size": 2917386,
-      "sha256": "808967859a00e5ff10fc8a5a9bd452dbd42addce1179ff703b14c88dd9bf18f8"
+      "name": "MiniStream-2.3.1-Source.zip",
+      "size": 2981865,
+      "sha256": "acb639e008f83f1d9c1ce1ea40566a5bd8b183d17a51338b6f6e7083f236a3af"
     }
   ],
   "sources": {
@@ -38,53 +38,29 @@
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
   "verification": {
-    "version": "2.3.0",
+    "version": "2.3.1",
     "passed": true,
-    "checked_utc": "2026-11-20",
     "results": [
       {
-        "name": "mslink CTest",
+        "name": "Tunnel regression",
         "status": "passed",
-        "evidence": "7/7 on Windows, including relay start-up, handshake, telemetry and UDP reply-source coverage"
+        "evidence": "CTest 7/7 on Windows."
       },
       {
-        "name": "Host settings and listener self-check",
+        "name": "Host connection settings",
         "status": "passed",
-        "evidence": "Isolated real mslink on random loopback TCP/UDP ports. Verified missing/occupied/owned listeners, invalid input rejection, running and stopped password changes, restart failure rollback and no credentials in action logs or backups."
+        "evidence": "Qt application-level test at 760x560 and 1000x660. Verified no horizontal overflow in the setup screen, available fixed invitation action, LAN/FRP switching, independent TCP/UDP public and local ports, local port mismatch handling, saved mappings and proxy-only clipboard output."
       },
       {
-        "name": "Host interface",
+        "name": "Installers",
         "status": "passed",
-        "evidence": "Qt program rendered and inspected at 1170×696. Verified overview entry, LAN default, FRP TCP/UDP TOML generation and invalid endpoint handling. Native Windows tray close and window recovery passed."
-      },
-      {
-        "name": "Windows application and installer builds",
-        "status": "passed",
-        "evidence": "MSVC 14.44 x64 and Qt 6.9.3. Both Inno Setup ProductVersion 2.3.0."
-      },
-      {
-        "name": "In-place host upgrade",
-        "status": "passed",
-        "evidence": "Existing installation directory retained the same tunnel config hash. Sunshine local serverinfo, TCP/UDP listeners, firewall rules, and both logon tasks verified."
-      },
-      {
-        "name": "Website and documentation",
-        "status": "passed",
-        "evidence": "China-facing product messaging, release links, current Host screenshot, LAN/FRP setup and diagnostic instructions."
-      },
-      {
-        "name": "LAN and FRP invitations",
-        "status": "passed",
-        "evidence": "Qt host overview and mode navigation, default maps, invalid address rejection; real isolated mslink TCP authentication and UDP return pass; UDP blackhole and forwarding to another host rejected; client invitation decoder rejects malformed links."
+        "evidence": "Both applications rebuilt with MSVC/Qt and packaged using Inno Setup. Both installers report ProductVersion 2.3.1."
       }
     ],
     "not_covered": [
-      "Clean Windows 10/11 VM installation",
-      "Long-running real game sessions across WAN",
-      "All encoders, drivers and network setups",
-      "Independent tunnel security audit and Authenticode signing",
-      "External FRP validation across the user WAN",
-      "Clean browser-to-installed-client flow on a separate Windows PC"
+      "Fresh Windows VM and in-place installation with these exact 2.3.1 installers",
+      "Real external FRP, browser handoff, and long-duration game sessions across WAN",
+      "Independent security audit and Authenticode signing"
     ]
   },
   "limits": [
@@ -162,7 +138,7 @@
       {
         "path": "MiniStream.exe",
         "size": 3290624,
-        "sha256": "1673dce788707f94fd8d68770598b678164d08f6afaaf4c3ef8eeb7fa65f510b"
+        "sha256": "df78cce4f4285bd710ed0da25382f95421a8ddb89d2e657782fe39e23415ef19"
       },
       {
         "path": "ministream.ico",
@@ -1883,8 +1859,8 @@
       },
       {
         "path": "console/MiniStreamHost.exe",
-        "size": 307712,
-        "sha256": "594234c5e9dea6dd164cb7d8ed0b3bdde6c8705f107fcc62180807debb9e01cc"
+        "size": 304128,
+        "sha256": "9e67b8ee6325fffd06d5a6eec1949edf73e30e0fa163bd63c619b45b9c37bf69"
       },
       {
         "path": "console/msvcp140.dll",

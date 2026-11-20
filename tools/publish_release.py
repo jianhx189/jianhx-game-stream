@@ -89,6 +89,9 @@ def commit_files(items,message):
         if old.get(path,{}).get('sha')==sha:continue
         blob=api('/git/blobs','POST',{'content':base64.b64encode(data).decode(),'encoding':'base64'})
         changes.append({'path':path,'mode':'100644','type':'blob','sha':blob['sha']})
+    retired_probe="src/host-console/route_probe.h"
+    if retired_probe in old and retired_probe not in items and "src/host-console/main.cpp" in items:
+        changes.append({"path":retired_probe,"mode":"100644","type":"blob","sha":None})
     if not changes:return head
     tree=api('/git/trees','POST',{'base_tree':previous['tree']['sha'],'tree':changes})
     commit=api('/git/commits','POST',{'message':message,'tree':tree['sha'],'parents':[head]})

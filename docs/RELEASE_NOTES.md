@@ -1,20 +1,13 @@
-# MiniStream 2.3.0 · 被控端控制台
+# MiniStream 2.3.1
 
-**为中国玩家打造，让远程游戏串流更流畅。**
+- 被控端重构连接设置页。局域网与 FRP 独立切换，邀请和代理复制操作固定在底部。
+- 勾选自定义映射后，可独立设置 TCP、UDP 的公网端口和本机隧道端口。内网端口与监听配置不一致时，界面会引导应用更改。
+- 复制项仅包含两条 frpc 代理配置。frps 由用户自行管理，被控端生成邀请时不连接 frps，也不发起公网探测。请从外网主控端验证 TCP 与 UDP。
 
-- 被控端首页提供「局域网连接」和「FRP 穿透连接」。局域网自动选址，FRP 按输入的公网 IPv4 验证真实 TCP 本机会话与 UDP 回程后，生成浏览器邀请链接。公网映射端口可分别覆盖。
-- Windows 主控端支持浏览器唤起和已有实例接收邀请。仅私发链接，首次 Sunshine 配对仍需授权。
-- 主控端自动检测 GitHub 正式版。新版安装器识别旧版、确认更新并显示实际文件部署进度。
-- 在控制台更换隧道口令。已运行的隧道会短暂重启并检查两条监听。更换后先在主控端更新口令，再重新连接。
-- 「运行本机自检」核对 Sunshine 响应、TCP/UDP 监听归属、Windows 防火墙和登录自启。有独立的防火墙规则修复按钮。公网可达性和双向 UDP 请从另一台电脑测试。
-- 关闭窗口时控制台收起到 Windows 托盘，后台服务继续运行。点击托盘图标或再次打开快捷方式可恢复窗口。
-
-## 升级与校验
-
-先结束当前串流，再在已有目录覆盖升级。安装器保留已有的隧道与 Sunshine 配置。下载后用 PowerShell `Get-FileHash -Algorithm SHA256` 对照 `SHA256SUMS.txt`。验证范围见同版本的 `release-manifest.json`。
+到主机下载 Host，到操作电脑下载 Client。结束串流后在原目录覆盖升级。请对照本版本的 SHA-256 校验安装文件。
 
 ## English
 
-The Host Console adds LAN and FRP setup templates, a copyable connection summary, and tunnel password changes. A local self-check reports Sunshine, TCP and UDP listeners, firewall rules, and logon startup. The console minimizes to the Windows tray while streaming services keep running. Upgrade in the existing installation directory, and update the controller password after changing it on the host.
+The Host connection settings have separate LAN and FRP views, a fixed invitation bar and separate public-to-local TCP and UDP port mappings. Copy the proxy definitions into your existing frpc configuration. Manage frps independently and test public connectivity from the client.
 
-[中文使用教程](https://ministream.jianhx.com/tutorial.html) · [English project overview](https://ministream.jianhx.com/en.html)
+[使用教程](https://ministream.jianhx.com/tutorial.html) · [English overview](https://ministream.jianhx.com/en.html)

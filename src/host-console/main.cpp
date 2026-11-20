@@ -7,7 +7,6 @@
 #include <cmath>
 #include "ui_components.h"
 #include "host_setup.h"
-#include "route_probe.h"
 
 class ConnectionPulse final : public QWidget {
     QVariantAnimation animation;
@@ -90,7 +89,6 @@ static QString number(QJsonValue value, int precision = 1, const QString &suffix
 class Console final : public QMainWindow {
     QString root;
     QStackedWidget *pages = nullptr;
-    QScrollArea *pageScroll = nullptr;
     QLabel *headline = nullptr, *subtitle = nullptr, *heroTitle = nullptr, *heroDetail = nullptr;
     QLabel *sessionCount = nullptr, *lastUpdate = nullptr, *quality = nullptr, *notice = nullptr;
     QLabel *serviceState = nullptr, *runtimeState = nullptr, *deviceDetail = nullptr;
@@ -114,16 +112,18 @@ class Console final : public QMainWindow {
     ConnectionPulse *pulse = nullptr;
     QPushButton *setupNav = nullptr, *serviceNav = nullptr, *checkButton = nullptr;
     QLabel *checkResult = nullptr, *stepHint = nullptr, *routeStatus = nullptr;
-    QLabel *summary = nullptr, *setupNotice = nullptr;
-    QStackedWidget *endpointFields = nullptr;
+    QLabel *summary = nullptr, *setupNotice = nullptr, *mappingStatus = nullptr;
+    QWidget *lanFields = nullptr, *frpFields = nullptr;
     QTabBar *templateMode = nullptr;
     QCheckBox *advancedMapping = nullptr;
     QWidget *mappingFields = nullptr;
     QComboBox *lanAddress = nullptr;
     QLineEdit *publicAddress = nullptr;
-    QSpinBox *frpPort = nullptr, *publicTcp = nullptr, *publicUdp = nullptr;
-    QPushButton *copyEndpoint = nullptr, *copyConnection = nullptr, *frpCopy = nullptr;
-    QPlainTextEdit *frpPreview = nullptr;
+    QSpinBox *publicTcp = nullptr, *publicUdp = nullptr, *privateTcp = nullptr, *privateUdp = nullptr;
+    QAction *copyEndpoint = nullptr;
+    QPushButton *copyConnection = nullptr, *frpCopy = nullptr;
+    QFrame *setupFooter = nullptr;
+    QPushButton *applyMapping = nullptr;
     QString connectionAddress, frpTemplate;
     int connectionTcp = 0, connectionUdp = 0;
     HANDLE actionHandle = nullptr;
@@ -267,9 +267,11 @@ class Console final : public QMainWindow {
         auto *layout = new QVBoxLayout(page);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(16);
-        auto *detail = Ui::text(description, "muted");
-        detail->setWordWrap(true);
-        layout->addWidget(detail);
+        if (!description.isEmpty()) {
+            auto *detail = Ui::text(description, "muted");
+            detail->setWordWrap(true);
+            layout->addWidget(detail);
+        }
         return page;
     }
 
@@ -463,7 +465,9 @@ class Console final : public QMainWindow {
     void refreshSetup()
     {
         const bool frp = templateMode->currentIndex() == 1;
-        endpointFields->setCurrentIndex(frp ? 1 : 0);
+        const bool custom = frp && advancedMapping->isChecked();
+        lanFields->setVisible(!frp);
+        frpFields->setVisible(frp);
         connectionAddress = frp ? publicAddress->text().trimmed() : lanAddress->currentData().toString();
         const QHostAddress parsed(connectionAddress);
         if (parsed.protocol() != QAbstractSocket::IPv4Protocol || parsed == QHostAddress::AnyIPv4 ||
@@ -472,52 +476,61 @@ class Console final : public QMainWindow {
         const int localTcp = cfg("mslink-host.ini", "tcp_port", "14738").toInt();
         const int localUdp = cfg("mslink-host.ini", "udp_port", "14739").toInt();
         const bool localPortsValid = localTcp > 0 && localTcp <= 65535 && localUdp > 0 && localUdp <= 65535 && localTcp != localUdp;
-        { QSignalBlocker tcpBlock(publicTcp), udpBlock(publicUdp);
-          if (!QSettings().contains(settingsKey("frp/tcp"))) publicTcp->setValue(localTcp);
-          if (!QSettings().contains(settingsKey("frp/udp"))) publicUdp->setValue(localUdp);
-        }
-        connectionTcp = frp ? publicTcp->value() : localTcp;
-        connectionUdp = frp ? publicUdp->value() : localUdp;
-        const bool endpointReady = localPortsValid && !connectionAddress.isEmpty();
-        stepHint->setText(frp ? "填入 FRP 公网 IPv4。公网端口默认与本机相同；若映射时改了端口，请展开高级设置。"
-            : "已自动选择本机网卡。同一局域网内，在装有主控端的电脑上打开邀请即可连接。");
-        routeStatus->setText(endpointReady ? frp ? "生成前将校验 TCP 认证与 UDP 回包" : "局域网地址已就绪" : frp ? "请填写 FRP 地址并核对两条公网端口" : "请检查本机网卡和隧道端口");
-        summary->setText(QString("地址    %1     /     TCP  %2     /     UDP  %3")
+        const auto syncPort = [this](QSpinBox *field, const QString &key, int port) {
+            if (!QSettings().contains(settingsKey(key))) {
+                const QSignalBlocker blocker(field);
+                field->setValue(port);
+            }
+        };
+        syncPort(publicTcp, "frp/tcp", localTcp);
+        syncPort(publicUdp, "frp/udp", localUdp);
+        syncPort(privateTcp, "frp/privateTcp", localTcp);
+        syncPort(privateUdp, "frp/privateUdp", localUdp);
+        const int targetTcp = custom ? privateTcp->value() : localTcp;
+        const int targetUdp = custom ? privateUdp->value() : localUdp;
+        connectionTcp = custom ? publicTcp->value() : localTcp;
+        connectionUdp = custom ? publicUdp->value() : localUdp;
+        const bool distinctTargets = targetTcp != targetUdp;
+        const bool targetsMatch = targetTcp == localTcp && targetUdp == localUdp;
+        const bool endpointReady = localPortsValid && targetsMatch && !connectionAddress.isEmpty();
+        stepHint->setText(frp ? "使用自己的 FRP 服务，将两条代理加入现有 frpc 配置。"
+            : "主控端和本机使用同一个网络时，分享此地址。");
+        mappingStatus->setText(!distinctTargets ? "MiniStream 的 TCP 和 UDP 内网监听端口必须不同。"
+            : !targetsMatch ? QString("当前主机监听配置为 TCP %1 / UDP %2。请应用内网端口后再生成邀请。").arg(localTcp).arg(localUdp)
+            : QString());
+        mappingStatus->setVisible(!distinctTargets || !targetsMatch);
+        applyMapping->setVisible(custom && distinctTargets && !targetsMatch);
+        routeStatus->setText(endpointReady ? frp ? "请在主控端测试公网 TCP 和 UDP。" : "局域网地址已就绪。"
+            : connectionAddress.isEmpty() ? "请先确认连接地址。" : "请先核对本机隧道端口。");
+        summary->setText(QString("%1  ·  TCP %2  ·  UDP %3")
             .arg(connectionAddress.isEmpty() ? "待填写" : connectionAddress)
             .arg(connectionTcp).arg(connectionUdp));
         copyEndpoint->setEnabled(!connectionAddress.isEmpty());
         copyConnection->setEnabled(endpointReady);
-        mappingFields->setVisible(advancedMapping->isChecked());
-        frpCopy->setVisible(frp && advancedMapping->isChecked());
+        mappingFields->setVisible(custom);
+        frpCopy->setVisible(frp);
         const auto bind = cfg("mslink-host.ini", "bind", "0.0.0.0");
         const auto localAddress = bind == "0.0.0.0" ? QString("127.0.0.1") : bind;
         const bool localAddressValid = QHostAddress(localAddress).protocol() == QAbstractSocket::IPv4Protocol;
-        frpCopy->setEnabled(frp && endpointReady && localAddressValid);
+        frpCopy->setEnabled(frp && localAddressValid && distinctTargets &&
+                            targetTcp > 0 && targetTcp <= 65535 && targetUdp > 0 && targetUdp <= 65535);
         frpTemplate = !frpCopy->isEnabled() ? QString() :
-            QString("serverAddr = \"%1\"\nserverPort = %2\n\n"
-                    "[[proxies]]\nname = \"ministream-tcp\"\ntype = \"tcp\"\nlocalIP = \"%3\"\n"
-                    "localPort = %4\nremotePort = %5\n\n"
-                    "[[proxies]]\nname = \"ministream-udp\"\ntype = \"udp\"\nlocalIP = \"%3\"\n"
-                    "localPort = %6\nremotePort = %7\n")
-                .arg(connectionAddress).arg(frpPort->value()).arg(localAddress).arg(localTcp)
-                .arg(connectionTcp).arg(localUdp).arg(connectionUdp);
-        frpPreview->setVisible(frp && advancedMapping->isChecked());
-        frpPreview->setPlainText(frpTemplate);
+            QString("[[proxies]]\nname = \"ministream-tcp\"\ntype = \"tcp\"\nlocalIP = \"%1\"\n"
+                    "localPort = %2\nremotePort = %3\n\n"
+                    "[[proxies]]\nname = \"ministream-udp\"\ntype = \"udp\"\nlocalIP = \"%1\"\n"
+                    "localPort = %4\nremotePort = %5\n")
+                .arg(localAddress).arg(targetTcp).arg(connectionTcp).arg(targetUdp).arg(connectionUdp);
     }
 
     void shareInvitation()
     {
+        refreshSetup();
+        if (!copyConnection->isEnabled()) return;
         const auto password = cfg("mslink-host.ini", "password", "");
         if (!HostSetup::validPassword(password, 1)) { setupNotice->setText("请先设置有效的隧道口令。"); return; }
         const bool frp = templateMode->currentIndex() == 1;
         const auto ip = connectionAddress;
         const int tcpPort = connectionTcp, udpPort = connectionUdp;
-        if (ip.isEmpty()) return;
-        if (frp) {
-            const auto failure = RouteProbe::check(this, root, ip, tcpPort, udpPort, password);
-            if (!failure.isEmpty()) { setupNotice->setText(failure + " 未生成链接。"); return; }
-        }
-        if (password != cfg("mslink-host.ini", "password", "")) { setupNotice->setText("校验期间口令已更换，请重试。"); return; }
         const QJsonObject invite{{"v",1},{"mode",frp ? "frp" : "lan"},{"ip",ip},{"tcp",tcpPort},{"udp",udpPort},{"key",password}};
         const auto payload = QJsonDocument(invite).toJson(QJsonDocument::Compact).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
         copyText("https://ministream.jianhx.com/connect.html#" + QString::fromLatin1(payload), true);
@@ -536,20 +549,24 @@ class Console final : public QMainWindow {
 
     QWidget *setupPage()
     {
-        auto *page = makePage("在主机上准备连接信息，然后到另一台电脑的 MiniStream 主控端添加设备。");
-        auto *card = Ui::card();
+        auto *page = makePage({});
+        page->setObjectName("connectionPage");
+        auto *card = new QFrame;
+        card->setObjectName("connectionPanel");
         auto *form = new QVBoxLayout(card);
-        form->setContentsMargins(20, 16, 20, 16);
-        form->setSpacing(12);
-        form->addWidget(Ui::text("选择网络模板", "sectionTitle"));
+        form->setContentsMargins(22, 16, 22, 16);
+        form->setSpacing(10);
         templateMode = new QTabBar;
-        templateMode->setExpanding(true);
-        templateMode->addTab("局域网模式");
-        templateMode->addTab("FRP 内网穿透模式");
+        templateMode->setObjectName("connectionTabs");
+        templateMode->setExpanding(false);
+        templateMode->setDrawBase(false);
+        templateMode->addTab("局域网直连");
+        templateMode->addTab("FRP 穿透");
         templateMode->setAccessibleName("网络模板");
-        form->addWidget(templateMode);
-        endpointFields = new QStackedWidget;
+        page->layout()->addWidget(templateMode);
         auto *lan = new QWidget;
+        lanFields = lan;
+        lan->setObjectName("connectionFields");
         auto *lanForm = new QFormLayout(lan);
         lanForm->setContentsMargins(0, 0, 0, 0);
         lanAddress = new QComboBox;
@@ -562,75 +579,120 @@ class Console final : public QMainWindow {
         lanRow->addWidget(lanAddress, 1);
         lanRow->addWidget(button("刷新网卡", [this] { HostSetup::populateLanAddresses(lanAddress, cfg("mslink-host.ini", "bind", "0.0.0.0")); refreshSetup(); }));
         lanForm->addRow("本机 IPv4", lanRow);
-        endpointFields->addWidget(lan);
+        form->addWidget(lan);
         auto *frp = new QWidget;
-        auto *frpForm = new QFormLayout(frp);
+        frpFields = frp;
+        frp->setObjectName("connectionFields");
+        auto *frpForm = new QVBoxLayout(frp);
         frpForm->setContentsMargins(0, 0, 0, 0);
+        frpForm->setSpacing(10);
+        auto *addressLabel = Ui::text("公网 IPv4", "connectionLabel");
         publicAddress = new QLineEdit(QSettings().value(settingsKey("frp/address")).toString());
         publicAddress->setPlaceholderText("输入穿透后的公网 IPv4");
-        publicAddress->setMaxLength(253);
-        frpForm->addRow("FRP 公网地址", publicAddress);
-        advancedMapping = new QCheckBox("高级设置 · 自定义公网端口与 frpc 模板");
-        frpForm->addRow(advancedMapping);
-        mappingFields = new QWidget;
-        auto *mappingForm = new QFormLayout(mappingFields);
-        mappingForm->setContentsMargins(0,0,0,0);
-        frpForm->addRow(mappingFields);
-        connect(advancedMapping, &QCheckBox::toggled, this, [this] { refreshSetup(); });
-        auto port = [this, mappingForm](const QString &name, const QString &key, int fallback) {
+        publicAddress->setObjectName("publicAddress");
+        publicAddress->setMaxLength(15);
+        publicAddress->setAccessibleName(addressLabel->text());
+        addressLabel->setBuddy(publicAddress);
+        frpForm->addWidget(addressLabel);
+        frpForm->addWidget(publicAddress);
+        advancedMapping = new QCheckBox("自定义公网与内网端口映射");
+        const QSettings settings;
+        const bool hasOldMapping = settings.contains(settingsKey("frp/tcp")) || settings.contains(settingsKey("frp/udp"));
+        advancedMapping->setChecked(settings.value(settingsKey("frp/customMapping"), hasOldMapping).toBool());
+        frpForm->addWidget(advancedMapping);
+        connect(advancedMapping, &QCheckBox::toggled, this, [this](bool enabled) {
+            QSettings().setValue(settingsKey("frp/customMapping"), enabled);
+            refreshSetup();
+        });
+
+        auto *mappingCard = new QWidget;
+        mappingCard->setObjectName("mappingTable");
+        mappingFields = mappingCard;
+        auto *mapping = new QGridLayout(mappingCard);
+        mapping->setContentsMargins(12, 8, 12, 9);
+        mapping->setHorizontalSpacing(10);
+        mapping->setVerticalSpacing(6);
+        mapping->setColumnStretch(1, 1);
+        mapping->setColumnStretch(3, 1);
+        mapping->addWidget(Ui::text("公网端口", "muted"), 1, 1);
+        mapping->addWidget(Ui::text("本机隧道端口", "muted"), 1, 3);
+        auto port = [this, mapping](const QString &name, const QString &key, int row, int column) {
             auto *field = new QSpinBox;
+            field->setObjectName("mappingPort");
+            field->setAccessibleName(name);
             field->setRange(1, 65535);
-            field->setValue(QSettings().value(settingsKey(key), fallback).toInt());
+            field->setValue(QSettings().value(settingsKey(key), 1).toInt());
+            field->setKeyboardTracking(false);
+            field->setButtonSymbols(QAbstractSpinBox::NoButtons);
             connect(field, &QSpinBox::valueChanged, this, [this, key](int value) {
                 QSettings().setValue(settingsKey(key), value);
                 refreshSetup();
             });
-            mappingForm->addRow(name, field);
+            mapping->addWidget(field, row, column);
             return field;
         };
-        frpPort = port("frps 连接端口", "frp/serverPort", 7000);
-        publicTcp = port("公网 TCP 端口", "frp/tcp", cfg("mslink-host.ini","tcp_port","14738").toInt());
-        publicUdp = port("公网 UDP 端口", "frp/udp", cfg("mslink-host.ini","udp_port","14739").toInt());
-        endpointFields->addWidget(frp);
-        form->addWidget(endpointFields);
+        mapping->addWidget(Ui::text("TCP", "sectionTitle"), 2, 0);
+        mapping->addWidget(Ui::text("→", "muted"), 2, 2);
+        mapping->addWidget(Ui::text("UDP", "sectionTitle"), 3, 0);
+        mapping->addWidget(Ui::text("→", "muted"), 3, 2);
+        publicTcp = port("公网 TCP 端口", "frp/tcp", 2, 1);
+        privateTcp = port("内网 TCP 端口", "frp/privateTcp", 2, 3);
+        publicUdp = port("公网 UDP 端口", "frp/udp", 3, 1);
+        privateUdp = port("内网 UDP 端口", "frp/privateUdp", 3, 3);
+        mappingStatus = Ui::text("", "muted");
+        mappingStatus->setWordWrap(true);
+        mapping->addWidget(mappingStatus, 4, 0, 1, 4);
+        applyMapping = button("在服务设置中应用内网端口", [this] {
+            tcp->setValue(privateTcp->value());
+            udp->setValue(privateUdp->value());
+            serviceNav->click();
+            save->setFocus();
+        });
+        mapping->addWidget(applyMapping, 5, 0, 1, 4, Qt::AlignLeft);
+
+        form->addWidget(frp);
         stepHint = Ui::text("", "muted");
         stepHint->setWordWrap(true);
         form->addWidget(stepHint);
-        frpCopy = button("复制 frpc.toml 模板", [this] { copyText(frpTemplate, false); });
-        form->addWidget(frpCopy, 0, Qt::AlignLeft);
-        frpPreview = new QPlainTextEdit;
-        frpPreview->setReadOnly(true);
-        frpPreview->setAccessibleName("frpc.toml 模板");
-        frpPreview->setFixedHeight(117);
-        form->addWidget(frpPreview);
+        form->addWidget(mappingCard);
+        card->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
         page->layout()->addWidget(card);
 
-        auto *handoff = Ui::card();
-        auto *details = new QVBoxLayout(handoff);
-        details->setContentsMargins(20, 16, 20, 16);
-        details->setSpacing(12);
-        details->addWidget(Ui::text("在主控端填写", "sectionTitle"));
-        routeStatus = Ui::text("", "muted");
-        details->addWidget(routeStatus);
-        summary = Ui::text("");
+        setupFooter = new QFrame;
+        setupFooter->setObjectName("connectionFooter");
+        auto *details = new QVBoxLayout(setupFooter);
+        details->setContentsMargins(16, 10, 16, 10);
+        details->setSpacing(5);
+        auto *copyRow = new QHBoxLayout;
+        copyRow->setSpacing(8);
+        routeStatus = Ui::text("", "connectionHelp");
+        routeStatus->setWordWrap(true);
+        summary = Ui::text("", "connectionSummary");
         summary->setTextFormat(Qt::PlainText);
         summary->setWordWrap(true);
         details->addWidget(summary);
-        auto *copyRow = new QGridLayout;
-        copyConnection = button("生成并复制邀请链接", [this] { shareInvitation(); }, "primary");
-        copyEndpoint = button("复制地址", [this] { copyText(connectionAddress, false); });
-        copyRow->addWidget(copyConnection, 0, 0);
-        copyRow->addWidget(copyEndpoint, 0, 1);
-        copyRow->addWidget(button("复制隧道口令", [this] { copyTunnelPassword(); }), 1, 0);
-        copyRow->addWidget(button("更换隧道口令", [this] { action("password", "tunnel"); }), 1, 1);
-        details->addLayout(copyRow);
-        auto *pairing = Ui::text("Sunshine 管理密码用于可选自动配对。也可以留空，改用 Sunshine 管理页完成手动 PIN 配对。", "muted");
-        pairing->setWordWrap(true);
-        details->addWidget(pairing);
-        setupNotice = Ui::text("口令只在点击复制时读取。请通过可信渠道分享。", "small");
+        copyConnection = button("生成并复制邀请链接", [this] { shareInvitation(); }, "inviteAction");
+        copyRow->addStretch();
+        frpCopy = button("复制 frpc 代理段", [this] {
+            copyText(frpTemplate, false);
+            setupNotice->setText("已复制 TCP 和 UDP 代理段。请合并到现有 frpc 配置。");
+        });
+        copyRow->addWidget(frpCopy);
+        auto *credentials = new QToolButton;
+        credentials->setText("更多");
+        credentials->setPopupMode(QToolButton::InstantPopup);
+        auto *menu = new QMenu(credentials);
+        copyEndpoint = menu->addAction("复制地址", this, [this] { copyText(connectionAddress, false); });
+        menu->addAction("复制隧道口令", this, [this] { copyTunnelPassword(); });
+        menu->addAction("更换隧道口令", this, [this] { action("password", "tunnel"); });
+        credentials->setMenu(menu);
+        copyRow->addWidget(credentials);
+        copyRow->addWidget(copyConnection);
+        setupNotice = Ui::text("", "connectionHelp");
         setupNotice->setWordWrap(true);
+        details->addLayout(copyRow);
+        details->addWidget(routeStatus);
         details->addWidget(setupNotice);
-        page->layout()->addWidget(handoff);
         qobject_cast<QVBoxLayout *>(page->layout())->addStretch();
         connect(templateMode, &QTabBar::currentChanged, this, [this](int index) {
             QSettings().setValue(settingsKey("template"), index);
@@ -984,10 +1046,27 @@ public:
             QPushButton#nav:hover{background:#1b2942;color:#f0f5ff}QPushButton:disabled{color:#526580}
             QPushButton:focus,QLineEdit:focus,QComboBox:focus,QSpinBox:focus{border-color:#66c9f2}
             QLineEdit,QSpinBox,QComboBox{background:#1b2942;border:1px solid #2c3c5a;border-radius:6px;padding:9px;min-width:160px;color:#f0f5ff}
+            QTabBar#connectionTabs::tab{background:transparent;color:#8d9bb1;border:none;border-bottom:2px solid #243247;margin-right:8px;padding:8px 18px;font-size:13px}
+            QTabBar#connectionTabs::tab:selected{color:#bdf6e5;border-bottom-color:#69dfbd;font-weight:600}
+            QTabBar#connectionTabs::tab:hover{color:#f0f5ff}
+            QFrame#connectionPanel,QFrame#connectionFooter{background:#141e2d;border:1px solid #2a394b;border-radius:12px}
+            QWidget#connectionFields{background:transparent}
+            QWidget#mappingTable{background:#101926;border:1px solid #27384b;border-radius:8px}
+            QLabel#connectionLabel,QLabel#connectionSummary{background:transparent;color:#e7f1f6;font-size:14px;font-weight:600}
+            QLabel#connectionHelp{background:transparent;color:#9cafc0;font-size:11px}
+            QLineEdit#publicAddress,QSpinBox#mappingPort{background:#0e1725;border:1px solid #36475b;color:#edf8fe;border-radius:7px;padding:6px 10px}
+            QLineEdit#publicAddress:focus,QSpinBox#mappingPort:focus{border-color:#69dfbd}
+            QPushButton#inviteAction{background:#79e4c5;color:#102523;border:1px solid #79e4c5;border-radius:8px;font-weight:700;padding:8px 13px}
+            QPushButton#inviteAction:hover{background:#a5f2db}
+            QPushButton#inviteAction:disabled{background:#263646;border-color:#334658;color:#8496ab}
+            QCheckBox{background:transparent;spacing:9px;padding:3px 0;color:#d3e2f6}
+            QSpinBox#mappingPort{min-width:68px}
+            QToolButton{background:#1b2942;border:1px solid #2c3c5a;border-radius:7px;padding:7px 12px;color:#b1c2dd}
+            QToolButton:hover{background:#243653;color:#f0f5ff}
             QAbstractItemView{background:#131e33;border:1px solid #20304b;color:#b1c2dd;selection-background-color:#243653}
             QHeaderView::section{background:#18243a;color:#7f95b7;border:0;padding:9px;text-align:left}
             QPlainTextEdit{background:#0d1628;color:#b1c2dd;border:1px solid #20304b;border-radius:8px;font-family:Consolas;font-size:11px;padding:14px}
-            QScrollArea{background:transparent;border:0}QScrollArea>QWidget>QWidget{background:transparent}
+            QScrollArea,QWidget#qt_scrollarea_viewport{background:transparent;border:0}QScrollArea>QWidget>QWidget{background:transparent}
             QScrollBar:vertical{background:transparent;width:8px}QScrollBar::handle:vertical{background:#2c3c5a;border-radius:4px;min-height:30px}
             QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0}
             QToolTip{background:#1b2942;color:#f0f5ff;border:1px solid #2c3c5a;padding:6px}
@@ -1015,12 +1094,14 @@ public:
         pages = new QStackedWidget;
         auto *group = new QButtonGroup(this);
         const QStringList names{"主机概览", "连接质量", "媒体会话", "服务与诊断", "连接设置"};
-        const QStringList subtitles{"查看后台服务和当前连接。", "查看链路质量与发送队列。", "查看主控端上报的画面与处理耗时。", "核对本机服务、防火墙和登录自启。", "选择连接方式，再把信息填到主控端。"};
+        const QStringList subtitles{"查看后台服务和当前连接。", "查看链路质量与发送队列。", "查看主控端上报的画面与处理耗时。", "核对本机服务、防火墙和登录自启。", "配置主控端访问地址和端口。"};
         for (int i = 0; i < names.size(); ++i) {
             auto *nav = button(names[i], [this, i, names, subtitles] {
                 pages->setCurrentIndex(i);
+                setupFooter->setVisible(i == 4);
+                notice->setVisible(i != 4);
                 if (i == 4) refreshSetup();
-                pageScroll->verticalScrollBar()->setValue(0);
+                static_cast<QScrollArea *>(pages->currentWidget())->verticalScrollBar()->setValue(0);
                 headline->setText(names[i]);
                 subtitle->setText(subtitles[i]);
                 refresh();
@@ -1059,15 +1140,20 @@ public:
         header->addSpacing(12);
         header->addWidget(button("刷新", [this] { refresh(); }));
         body->addLayout(header);
-        pages->addWidget(overviewPage());
-        pages->addWidget(qualityPage());
-        pages->addWidget(mediaPage());
-        pages->addWidget(servicePage());
-        pages->addWidget(setupPage());
-        pageScroll = new QScrollArea;
-        pageScroll->setWidgetResizable(true);
-        pageScroll->setWidget(pages);
-        body->addWidget(pageScroll, 1);
+        const auto addPage = [this](QWidget *page) {
+            auto *scroll = new QScrollArea;
+            scroll->setWidgetResizable(true);
+            scroll->setWidget(page);
+            pages->addWidget(scroll);
+        };
+        addPage(overviewPage());
+        addPage(qualityPage());
+        addPage(mediaPage());
+        addPage(servicePage());
+        addPage(setupPage());
+        body->addWidget(pages, 1);
+        body->addWidget(setupFooter);
+        setupFooter->hide();
         notice = Ui::text("关闭窗口后，Sunshine 和隧道继续运行。", "small");
         notice->setWordWrap(true);
         body->addWidget(notice);
@@ -1156,7 +1242,7 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setOrganizationName("MiniStream");
     app.setApplicationName("MiniStreamHost");
-    app.setApplicationVersion("2.3.0");
+    app.setApplicationVersion("2.3.1");
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();

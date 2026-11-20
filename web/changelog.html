@@ -22,11 +22,12 @@
   </div></header>
 
   <main id="main">
-    <section class="wrap page-hero"><div class="eyebrow">RELEASE / MINISTREAM 2.3</div><h1>被控端 2.3，<br>第一次连接更清楚。</h1><p id="release-info" aria-live="polite">MiniStream 2.3 · 下载目标 v2.3.0 · 发布清单与 SHA-256 以 GitHub Release 为准。</p><div class="actions"><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.0">下载被控端 ↓</a><a class="button ghost" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.0">下载主控端 ↓</a><a class="button ghost" href="tutorial.html">阅读教程 →</a></div></section>
+    <section class="wrap page-hero"><div class="eyebrow">RELEASE / MINISTREAM 2.3</div><h1>被控端 2.3，<br>第一次连接更清楚。</h1><p id="release-info" aria-live="polite">MiniStream 2.3 · 下载目标 v2.3.1 · 发布清单与 SHA-256 以 GitHub Release 为准。</p><div class="actions"><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1">下载被控端 ↓</a><a class="button ghost" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1">下载主控端 ↓</a><a class="button ghost" href="tutorial.html">阅读教程 →</a></div></section>
     <div class="wrap tutorial">
+      <article class="release-card"><span class="version">V2.3.1</span><h2>重构连接设置</h2><p>局域网与 FRP 独立切换，TCP 和 UDP 分别设置公网到本机的端口映射。底部固定邀请和 frpc 代理复制入口。</p></article>
       <article class="release-card"><span class="version">V2.3.0</span><h2>被控端控制台</h2><ul><li>在控制台更换隧道口令，运行中变更会重启隧道。</li><li>切换局域网或 FRP 模板，一键复制主控端连接信息或 frpc.toml。</li><li>自检 Sunshine、本机 TCP/UDP 监听、防火墙和登录自启，支持修复 MiniStream 入站规则。</li><li>关闭窗口收起到系统托盘，后台继续提供串流服务。</li></ul></article>
 
-      <article><h2>下载、升级与校验</h2><p>结束当前串流并保存配置，在已有安装目录覆盖升级，两端建议使用相同版本。下载按钮使用 v2.3.0 的发布清单。</p><p>发布文件生成后，用 PowerShell 的 <code>Get-FileHash 文件名 -Algorithm SHA256</code> 与同版 <code>SHA256SUMS.txt</code> 对照。校验值必须来自实际构建，不能沿用旧版。</p><div class="actions"><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.0" target="_blank" rel="noopener noreferrer">打开 v2.3.0 Release ↗</a><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">查看源代码 ↗</a></div></article>
+      <article><h2>下载、升级与校验</h2><p>结束当前串流并保存配置，在已有安装目录覆盖升级，两端建议使用相同版本。下载按钮使用 v2.3.1 的发布清单。</p><p>发布文件生成后，用 PowerShell 的 <code>Get-FileHash 文件名 -Algorithm SHA256</code> 与同版 <code>SHA256SUMS.txt</code> 对照。校验值必须来自实际构建，不能沿用旧版。</p><div class="actions"><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1" target="_blank" rel="noopener noreferrer">打开 v2.3.1 Release ↗</a><a class="button ghost" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">查看源代码 ↗</a></div></article>
 
       <article><h2>验证范围</h2><table><thead><tr><th>项目</th><th>结果</th><th>边界</th></tr></thead><tbody><tr><td>本机 CTest</td><td>7 / 7 通过</td><td>仅覆盖实际自动化测试及其环境</td></tr><tr><td>被控端口令与本机监听</td><td>隔离测试通过</td><td>使用真实隧道和回环端口验证</td></tr><tr><td>完整 Windows 虚拟机</td><td>尚未完成</td><td>未完成干净虚拟机安装验收</td></tr><tr><td>ISO / 管理员限制</td><td>尚未完成</td><td>没有 ISO 或管理员限制环境的完整验证</td></tr></tbody></table><p>不能宣称 Windows 10/11 全部系统环境、所有 GPU/驱动组合或所有游戏均已测试。高码率弱网、长时间跨网串流和实际游戏兼容性仍取决于具体设备与链路。</p></article>
 
@@ -37,7 +38,7 @@
       <article class="release-card previous"><span class="version">V2.1.3 / EARLIER</span><h2>2.1.3：加固与已知回归</h2><p>引入隧道队列、帧和握手加固，以及主控端 DPAPI 凭据、被控端标准输入口令与文件 ACL。该版本存在首次保存失败和启动清理回归，相关问题已在 2.1.4 修复。</p></article>
       <article><h2>真实程序截图说明</h2><p>截图来自真实程序窗口，拍摄于离线或测试状态。</p><p><a href="index.html">返回首页</a> · <a href="tutorial.html#upgrade">教程与验证说明</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">仓库完整更新记录 ↗</a></p></article>
     </div>
-  <section class="wrap"><h2>2.3 · 邀请与升级</h2><p>局域网自动选址，FRP 在生成邀请前验证 TCP 与 UDP 回程。Windows 浏览器可唤起已安装的主控端。主控端新增 GitHub 正式版提醒，安装器增加版本识别与进度反馈。</p></section></main>
+  <section class="wrap"><h2>2.3 · 邀请与升级</h2><p>局域网自动选址，FRP 公网连通性由外网主控端测试。Windows 浏览器可唤起已安装的主控端。主控端新增 GitHub 正式版提醒，安装器增加版本识别与进度反馈。</p></section></main>
   <footer class="wrap site-footer"><a class="brand" href="index.html">MiniStream</a><p>Sunshine / Moonlight · GPLv3<br>Powered by jianhx2026 · 个人 Windows 游戏串流项目</p><a class="footer-github" href="https://github.com/jianhx189/jianhx-game-stream" target="_blank" rel="noopener noreferrer">GitHub ↗</a><small>© 2026 MiniStream</small></footer>
 </body>
 </html>

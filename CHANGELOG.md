@@ -1,5 +1,11 @@
 # Changelog / 更新记录
 
+## 2.3.1 · 2026-11-21
+
+- 重构被控端连接设置。局域网与 FRP 独立切换，邀请和代理复制操作固定在底部。
+- 可独立设置 TCP、UDP 的公网和本机映射端口。生成的 frpc 片段只含两条代理。frps 由用户管理，外网连通性从主控端测试。
+- Rebuilt Host connection settings, with separate LAN and FRP views, per-protocol port mappings and a fixed invitation bar.
+
 ## 2.3.0 · 2026-11-21
 
 - 被控端增加连接设置、局域网与 FRP 模板，以及主控端连接信息和 FRP TOML 复制。
