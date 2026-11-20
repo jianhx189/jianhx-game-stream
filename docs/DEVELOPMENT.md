@@ -1,6 +1,21 @@
 # MiniStream 开发交接与维护手册
 
-适用版本：2.2.0。此文是当前实现的接管入口，历史实验、旧原型说明与过往测试记录不能替代本文。发布的具体文件哈希、上游来源和验证结果以同版本 `release-manifest.json` 为准。
+本文适用于 2.3.0。此文是当前实现的接管入口，历史实验、旧原型说明与过往测试记录不能替代本文。发布的具体文件哈希、上游来源和验证结果以同版本 `release-manifest.json` 为准。
+
+## 邀请与更新的维护入口
+
+- `route_probe.h` 在独立临时目录运行随包的 mslink，使用随机设备 ID。核对临时客户端 PID、认证、UDP ACK，以及本机 Host 的新鲜对端报告。FRP 失败关闭探测并返回原因。测试会临时占用一个会话；已有用户时中止。
+- 被控端生成 HTTPS fragment（Base64URL JSON，字段 v、mode、ip、tcp、udp、key）。fragment 不随 HTTP 请求发送；拥有链接的人可以读取口令。落地页 `web/connect.html` 清理地址栏并请求 Windows 协议处理程序。避免把邀请记录到日志或工单。客户端的 `invitation.h` 负责验证，再通过当前用户的本地实例管道交给 QML。首次 PIN 由 Sunshine 处理。
+- `backend/autoupdatechecker.cpp` 使用 GitHub Releases latest API。启动后和每 24 小时异步比对稳定版本，更新入口指向固定仓库。升级检测使用 Inno AppId 在 Windows 32/64 位卸载视图中查找 DisplayVersion；旧版确认、同版维修、新版阻止降级。安装进度在 `install-progress.iss` 中根据实际字节驱动。
+- 发布时先完成原生构建、邀请与断路测试，再同步两个安装包、源码、SHA256SUMS 和 release-manifest。官网与 GitHub Pages 都需包含 connect.html 与 connect.js。
+
+## 2.3 被控端维护
+
+- `src/host-console/main.cpp` 管理页面、托盘、实例恢复与自检结果。
+- `src/host-console/host_setup.h` 管理连接模板的基础校验、口令弹窗和敏感剪贴板。口令经 stdin 交给管理脚本，模板参数用每个安装目录对应的 QSettings 键保存。
+- `scripts/host/gui-action.ps1` 负责高权限配置修改、隧道重启、失败恢复与防火墙规则。源码工作区的 `源码/host-console/gui-action.ps1` 与安装暂存区的同名脚本应同步；INI 替换沿用文件 ACL，旧值仅供本次内存恢复使用。
+- `scripts/host/host-health.ps1` 用无凭据 JSON 报告本机服务和策略。通过进程路径核对监听所有者，自检进程有超时，控制台始终保持响应。
+- `python tools/test_host_setup.py --host-stage <被控端暂存目录>` 使用随机回环端口验证监听归属和口令更换。登录任务、防火墙变更和 UAC 需要正常 Windows 用户会话验收。
 
 ## 1. 产品与实现现状
 
@@ -37,7 +52,7 @@
 
 ## 3. 上游与工具链锁定
 
-- Moonlight-Qt：`dc92b6d2f361064d3e9e53ce5de92f611db77220`，上游基线 6.2.0；MiniStream 对外版本单独为 2.2.0（`app/version.txt`、控制台 `setApplicationVersion`、两份安装脚本与网站需一致）。
+- Moonlight-Qt：`dc92b6d2f361064d3e9e53ce5de92f611db77220`，上游基线 6.2.0；MiniStream 对外版本为 2.3.0（`app/version.txt`、控制台 `setApplicationVersion`、两份安装脚本与网站需一致）。
 - 子模块：moonlight-common-c `04053843c90c4268583f2496b997d54d59f03957`；qmdnsengine `920c097ffa742e2968290f15d4dde6693aec02e5`；SDL_GameControllerDB `8d9fefd7b810f2541f78cc7a8ccbd185bc84c7a5`。
 - Windows 预编译依赖：Moonlight `moonlight-qt-deps` 的 `v19`，由基线 `setup-deps.ps1` 获取；位于完整树的 `libs/windows`。
 - Qt：6.9.3 `msvc2022_64`，本机 `D:\Qt\6.9.3\msvc2022_64`。

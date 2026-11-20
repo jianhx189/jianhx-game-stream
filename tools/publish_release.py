@@ -47,13 +47,7 @@ def cf(path,method='GET',data=None,token=None,ctype='application/json'):
     return response['result']
 
 user=request('https://api.github.com/user');api()
-if not account:
-    accounts=cf('/accounts?per_page=50')
-    if len(accounts)!=1:raise RuntimeError('Cloudflare token must identify exactly one account or provide account')
-    account=accounts[0]['id']
-project_path=f'/accounts/{account}/pages/projects/{args.cf_project}'
-cf(project_path)
-print('AUTHENTICATED',user['login'],'GitHub and Cloudflare',flush=True)
+print('AUTHENTICATED',user['login'],'GitHub',flush=True)
 
 release_dir=ROOT/'安装包'/args.version
 if not release_dir.exists():release_dir=ROOT/'release'/args.version
@@ -68,7 +62,7 @@ def gather():
     items={}
     for name in ('README.md','README_EN.md','LICENSE','CHANGELOG.md','SECURITY.md','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','manifest.json'):
         items[name]=(ROOT/name).read_bytes()
-    allowed={'.md','.py','.yml','.yaml','.html','.css','.js','.svg','.ico','.jpg','.png','.xml','.txt','.json','.cpp','.h','.qml','.qrc','.pro','.manifest','.iss','.ps1'}
+    allowed={'.md','.py','.yml','.yaml','.html','.css','.cjs','.js','.svg','.ico','.jpg','.png','.xml','.txt','.json','.cpp','.h','.qml','.qrc','.pro','.manifest','.iss','.ps1'}
     for directory in ('docs','tools','.github','web'):
         for file in (ROOT/directory).rglob('*'):
             if file.is_file() and file.suffix in allowed and '__pycache__' not in file.parts:
@@ -103,7 +97,7 @@ def commit_files(items,message):
     return commit['sha']
 
 items=gather()
-source_commit=commit_files({k:v for k,v in items.items() if not k.startswith('web/dist/')},'release: MiniStream '+args.version+' transport robustness and credential protection')
+source_commit=commit_files({k:v for k,v in items.items() if not k.startswith('web/dist/')},'release: MiniStream '+args.version+' host console and setup')
 notes=(ROOT/'docs/RELEASE_NOTES.md').read_text(encoding='utf-8')
 notes+='\n\n### SHA-256\n'+''.join(f"- `{x['name']}` ({x['size']} bytes): `{x['sha256']}`\n" for x in manifest['files'])
 release=next((r for r in api('/releases?per_page=100') if r['tag_name']==TAG),None)
@@ -122,11 +116,18 @@ for name in [x['name'] for x in manifest['files']]+['SHA256SUMS.txt','release-ma
     if asset.get('digest')!=digest:raise RuntimeError('Remote asset digest mismatch: '+name)
     print('ASSET_UPLOADED_VERIFIED',name,flush=True)
 release=api('/releases/'+str(release['id']),'PATCH',{'draft':False,'prerelease':False,'make_latest':'true','name':'MiniStream '+args.version+' · 正式版 / Release','body':notes})
-api('','PATCH',{'description':'MiniStream · Open-source Windows game & desktop streaming with Sunshine/Moonlight. 1 TCP + 1 UDP, native apps and real telemetry. 开源游戏串流。','homepage':'https://ministream.jianhx.com/'})
+api('','PATCH',{'description':'MiniStream · 为中国玩家打造，让远程游戏串流更流畅。 Open-source Windows game streaming with Sunshine, Moonlight, LAN and FRP.','homepage':'https://ministream.jianhx.com/'})
 api('/topics','PUT',{'names':['game-streaming','remote-gaming','remote-desktop','windows','sunshine','moonlight','qt','cpp','frp','self-hosted','low-latency','udp','tcp']})
 print('REGULAR_RELEASE_PUBLISHED',release['html_url'],flush=True)
 
 website_commit=commit_files({k:v for k,v in items.items() if k.startswith('web/dist/')},'site: publish '+args.version+' downloads, English introduction and guides')
+if not account:
+    accounts=cf('/accounts?per_page=50')
+    if len(accounts)!=1:raise RuntimeError('Cloudflare token must identify exactly one account or provide account')
+    account=accounts[0]['id']
+project_path=f'/accounts/{account}/pages/projects/{args.cf_project}'
+cf(project_path)
+print('AUTHENTICATED Cloudflare',flush=True)
 jwt=cf(project_path+'/upload-token')['jwt'];mapping={};payload=[]
 for file in (ROOT/'web/dist').rglob('*'):
     if not file.is_file():continue

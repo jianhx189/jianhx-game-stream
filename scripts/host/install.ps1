@@ -425,8 +425,7 @@ Sunshine 管理页面：https://localhost:47990
 Sunshine 用户名：$WebUser
 Sunshine 网页口令：$($webPasswordSaved)
 
-隧道口令（远控端要填一样的）：$($settings.Password)
-隧道本机监听：TCP $($settings.TcpPort) / UDP $($settings.UdpPort)
+连接信息：打开 MiniStream 被控端 → 连接设置，查看当前端口和口令。
 
 线路（FRP 公网，供核对）：
   主线：$lineMainText
@@ -441,12 +440,15 @@ Sunshine 网页口令：$($webPasswordSaved)
   2. 远控端在 Moonlight 里添加主机 127.0.0.1，会显示 4 位 PIN
   3. 回到 Sunshine 网页，在 PIN 输入框填入这 4 位数字，点发送
 
-改配置：用管理员身份编辑本目录 mslink-host.ini，再运行一次 安装.bat。
+改配置：选「连接设置」更换口令，选「服务与诊断」调整本机端口。
 "@
         Write-Utf8BomFile -Path $infoPath -Text ($info -replace "`r?`n", "`r`n")
         Log '  已生成 安装信息.txt'
     } else {
-        Log '  安装信息.txt 已存在，保留原文件'
+        $oldInfo = [IO.File]::ReadAllText($infoPath)
+        $oldInfo = [regex]::Replace($oldInfo, '(?m)^隧道口令[^\r\n]*\r?\n?', '')
+        Write-Utf8BomFile -Path $infoPath -Text $oldInfo
+        Log '  保留旧安装信息中的 Sunshine 凭据，隧道口令请到控制台查看'
     }
     Protect-MiniStreamFile -Path $infoPath -UserId $installUserId
 

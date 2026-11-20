@@ -1,11 +1,22 @@
 <p align="center"><img src="web/assets/brand.svg" width="76" alt="MiniStream"></p>
 <h1 align="center">MiniStream</h1>
-<p align="center"><strong>Your Windows gaming PC, on another screen.</strong><br>Powered by jianhx2026</p>
+<p align="center"><strong>Smoother remote gaming, built with players in China in mind.</strong><br>Powered by jianhx2026</p>
 <p align="center"><a href="README.md">简体中文</a> · English · <a href="https://ministream.jianhx.com/en.html">Website</a> · <a href="https://jianhx189.github.io/jianhx-game-stream/">GitHub Pages</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/releases/latest">Download</a></p>
 
 MiniStream combines **Sunshine and Moonlight-Qt** with a connection wizard, native applications for both ends, and **mslink**, a Windows tunnel that multiplexes streaming services over **one public TCP port and one public UDP port**. It is designed for your own Windows gaming or desktop PC, including FRP deployments with limited available ports.
 
 No MiniStream cloud account is required. You manage your host, credentials and network. Provide a reachable LAN, FRP deployment or another trusted path; MiniStream does not operate a public relay or provide automatic NAT traversal.
+
+## What's in v2.3.0
+
+LAN mode selects a local IPv4 address. In FRP mode enter the forwarded IPv4 address and override ports only when they differ. The host matches its own authenticated TCP session and a physical UDP reply before issuing a private browser invitation. Open it on a Windows PC with the client installed. The link contains the tunnel credential. Initial Sunshine pairing still requires authorization.
+
+The client checks GitHub for stable releases after launch and every 24 hours while running. The installer recognizes an older installation, confirms the update and shows deployment progress.
+
+- Choose a LAN or FRP template. Copy the address, TCP/UDP ports, and tunnel password for the controller. FRP users can also copy a two-proxy TOML template.
+- Change the tunnel password on the host. A running tunnel restarts. Update the controller password before reconnecting.
+- Run a local self-check for Sunshine, tunnel listeners, firewall rules, and logon startup. Verify WAN reachability from the controller on another network.
+- Close the console to the Windows tray while streaming services keep running.
 
 ## What's in v2.2.0
 
@@ -47,7 +58,7 @@ These are actual MiniStream 2.2 program windows captured offline with no configu
 
 Sunshine management credentials enable optional automatic pairing. Otherwise follow the manual PIN flow. During a stream, `F12` or `Ctrl+Alt+Shift+X` opens mouse mode, display, statistics and disconnect controls.
 
-Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. The 2.2.0 controller, host console and both installers were rebuilt in this round. Use the v2.2.0 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
+Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. Use the v2.3.0 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
 
 ## How it works
 
@@ -83,7 +94,7 @@ Release assets include a source bundle and component/build manifest. GitHub's au
 
 ## Status, security and contributions
 
-v2.2.0 is this round's experience and telemetry release: the controller workspace is rebuilt with a new Experience page, the host console grows to four pages, telemetry history and events are bounded in memory (300 samples, 100 events), a new `relay_telemetry` test brings mslink CTest to **7/7**, and the weak-network harness passes **50/50** checks across seven scenarios. All of these are **single-machine** results: the weak-network run drives the real binaries through a symmetric impairing proxy on 127.0.0.1 with synthetic echo payloads and no GPU decode or presentation, and **no Windows 10/11 virtual machine run was performed** (no ISO, non-admin session, Hyper-V available but unused). Clean installs, all GPU/driver combinations and long real sessions are therefore **not** claimed. The 2.1.3 first-save and leaked-socket regressions remain fixed as shipped in 2.1.4; final build, installer and hash results for 2.2.0 are recorded in the release manifest and the Release page.
+v2.2.0 was the experience and telemetry release: the controller workspace is rebuilt with a new Experience page, the host console grows to four pages, telemetry history and events are bounded in memory (300 samples, 100 events), a new `relay_telemetry` test brings mslink CTest to **7/7**, and the weak-network harness passes **50/50** checks across seven scenarios. All of these are **single-machine** results: the weak-network run drives the real binaries through a symmetric impairing proxy on 127.0.0.1 with synthetic echo payloads and no GPU decode or presentation, and **no Windows 10/11 virtual machine run was performed** (no ISO, non-admin session, Hyper-V available but unused). Clean installs, all GPU/driver combinations and long real sessions are therefore **not** claimed. The 2.1.3 first-save and leaked-socket regressions remain fixed as shipped in 2.1.4; final build, installer and hash results for 2.2.0 are recorded in the release manifest and the Release page.
 
 The custom authentication and key exchange are not independently audited and must not be treated as an encrypted VPN or zero-trust system. DPAPI and the tightened ACLs introduced in 2.1.3 and kept in 2.2.0 only reduce local file exposure: the same Windows user can still decrypt the values, passwords stay plaintext in memory, and traffic is not protected end to end. Telemetry and diagnostics are equally local to that user, and exported reports still need manual redaction. Use a trusted protected path and rotate passwords that were shared before 2.1.3: [SECURITY](SECURITY.md). Never publish working credentials or unredacted dumps.
 

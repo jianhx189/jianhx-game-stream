@@ -1,21 +1,21 @@
 # MiniStream 官网
 
-MiniStream 2.2 的静态官网，使用 HTML、CSS 与原生 JavaScript，主站为 <https://ministream.jianhx.com/>。设计语言以深空石墨 `#0b1020`、青蓝 `#66c9f2` 和少量紫 `#a899ff` 为主，支持键盘导航、移动端布局与 `prefers-reduced-motion`。
+MiniStream 2.3 的静态官网，使用 HTML、CSS 与原生 JavaScript，主站为 <https://ministream.jianhx.com/>，同步站点为 <https://jianhx189.github.io/jianhx-game-stream/>。设计语言以深空石墨 `#0b1020`、青蓝 `#66c9f2` 和少量紫 `#a899ff` 为主，支持键盘导航、移动端布局与 `prefers-reduced-motion`。
 
 ## 页面
 
 - `index.html`：中文首页、分端工作台、真实程序截图、连接架构、下载与验证范围。
 - `en.html`：与首页信息对应的英文产品页。
-- `tutorial.html`：安装、局域网/跨网连接、遥测指标解释、弱网排障与升级边界。
-- `changelog.html`：2.2 更新、2.1.4 修复背景、下载校验与验证范围。
+- `tutorial.html`：安装、局域网与 FRP 模板、被控端口令、自检、托盘及连接排障。
+- `changelog.html`：2.3 被控端更新、下载校验与验证范围。
 - `styles.css` / `script.js`：全站共享样式、移动导航和下载资产选择。
 - `release.json` / `updates.json`：站点发布元数据；静态构建会同步，但发布生成流程不由官网构建脚本负责。
 
-当前下载目标为 `v2.2.0`，页面版本文案为 MiniStream 2.2。`script.js` 只从 `tag_name` 精确匹配 `v2.2.0` 的 `release.json` 中读取安装包直链；元数据缺失、请求失败或版本不匹配时统一回退到该 Release 标签页，避免把旧版资产误标为 2.2。
+当前下载目标为 `v2.3.0`，页面版本文案为 MiniStream 2.3。`script.js` 只从 `tag_name` 精确匹配 `v2.3.0` 的 `release.json` 中读取安装包直链；元数据缺失、请求失败或版本不匹配时统一回退到该 Release 标签页，避免把旧版资产误标为 2.3。
 
 ## 截图
 
-沿用 `assets/client-home.jpg`、`assets/host-overview.jpg` 和 `assets/client-setup.jpg`，等待新版真实程序截图替换，文件名保持不变。截图说明统一为“新版真实程序离线或测试状态，不表示真实游戏性能”，不得作为帧率、延迟或兼容性承诺。`brand.svg` 为原创品牌图标。
+沿用 `assets/client-home.jpg`、`assets/host-overview.jpg` 和 `assets/client-setup.jpg`，其中被控端为 2.3 实际窗口，主控端沿用同一界面版本。截图说明统一为“新版真实程序离线或测试状态，不表示真实游戏性能”，不得作为帧率、延迟或兼容性承诺。`brand.svg` 为原创品牌图标。
 
 ## 构建
 

@@ -1,12 +1,12 @@
 # 当前版本构建指南 / Current build guide
 
-本文适用于 2.2.0。仓库早期根 CMake 客户端不是当前发布主控端；旧原型的构建方式见 `文档/历史构建指南-旧原型.md`，维护者应以本文和 DEVELOPMENT 为准。
+本文适用于 2.3.0。仓库早期根 CMake 客户端不是当前发布主控端；旧原型的构建方式见 `文档/历史构建指南-旧原型.md`，维护者应以本文和 DEVELOPMENT 为准。
 
 ## 版本与组件
 
-2.2.0 需要同时改到位的版本位置：主控端 `app/version.txt`、被控端控制台 `app.setApplicationVersion("2.2.0")`、两份 Inno 脚本的 `AppVersion`，以及 CHANGELOG、文档和网站。任何一处漏改都会让“关于/安装器/更新检查”显示不同版本。
+2.3.0 的版本位置：主控端 `app/version.txt`、被控端控制台 `app.setApplicationVersion("2.3.0")`、两份 Inno 脚本的 `AppVersion`，以及 CHANGELOG、文档和网站。任何一处漏改都会让“关于/安装器/更新检查”显示不同版本。
 
-2.2.0 的构建输入与 2.1.4 相同（主控端覆盖层 + 根 mslink + Qt Widgets 控制台 + Inno 脚本），变化集中在主控端界面（新增 `gui/ExperienceView.qml`、`gui/TrendChart.qml`、`gui/MetricCard.qml` 并登记在 `qml.qrc`）、隧道遥测历史/事件和被控端四页控制台。**本轮没有重新编译 2.2.0 安装包**，仓库当前 Release 仍是 2.1.4；打包前必须按本文重新编译两端，不能用旧包推断新版本内容。
+2.3.0 沿用主控端覆盖层、根 mslink、Qt Widgets 控制台和 Inno 构建。更新被控端时，重新编译 GUI，并将管理脚本与自检脚本同步到 Host 暂存目录的 `_internal`。
 
 ## Moonlight 主控端
 
@@ -81,7 +81,7 @@ nmake /NOLOGO
 
 使用 windeployqt 部署 Widgets/Network/SVG/platform 插件，复制图标。中文资源路径下自动生成 RC 需要 UTF-8 code page（`#pragma code_page(65001)`），或改用 ASCII 构建路径。运行时用 `--root` 指定真实被控端根目录。
 
-2.2 控制台有四个页面：`主机概览`、`连接质量`、`媒体会话`、`服务与诊断`（侧栏另有“真实遥测 · 1 秒采样”“无数据时显示 — / 不生成演示指标”说明）。趋势图来自安装根目录 `mslink-status.jsonl` 的尾部 300 行，事件来自当前 `mslink-status.json` 的 `events` 数组；两者都要求后台已更新。验证时同时打开 GUI 和状态文件，确认 PID、`updated_unix_ms` 与图表点数一致，不要用旧后台的界面反推新功能。
+2.3 控制台包含主机概览、连接质量、媒体会话、服务与诊断、连接设置。趋势图来自安装根目录 `mslink-status.jsonl` 的尾部 300 行，事件来自当前 `mslink-status.json` 的 `events` 数组；两者都要求后台已更新。验证时同时打开 GUI 和状态文件，确认 PID、`updated_unix_ms` 与图表点数一致，不要用旧后台的界面反推新功能。
 
 ## 安装包与发布
 

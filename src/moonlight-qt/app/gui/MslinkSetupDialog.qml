@@ -17,6 +17,8 @@ Dialog {
     id: setupDialog
 
     property bool autoConnect: false
+    property bool switchPending: false
+    onClosed: switchPending = false
     property bool hostAddedOnce: false
     property bool everConnected: false
     property string failMessage: ""
@@ -50,6 +52,36 @@ Dialog {
     palette.highlight: theme.primary
     palette.highlightedText: "#ffffff"
 
+    function openInvitation(data) {
+        var same = MslinkTunnel.server === data.ip && MslinkTunnel.tcpPort === data.tcp &&
+                   MslinkTunnel.udpPort === data.udp && MslinkTunnel.password === data.key
+        switchPending = false
+        if (same && MslinkTunnel.tunnelUp) {
+            currentStep = 2
+            testResultText.text = qsTr("此邀请对应的主机已连接。")
+            finishBtn.visible = true
+            open()
+            return
+        }
+        hostAddedOnce = false
+        everConnected = false
+        connMode = data.mode === "frp" ? 1 : 0
+        serverField.text = data.ip
+        tcpField.text = String(data.tcp)
+        udpField.text = String(data.udp)
+        passwordField.text = data.key
+        if (!same) { sunUserField.text = ""; sunPassField.text = "" }
+        currentStep = 1
+        failMessage = ""
+        testResultText.text = ""
+        finishBtn.visible = false
+        open()
+        switchPending = MslinkTunnel.running && !same
+        if (switchPending)
+            failMessage = qsTr("已有隧道正在运行。点「测试连接」将切换到邀请中的主机。")
+        else doConnect()
+    }
+
     function openWithError(msg) {
         failMessage = msg ? msg : ""
         open()
@@ -71,6 +103,7 @@ Dialog {
     // 尝试连接。注意：返回空串只代表「本机监听已就绪」，
     // 远端是否真的通了由 tunnelUp 属性在后续 1 秒内判定。
     function doConnect() {
+        if (switchPending) { MslinkTunnel.disconnectTunnel(); switchPending = false }
         failMessage = ""
         // 先把自动配对账号存下来（空密码=不用自动配对，退回手动输 PIN）
         MslinkTunnel.setSunshineCredentials(sunUserField.text, sunPassField.text)
@@ -87,11 +120,12 @@ Dialog {
     Connections {
         target: MslinkTunnel
         function onStateChanged() {
+            if (setupDialog.switchPending) return
             if (MslinkTunnel.tunnelUp) {
                 failMessage = ""
                 setupDialog.addHostIfNeeded()
-                if (setupDialog.opened && setupDialog.currentStep === 2) {
-                    testResultText.text = qsTr("连接成功！被控端 Sunshine 在线。\n关闭本窗口后，双击主机列表里的电脑即可开始串流。") +
+                if (setupDialog.visible && setupDialog.currentStep === 2) {
+                    testResultText.text = qsTr("隧道认证成功。\n关闭本窗口后，双击主机列表里的电脑即可开始串流。") +
                         (MslinkTunnel.autoPairReady ? qsTr("\n已填 Sunshine 管理密码：若主机显示「未配对」，点一下主机会自动完成配对。")
                                                     : qsTr("\n未填 Sunshine 管理密码：首次连接会显示 4 位 PIN，需到被控端 https://localhost:47990 输入。"))
                     testResultText.color = "#35d39a"
@@ -108,7 +142,7 @@ Dialog {
                 failMessage = MslinkTunnel.lastError
                 if (setupDialog.currentStep === 2) {
                     testResultText.text = qsTr("连接失败：") + MslinkTunnel.lastError +
-                        qsTr("\n\n排查：\n· 网络不通——被控端是否开机、FRP 转发是否生效\n· 口令不一致——核对被控端安装时显示的隧道口令\n· 端口不对——局域网填被控端 IP 和 14738/14739；FRP 填公网地址和公网端口")
+                        qsTr("\n\n排查：\n· 网络不通——被控端是否开机、FRP 转发是否生效\n· 口令不一致——核对被控端「连接设置」里的当前隧道口令\n· 端口不对——局域网填被控端 IP 和 14738/14739；FRP 填公网地址和公网端口")
                     testResultText.color = "#f87171"
                     finishBtn.visible = false
                 } else {
@@ -283,7 +317,7 @@ Dialog {
                     id: passwordField
                     Layout.fillWidth: true
                     echoMode: TextInput.Password
-                    placeholderText: qsTr("被控端安装完成时显示的「隧道口令」")
+                    placeholderText: qsTr("在被控端「连接设置」中复制的隧道口令")
                     selectByMouse: true
                     onAccepted: sunPassField.forceActiveFocus()
                 }
@@ -330,6 +364,12 @@ Dialog {
                     color: "#9aa7ba"
                     font.pixelSize: 12
                     text: qsTr("测试内容：① 启动 mslink 隧道 ② 探测被控端 Sunshine 是否在线 ③ 在线且未配对时，用第 2 步填的管理密码自动配对。")
+                }
+                ProgressBar {
+                    Layout.fillWidth: true
+                    visible: MslinkTunnel.connecting
+                    indeterminate: visible
+                    palette.highlight: "#46dfc1"
                 }
                 Label {
                     Layout.fillWidth: true
@@ -426,7 +466,7 @@ Dialog {
                 font.pixelSize: 12
                 highlighted: true
                 visible: setupDialog.currentStep >= 1
-                enabled: !MslinkTunnel.connecting && !MslinkTunnel.tunnelUp
+                enabled: (setupDialog.switchPending || (!MslinkTunnel.connecting && !MslinkTunnel.tunnelUp))
                          && serverField.text.trim() !== ""
                 onClicked: setupDialog.doConnect()
             }

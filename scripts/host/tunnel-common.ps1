@@ -169,15 +169,15 @@ function Protect-MiniStreamFile {
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', $inherit, $propagation, $allow)
         $acl.AddAccessRule($rule)
     }
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    [IO.File]::SetAccessControl($Path, $acl)
 }
 
 # 端口是否已在监听（用于“隧道已在运行”的友好提示）
 function Test-TcpPortListening {
     param([Parameter(Mandatory = $true)][int]$Port)
     try {
-        $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop
-        return ($null -ne $c)
+        $listeners = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
+        return ($Port -in $listeners.Port)
     } catch {
         return $false
     }

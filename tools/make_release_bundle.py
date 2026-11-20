@@ -24,7 +24,7 @@ for left,right in [('源码/moonlight-qt/app','构建环境/mlqt/app'),('源码/
             peer=ROOT/right/file.relative_to(ROOT/left)
             if not peer.is_file() or file.read_bytes()!=peer.read_bytes():
                 raise RuntimeError('Build tree differs from authoritative source: '+str(file))
-bad_token=re.compile(rb'(?:github_pat_[A-Za-z0-9_]{25,}|cfat_[A-Za-z0-9]{20,})')
+bad_token=re.compile(rb'(?:github_pat_[A-Za-z0-9_]{25,}|ghp_[A-Za-z0-9]{36}|cfat_[A-Za-z0-9]{20,})')
 def check(data,name):
     if bad_token.search(data) or any(s.encode() in data for s in args.forbid_text):
         raise RuntimeError('Private marker in release input: '+name)
@@ -67,7 +67,7 @@ for name,data in full.items():source['moonlight-qt/'+name]=data
 for local,remote in [('源码/mslink','src/mslink'),('源码/host-console','src/host-console'),('源码/安装包脚本','scripts/installer'),('构建产物/host/_internal','scripts/host'),('docs','docs'),('tools','tools'),('web','web')]:
     base=ROOT/local
     for file in base.rglob('*'):
-        if file.is_file() and file.suffix in {'.cpp','.h','.qml','.qrc','.svg','.ico','.pro','.txt','.md','.py','.iss','.ps1','.html','.css','.js','.jpg','.png','.xml','.json'} and not any(p in ('build','release','debug','__pycache__','dist') for p in file.relative_to(base).parts) and file.name not in ('release.json','release-manifest.json'):
+        if file.is_file() and file.suffix in {'.cpp','.h','.qml','.qrc','.svg','.ico','.pro','.txt','.md','.py','.iss','.ps1','.html','.css','.cjs','.js','.jpg','.png','.xml','.json'} and not any(p in ('build','release','debug','__pycache__','dist') for p in file.relative_to(base).parts) and file.name not in ('release.json','release-manifest.json'):
             rel=file.relative_to(base).as_posix();data=file.read_bytes();source[remote+'/'+rel]=data
             if local=='源码/mslink':source['moonlight-qt/mslink/'+rel]=data
 for name in ('README.md','README_EN.md','LICENSE','CHANGELOG.md','SECURITY.md','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md'):

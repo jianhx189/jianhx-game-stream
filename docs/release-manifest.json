@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "channel": "stable",
-  "created_utc": "2026-10-24T13:36:28.078770+00:00",
+  "created_utc": "2026-11-20T16:25:32.158019+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49369929,
-      "sha256": "4cf9aa2b03039d7711eef7627a7504e0ac46d4917c5261d9882d2f54656a6a52"
+      "size": 49382700,
+      "sha256": "f86155cd9230a160c952a94c7c75c4ad5b563b8bcf1898cd37d85bba3db7a23d"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63513817,
-      "sha256": "c8763ca435f2411aec7a2c8f8d65005b6e7b1e49cf8506a59d9594de3c575b57"
+      "size": 63531475,
+      "sha256": "b9dda082608e5a2a59c583ade9de4619f686b46272d8d163cd35e9f3c2586796"
     },
     {
-      "name": "MiniStream-2.2.0-Source.zip",
-      "size": 2918649,
-      "sha256": "acd67149cb4a2812c550e2a23ac204fe070d18968567c4c966db1a28dfb4da2b"
+      "name": "MiniStream-2.3.0-Source.zip",
+      "size": 2917386,
+      "sha256": "808967859a00e5ff10fc8a5a9bd452dbd42addce1179ff703b14c88dd9bf18f8"
     }
   ],
   "sources": {
@@ -38,58 +38,53 @@
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
   "verification": {
-    "version": "2.2.0",
+    "version": "2.3.0",
     "passed": true,
-    "checked_utc": "2026-10-24",
+    "checked_utc": "2026-11-20",
     "results": [
       {
-        "name": "mslink Release build and CTest",
+        "name": "mslink CTest",
         "status": "passed",
-        "evidence": "7/7: udp_reply_source, relay_queue_frame, relay_handshake_integration, relay_startup, relay_stream_open_failure, relay_telemetry, relay_selftest"
+        "evidence": "7/7 on Windows, including relay start-up, handshake, telemetry and UDP reply-source coverage"
       },
       {
-        "name": "real-binary weak-network and recovery matrix",
+        "name": "Host settings and listener self-check",
         "status": "passed",
-        "evidence": "7 scenarios / 50 checks: baseline, rtt100_loss2, limit5, udp_down, recover, outage30, duplex; 30 s outage recovered in 1.14 s; physical UDP verified by proxy data counters"
+        "evidence": "Isolated real mslink on random loopback TCP/UDP ports. Verified missing/occupied/owned listeners, invalid input rejection, running and stopped password changes, restart failure rollback and no credentials in action logs or backups."
       },
       {
-        "name": "bounded telemetry history and events",
+        "name": "Host interface",
         "status": "passed",
-        "evidence": "300 samples / 100 events in memory; <64 KiB live telemetry and <128 KiB history; no device name, peer report, password or address leakage"
+        "evidence": "Qt program rendered and inspected at 1170×696. Verified overview entry, LAN default, FRP TCP/UDP TOML generation and invalid endpoint handling. Native Windows tray close and window recovery passed."
       },
       {
-        "name": "controller build and UI launch",
+        "name": "Windows application and installer builds",
         "status": "passed",
-        "evidence": "MSVC 14.44 / Qt 6.9.3, version 2.2.0.0; isolated UI Preview launched; device workspace, connection wizard and Experience page inspected"
+        "evidence": "MSVC 14.44 x64 and Qt 6.9.3. Both Inno Setup ProductVersion 2.3.0."
       },
       {
-        "name": "host console build and four-page UI",
+        "name": "In-place host upgrade",
         "status": "passed",
-        "evidence": "MSVC 14.44 / Qt 6.9.3, version 2.2.0.0; isolated launch; Overview, Connection Quality, Media Session and Services & Diagnostics switched and inspected"
+        "evidence": "Existing installation directory retained the same tunnel config hash. Sunshine local serverinfo, TCP/UDP listeners, firewall rules, and both logon tasks verified."
       },
       {
-        "name": "website responsive rendering",
+        "name": "Website and documentation",
         "status": "passed",
-        "evidence": "Static build inspected at 1280x720 and iPhone 14 Pro 393x852; navigation, download call-to-action and real UI screenshot rendered"
+        "evidence": "China-facing product messaging, release links, current Host screenshot, LAN/FRP setup and diagnostic instructions."
       },
       {
-        "name": "Inno installers",
+        "name": "LAN and FRP invitations",
         "status": "passed",
-        "evidence": "Client and Host installers compiled; ProductVersion 2.2.0"
-      },
-      {
-        "name": "PowerShell 5.1 syntax and credential ACL helper",
-        "status": "passed",
-        "evidence": "Install scripts parsed; ACL helper produced protected rules for SYSTEM, Administrators and the current user"
+        "evidence": "Qt host overview and mode navigation, default maps, invalid address rejection; real isolated mslink TCP authentication and UDP return pass; UDP blackhole and forwarding to another host rejected; client invitation decoder rejects malformed links."
       }
     ],
     "not_covered": [
-      "Windows 10/11 virtual-machine setup and clean install: no Windows ISO available and current session is not elevated; Hyper-V itself is available",
-      "Full elevated install.ps1/task/firewall execution on a clean guest",
-      "All GPU, encoder and driver combinations",
-      "Real H.264/Opus media over weak WAN, GPU decode/presentation, long-duration gaming",
-      "Full independent security audit",
-      "Authenticode signing; installers remain unsigned"
+      "Clean Windows 10/11 VM installation",
+      "Long-running real game sessions across WAN",
+      "All encoders, drivers and network setups",
+      "Independent tunnel security audit and Authenticode signing",
+      "External FRP validation across the user WAN",
+      "Clean browser-to-installed-client flow on a separate Windows PC"
     ]
   },
   "limits": [
@@ -166,8 +161,8 @@
       },
       {
         "path": "MiniStream.exe",
-        "size": 3279872,
-        "sha256": "2392ad1d11356e7d0d3626d3ceeb1bf2cdc6b2c5b9d69f32f796243dca40f855"
+        "size": 3290624,
+        "sha256": "1673dce788707f94fd8d68770598b678164d08f6afaaf4c3ef8eeb7fa65f510b"
       },
       {
         "path": "ministream.ico",
@@ -1888,8 +1883,8 @@
       },
       {
         "path": "console/MiniStreamHost.exe",
-        "size": 202240,
-        "sha256": "c8b573429a76718d5e3c151919b75b149c3537310a406286a3595112cfe767df"
+        "size": 307712,
+        "sha256": "594234c5e9dea6dd164cb7d8ed0b3bdde6c8705f107fcc62180807debb9e01cc"
       },
       {
         "path": "console/msvcp140.dll",
@@ -1978,13 +1973,18 @@
       },
       {
         "path": "_internal/gui-action.ps1",
-        "size": 3501,
-        "sha256": "bd129f7a64da48ae97b6cb4d30f5c49187452e5979b673fde0da2162e4de01af"
+        "size": 8592,
+        "sha256": "b96bf97e4af60f5ef3a2e05d6ae9dab60c67ff58f407e5f426587e8284fcb771"
+      },
+      {
+        "path": "_internal/host-health.ps1",
+        "size": 6233,
+        "sha256": "82c1fea73cfbe95a2c0930a6768999097a8d9f53c8593c1518f1faf2d94e842b"
       },
       {
         "path": "_internal/install.ps1",
-        "size": 24112,
-        "sha256": "2b4e166b6eee8061170e2a63025c88ed4abe7a39e2721eb3588164d21b387082"
+        "size": 24297,
+        "sha256": "13d42af4022a894b617a09d187e54d7004f2332323f9664e6461ebc616e940cb"
       },
       {
         "path": "_internal/run-sunshine.ps1",
@@ -2003,8 +2003,8 @@
       },
       {
         "path": "_internal/tunnel-common.ps1",
-        "size": 7402,
-        "sha256": "de62c43cb15f543ec5463977227c023d0291ff0d9fac1257d820c42ebc568aef"
+        "size": 7636,
+        "sha256": "4dce511316b6ab1b9d7527b8e447d222ef39ba80a739cb90a2202ea99724cb70"
       },
       {
         "path": "_internal/uninstall.ps1",
@@ -2068,8 +2068,8 @@
       },
       {
         "path": "console/_internal/gui-action.ps1",
-        "size": 2521,
-        "sha256": "b885aa803859ceed178e94d41c1deba5b33ff7ee74b2fca098e12374ebcf4888"
+        "size": 8592,
+        "sha256": "b96bf97e4af60f5ef3a2e05d6ae9dab60c67ff58f407e5f426587e8284fcb771"
       },
       {
         "path": "sunshine/assets/apps.json",

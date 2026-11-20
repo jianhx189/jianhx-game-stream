@@ -1,12 +1,21 @@
 <p align="center"><img src="web/assets/brand.svg" width="76" alt="MiniStream"></p>
 <h1 align="center">MiniStream</h1>
-<p align="center"><strong>让自己的 Windows 游戏主机，连接到另一块屏幕。</strong><br>Windows game & desktop streaming · Powered by jianhx2026</p>
+<p align="center"><strong>为中国玩家打造，让远程游戏串流更流畅。</strong><br>Windows game & desktop streaming · Powered by jianhx2026</p>
 <p align="center">简体中文 · <a href="README_EN.md">English</a> · <a href="https://ministream.jianhx.com/">官网</a> · <a href="https://jianhx189.github.io/jianhx-game-stream/">GitHub Pages</a> · <a href="https://github.com/jianhx189/jianhx-game-stream/releases/latest">下载正式版</a></p>
 <p align="center"><a href="https://github.com/jianhx189/jianhx-game-stream/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/jianhx189/jianhx-game-stream"></a> <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a> <img alt="Windows x64" src="https://img.shields.io/badge/platform-Windows%20x64-0078D4"></p>
 
 MiniStream 基于 **Sunshine + Moonlight-Qt**，为个人游戏与桌面串流提供连接向导、两端原生界面和 **mslink 隧道**：把多路服务复用到 **1 个 TCP + 1 个 UDP 对外端口**，适合端口受限的 FRP 部署。
 
 不需要 MiniStream 云账号。你管理自己的主机、凭据和网络；跨网络需自备可达的 FRP 或可信网络。项目不提供公共服务器，也不等同于自动 NAT 打洞服务。
+
+## v2.3.0 被控端控制台
+
+- **局域网连接**自动选取网卡地址。**FRP 穿透连接**只需输入映射后的 IPv4；公网端口与本机不同时可单独修改。被控端在真实 TCP 会话中核对本机身份，并等待 UDP 回包，双向验证成功才允许生成邀请。
+- 在装有主控端的 Windows 电脑上打开私有邀请，允许浏览器启动 MiniStream，即可建立隧道。首次 Sunshine 配对仍需授权。邀请含隧道口令，请通过可信渠道传递。
+- 主控端启动后和持续运行期间每 24 小时检查 GitHub 正式版。旧版用户运行新版安装器时会看到版本和升级确认，安装时显示文件部署进度。
+- **口令更换**在被控端完成。运行中的隧道会短暂重启，随后到主控端更新口令并重新连接。
+- **一键自检**核对 Sunshine 响应、隧道监听、防火墙和登录自启。可修复本机 MiniStream 规则，公网可达性请在另一台电脑测试。
+- **托盘运行**在关窗后保留控制台和后台会话。需要停服时，在「服务与诊断」手动停止。
 
 ## v2.2.0 体验与遥测版
 
@@ -38,17 +47,17 @@ DPAPI 只保护“同一 Windows 用户可解”的本地文件，口令在内�
 
 ![连接向导真实窗口](web/assets/client-setup.jpg)
 
-截图为本次 2.2 真实程序窗口，拍摄于主控端未添加设备、被控端等待遥测的离线状态；只展示界面与信息结构，不作为性能承诺，也不会用演示数据填充曲线。
+截图为实际程序窗口，拍摄于主控端未添加设备、被控端等待遥测的离线状态；只展示界面与信息结构，不作为性能承诺，也不会用演示数据填充曲线。
 
 ## 三步开始
 
-1. 在运行游戏的电脑安装 [被控端 Host](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，保存自己的隧道口令和 Sunshine 管理信息。
+1. 在运行游戏的电脑安装 [被控端 Host](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，打开「连接设置」复制隧道口令和主控端连接信息。
 2. 同一局域网填写主机局域网地址；跨网络分别配置 TCP、UDP 转发。默认本机端口为 TCP **14738**、UDP **14739**；公网端口可以不同，主控端填写实际公网端口。
 3. 在操作电脑安装 [主控端 Client](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，完成连接向导和配对，打开桌面或游戏。
 
 Sunshine 管理密码用于可选自动配对；未提供时按提示完成手动 PIN 配对。串流中用 `F12` 或 `Ctrl+Alt+Shift+X` 打开菜单，调整鼠标模式、全屏和统计。
 
-用 `Get-FileHash .\MiniStream-Host-Setup.exe -Algorithm SHA256` 校验文件，与同版本 Release 的 `SHA256SUMS.txt` 对照。升级前结束当前串流，在已有安装目录覆盖升级；两端建议使用同一版本。旧式主控端配置可能需要在新向导重新填写：2.1.3 起会把旧明文口令迁移为 DPAPI 密文，回退到旧版本时旧程序读不到口令，需要重新填写。若仍在使用 2.1.3，请覆盖升级到 2.1.4 或更新版本，以修复首次保存失败与启动失败残留 socket 的问题。2.2.0 的客户端、被控端与两份安装包已在本轮构建；下载与校验以 v2.2.0 Release 页面和同版 `release-manifest.json` 为准，不要混装两端版本。
+用 `Get-FileHash .\MiniStream-Host-Setup.exe -Algorithm SHA256` 校验文件，与同版本 Release 的 `SHA256SUMS.txt` 对照。升级前结束当前串流，在已有安装目录覆盖升级；两端建议使用同一版本。旧式主控端配置可能需要在新向导重新填写：2.1.3 起会把旧明文口令迁移为 DPAPI 密文，回退到旧版本时旧程序读不到口令，需要重新填写。若仍在使用 2.1.3，请覆盖升级到 2.1.4 或更新版本，以修复首次保存失败与启动失败残留 socket 的问题。下载与校验以 v2.3.0 Release 页面和同版 `release-manifest.json` 为准，不要混装两端版本。
 
 ## 连接原理
 
@@ -100,7 +109,7 @@ Release 提供源码归档、组件来源和构建清单。GitHub 自动源码�
 
 ## 项目状态、贡献与许可
 
-v2.2.0 是本轮的体验与遥测版本：主控端工作台重做并新增体验监测页，被控端控制台扩为四页，遥测历史与事件在内存中有界保留（300 点 / 100 条），mslink 新增 `relay_telemetry` 测试使 CTest 达到 **7/7**，弱网端到端 **7 场景 50/50** 检查通过。这些结果都是**本机单机**结果：弱网测试在 127.0.0.1 上以对称损伤代理驱动真实二进制，回显数据不是游戏媒体，也没有 GPU 解码与呈现；**Windows 10/11 虚拟机验收本轮未执行**（无 ISO、当前会话非管理员，Hyper-V 可用但未建机），因此不宣称干净系统安装、所有 GPU/驱动组合或真实长时串流通过。2.1.3 的首次保存与启动失败回归由 2.1.4 修复，相关说明保留在更新记录中；2.2.0 的最终构建、安装包与哈希以发布清单和 Release 页面为准。
+v2.2.0 是此前的体验与遥测版本：主控端工作台重做并新增体验监测页，被控端控制台扩为四页，遥测历史与事件在内存中有界保留（300 点 / 100 条），mslink 新增 `relay_telemetry` 测试使 CTest 达到 **7/7**，弱网端到端 **7 场景 50/50** 检查通过。这些结果都是**本机单机**结果：弱网测试在 127.0.0.1 上以对称损伤代理驱动真实二进制，回显数据不是游戏媒体，也没有 GPU 解码与呈现；**Windows 10/11 虚拟机验收本轮未执行**（无 ISO、当前会话非管理员，Hyper-V 可用但未建机），因此不宣称干净系统安装、所有 GPU/驱动组合或真实长时串流通过。2.1.3 的首次保存与启动失败回归由 2.1.4 修复，相关说明保留在更新记录中；2.2.0 的最终构建、安装包与哈希以发布清单和 Release 页面为准。
 
 自定义认证和会话密钥传递尚未完成安全审计，不能视为完整的加密 VPN 或零信任接入。2.1.3 起引入并延续到 2.2.0 的 DPAPI 与 ACL 只降低本机文件泄露面：同一 Windows 用户仍可解密，口令在内存中为明文，网络传输的机密性没有改变。遥测与诊断同样只在本机可读，导出后仍需人工脱敏。请在可信、受保护的网络路径部署；曾以旧方式分享过口令的，建议轮换。[安全说明](SECURITY.md)
 

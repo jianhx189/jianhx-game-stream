@@ -20,6 +20,9 @@
 #include <QTextStream>
 #include <QDateTime>
 #include <QThreadPool>
+#include "backend/autoupdatechecker.h"
+#include "invitation.h"
+#include <QTimer>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQuickWindow>
@@ -824,7 +827,17 @@ int main(int argc, char *argv[])
 
     // 命令行解析要提到最前面：单实例判断需要知道是不是普通 GUI 启动
     GlobalCommandLineParser parser;
-    GlobalCommandLineParser::ParseResult commandLineParserResult = parser.parse(app.arguments());
+    const auto args = app.arguments();
+    const bool fromLink = args.value(1) == "--open-link";
+    static QVariantMap pendingInvitation;
+    if (fromLink && (args.size() != 3 || (pendingInvitation = decodeInvitation(args[2])).isEmpty())) return 2;
+    auto deliverInvitation = [] {
+        if (!g_mainWindow || pendingInvitation.isEmpty()) return;
+        const QVariant value(pendingInvitation);
+        pendingInvitation.clear();
+        QMetaObject::invokeMethod(g_mainWindow, "openInvitation", Q_ARG(QVariant, value));
+    };
+    auto commandLineParserResult = fromLink ? GlobalCommandLineParser::NormalStartRequested : parser.parse(args);
 
     // ---- MiniStream：单实例保护 ----
     //
@@ -842,7 +855,7 @@ int main(int argc, char *argv[])
         QLocalSocket probe;
         probe.connectToServer(kInstanceName);
         if (probe.waitForConnected(500)) {
-            probe.write("show");
+            probe.write(fromLink ? args[2].toLatin1() + "\n" : QByteArray("show\n"));
             probe.flush();
             probe.waitForBytesWritten(300);
             probe.disconnectFromServer();
@@ -857,9 +870,18 @@ int main(int argc, char *argv[])
         if (probeServer->listen(kInstanceName)) {
             s_instanceServer = probeServer;
             // 主窗口在 QML 加载后才存在，用全局指针延迟取
-            QObject::connect(s_instanceServer, &QLocalServer::newConnection, &app, []() {
+            QObject::connect(s_instanceServer, &QLocalServer::newConnection, &app, [deliverInvitation]() {
                 while (QLocalSocket* c = s_instanceServer->nextPendingConnection()) {
-                    c->deleteLater();
+                    c->setReadBufferSize(2050);
+                    auto receive = [c, deliverInvitation] {
+                        if (!c->canReadLine()) return;
+                        const auto invite = decodeInvitation(QString::fromLatin1(c->readLine(2049).trimmed()));
+                        if (!invite.isEmpty()) { pendingInvitation = invite; deliverInvitation(); }
+                        c->deleteLater();
+                    };
+                    QObject::connect(c, &QLocalSocket::readyRead, c, receive);
+                    QTimer::singleShot(2500, c, &QObject::deleteLater);
+                    receive();
                 }
                 if (g_mainWindow != nullptr) {
                     g_mainWindow->show();
@@ -883,7 +905,7 @@ int main(int argc, char *argv[])
         const QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         QDir().mkpath(configDir);
         const QString iniPath = configDir + "/mslink.ini";
-        MslinkBridge::startFromIni(iniPath, &tunnelErr);
+        if (!fromLink) MslinkBridge::startFromIni(iniPath, &tunnelErr);
         // MiniStream：把 ini 里的自动配对凭据（sunshine_user / sunshine_pass）
         // 读进单例。自动配对（PendingPairingTask）会从这里取账号口令，
         // 少了这一步客户端会以为「没配凭据」，于是永远退回手动输 PIN。
@@ -1087,7 +1109,10 @@ int main(int argc, char *argv[])
         qputenv("QT_QUICK_CONTROLS_MATERIAL_PRIMARY", "#3F51B5");
     }
 
+    AutoUpdateChecker updateChecker;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("releaseChecker", &updateChecker);
+    engine.rootContext()->setContextProperty("invitationStartup", fromLink);
     QString initialView;
     bool hasGUI = true;
 
@@ -1151,6 +1176,15 @@ int main(int argc, char *argv[])
         // 这里只负责：告诉 QML 可以用托盘、以及「窗口全隐藏时不要退出进程」。
         auto rootWin = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
         g_mainWindow = rootWin;
+        if (commandLineParserResult == GlobalCommandLineParser::NormalStartRequested) {
+            QTimer::singleShot(0, rootWin, deliverInvitation);
+            if (!qEnvironmentVariableIsSet("MINISTREAM_UI_PREVIEW")) {
+                QTimer::singleShot(2500, &updateChecker, &AutoUpdateChecker::start);
+                auto *timer = new QTimer(&updateChecker);
+                QObject::connect(timer, &QTimer::timeout, &updateChecker, &AutoUpdateChecker::start);
+                timer->start(24 * 60 * 60 * 1000);
+            }
+        }
         engine.rootContext()->setContextProperty("trayAvailable", true);
         QGuiApplication::setQuitOnLastWindowClosed(false);
         qInfo() << "MiniStream: 关闭窗口将最小化到托盘（托盘右键可退出）";

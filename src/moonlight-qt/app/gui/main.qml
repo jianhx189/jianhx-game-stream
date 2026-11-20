@@ -19,6 +19,16 @@ import StreamMenu 1.0
 //  页面切换仍走 StackView；与 backend 的调用关系保持原样。
 // =============================================================================
 ApplicationWindow {
+    function openInvitation(data) { mslinkSetupDialog.openInvitation(data) }
+    property string releaseVersion: ""
+    property string releaseUrl: ""
+    Connections {
+        target: releaseChecker
+        function onUpdateAvailable(version, url) {
+            window.releaseVersion = version
+            window.releaseUrl = url
+        }
+    }
     property bool pollingActive: false
 
     // MiniStream：点关闭时默认最小化到托盘，而不是退出。
@@ -249,6 +259,16 @@ ApplicationWindow {
             Text { visible: !window.compact; text: "CONTROL / 主控工作台"; color: theme.primary; font.pixelSize: 9; font.letterSpacing: 1.6; Layout.topMargin: 16; Layout.bottomMargin: 16 }
             BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "devices"; onClicked: window.showWorkspacePage("devices") }
             BrandButton { label: window.compact ? "" : "体验监测"; iconSource: "qrc:/res/activity.svg"; ToolTip.text: "体验监测"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "experience"; onClicked: window.showWorkspacePage("experience") }
+            BrandButton {
+                visible: window.releaseVersion !== ""
+                label: window.compact ? "" : "更新 " + window.releaseVersion
+                iconSource: "qrc:/res/activity.svg"
+                ToolTip.text: "发现正式版 " + window.releaseVersion
+                ToolTip.visible: hovered
+                Layout.fillWidth: true
+                accent: true
+                onClicked: Qt.openUrlExternally(window.releaseUrl)
+            }
             BrandButton { label: window.compact ? "" : "连接配置"; iconSource: "qrc:/res/network.svg"; ToolTip.text: "连接配置"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: mslinkSetupDialog.open() }
             BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: { window.showWorkspacePage("devices"); settingsButton.clicked() } }
             Item { Layout.fillHeight: true }
@@ -261,7 +281,7 @@ ApplicationWindow {
             }
             Rectangle { Layout.fillWidth: true; height: 1; color: theme.borderSoft }
             BrandButton { label: window.compact ? "" : "使用教程"; iconSource: "qrc:/res/help.svg"; Layout.fillWidth: true; onClicked: Qt.openUrlExternally("https://ministream.jianhx.com/tutorial.html") }
-            Text { visible: !window.compact; text: "MiniStream 2.2 · Workspace"; color: theme.textTertiary; font.pixelSize: 10 }
+            Text { visible: !window.compact; text: "MiniStream 2.3 · Workspace"; color: theme.textTertiary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Powered by jianhx2026"; color: theme.textSecondary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Sunshine / Moonlight · GPLv3"; color: theme.textTertiary; font.pixelSize: 9 }
         }
@@ -740,6 +760,6 @@ ApplicationWindow {
     // 127.0.0.1 加进主机列表，用户只需要填被控端地址和口令。
     MslinkSetupDialog {
         id: mslinkSetupDialog
-        autoConnect: true
+        autoConnect: !invitationStartup
     }
 }
