@@ -1,24 +1,24 @@
 {
-  "tag_name": "v2.3.0",
-  "published_at": "2026-11-20T16:25:32.162026+00:00",
+  "tag_name": "v2.3.1",
+  "published_at": "2026-11-20T16:59:41.035070+00:00",
   "assets": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49382700,
-      "sha256": "f86155cd9230a160c952a94c7c75c4ad5b563b8bcf1898cd37d85bba3db7a23d",
-      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.0/MiniStream-Client-Setup.exe"
+      "size": 49385932,
+      "sha256": "b066320a7acc72d81ea9175bd2213d8f0e214a6aa71d7181d736d9dce25f30ea",
+      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.1/MiniStream-Client-Setup.exe"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63531475,
-      "sha256": "b9dda082608e5a2a59c583ade9de4619f686b46272d8d163cd35e9f3c2586796",
-      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.0/MiniStream-Host-Setup.exe"
+      "size": 63534838,
+      "sha256": "22a5cb8c22a1576b1934fe1adc21243ed6428f516b6a90a3ee53b63c01aafaf9",
+      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.1/MiniStream-Host-Setup.exe"
     },
     {
-      "name": "MiniStream-2.3.0-Source.zip",
-      "size": 2917386,
-      "sha256": "808967859a00e5ff10fc8a5a9bd452dbd42addce1179ff703b14c88dd9bf18f8",
-      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.0/MiniStream-2.3.0-Source.zip"
+      "name": "MiniStream-2.3.1-Source.zip",
+      "size": 2981865,
+      "sha256": "acb639e008f83f1d9c1ce1ea40566a5bd8b183d17a51338b6f6e7083f236a3af",
+      "browser_download_url": "https://github.com/jianhx189/jianhx-game-stream/releases/download/v2.3.1/MiniStream-2.3.1-Source.zip"
     }
   ]
 }
