@@ -34,7 +34,7 @@
   if (!links.length) return;
 
   const english = document.documentElement.lang.startsWith('en');
-  const tag = 'v2.3.2';
+  const tag = 'v2.3.3';
   const release = `https://github.com/jianhx189/jianhx-game-stream/releases/tag/${tag}`;
   const fallback = () => {
     links.forEach(link => {
@@ -42,11 +42,11 @@
       link.removeAttribute('aria-disabled');
     });
     if (info) info.textContent = english
-      ? 'MiniStream 2.3 · target v2.3.2 · release manifest and SHA-256 on GitHub.'
-      : 'MiniStream 2.3 · 下载目标 v2.3.2 · 发布清单与 SHA-256 以 GitHub Release 为准。';
+      ? 'MiniStream 2.3 · target v2.3.3 · release manifest and SHA-256 on GitHub.'
+      : 'MiniStream 2.3 · 下载目标 v2.3.3 · 发布清单与 SHA-256 以 GitHub Release 为准。';
   };
 
-  fetch(new URL('release.json', document.baseURI))
+  fetch(new URL('release.json?v=' + tag, document.baseURI))
     .then(response => response.ok ? response.json() : null)
     .then(data => {
       if (!data || data.tag_name !== tag || !Array.isArray(data.assets) || !data.assets.length) {
