@@ -139,6 +139,7 @@ public:
     void notifyFocusLost();
 
     void notifyFocusGained();
+    void setLocalKeyboardActive(bool active);
 
     bool isCaptureActive();
 
@@ -153,6 +154,7 @@ public:
     bool isMouseInVideoRegion(int mouseX, int mouseY, int windowWidth = -1, int windowHeight = -1);
 
     void updateKeyboardGrabState();
+    bool m_LocalKeyboardActive = false;
 
     void updatePointerRegionLock();
 

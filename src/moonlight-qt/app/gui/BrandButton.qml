@@ -49,8 +49,7 @@ Button {
             id: labelText
             visible: control.label.length > 0
             text: control.label
-            color: control.accent ? theme.canvas
-                                  : (control.enabled ? theme.text : theme.textTertiary)
+            color: !control.enabled ? theme.textTertiary : control.accent ? theme.canvas : theme.text
             font.pixelSize: control.fontSize
             font.family: theme.fontFamily
             anchors.verticalCenter: parent.verticalCenter
@@ -73,7 +72,8 @@ Button {
             return "transparent"
         }
         border.width: control.accent ? 0 : 1
-        border.color: control.hovered ? theme.borderStrong : theme.border
+        border.color: control.activeFocus ? theme.primary : control.hovered ? theme.borderStrong : theme.border
+        Behavior on color { ColorAnimation { duration: 135 } }
     }
 
     ToolTip.visible: false

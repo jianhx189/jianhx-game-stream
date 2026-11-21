@@ -7,6 +7,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--version',required=True)
 parser.add_argument('--moonlight',type=Path)
 parser.add_argument('--forbid-text',action='append',default=[])
+parser.add_argument('--bundle-only', action='store_true', help='Create versioned assets without advancing the website or root release manifest.')
 args=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[1]
 TREE=(args.moonlight or ROOT/'构建环境/mlqt').resolve()
@@ -93,11 +94,13 @@ if verification.get('version')!=args.version or not verification.get('passed'):
     raise RuntimeError('Release verification is missing, failed or belongs to another version')
 manifest={'product':'MiniStream','version':args.version,'channel':'stable','created_utc':datetime.now(timezone.utc).isoformat(),'files':files,'sources':refs,'compiler':'MSVC 14.44 x64 / Qt 6.9.3','privacy':'Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.','verification':verification,'limits':['Clean Win10/Win11 installation and all driver combinations not comprehensively covered','Long-duration cross-network media/input testing remains ongoing','Custom tunnel/key exchange is not an independently audited encrypted VPN'],'package_input_files':inputs}
 (OUT/'release-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
-(ROOT/'manifest.json').write_bytes((OUT/'release-manifest.json').read_bytes())
+if not args.bundle_only:
+    (ROOT/'manifest.json').write_bytes((OUT/'release-manifest.json').read_bytes())
 checksum_files=files+[{'name':'release-manifest.json','sha256':sha((OUT/'release-manifest.json').read_bytes())}]
 (OUT/'SHA256SUMS.txt').write_text(''.join(x['sha256']+'  '+x['name']+'\n' for x in checksum_files),encoding='utf-8')
 release={'tag_name':'v'+args.version,'published_at':datetime.now(timezone.utc).isoformat(),'assets':[dict(x,browser_download_url='https://github.com/jianhx189/jianhx-game-stream/releases/download/v'+args.version+'/'+x['name']) for x in files]}
-(ROOT/'web/release.json').write_text(json.dumps(release,ensure_ascii=False,indent=2),encoding='utf-8')
-(ROOT/'web/updates.json').write_text(json.dumps([{'platform':'windows','arch':'x86_64','version':args.version,'browser_url':'https://github.com/jianhx189/jianhx-game-stream/releases/tag/v'+args.version}],indent=2),encoding='utf-8')
-sync_dist()
+if not args.bundle_only:
+    (ROOT/'web/release.json').write_text(json.dumps(release,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'web/updates.json').write_text(json.dumps([{'platform':'windows','arch':'x86_64','version':args.version,'browser_url':'https://github.com/jianhx189/jianhx-game-stream/releases/tag/v'+args.version}],indent=2),encoding='utf-8')
+    sync_dist()
 print(json.dumps({'version':args.version,'assets':files,'source_files':len(source),'package_inputs':{k:len(v) for k,v in inputs.items()}},ensure_ascii=False,indent=2))

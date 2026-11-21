@@ -1,17 +1,47 @@
 #include "autoupdatechecker.h"
-#include <QNetworkReply>
+#include <QCoreApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkReply>
 #include <QRegularExpression>
 #include <QVersionNumber>
 
+namespace {
+const QString repo = QStringLiteral("https://github.com/jianhx189/jianhx-game-stream");
+
+QVersionNumber parseVersion(const QString &value)
+{
+    static const QRegularExpression pattern(
+        QStringLiteral("\\A[vV]?([0-9]{1,6}\\.[0-9]{1,6}\\.[0-9]{1,6}(?:\\.[0-9]{1,6})?)\\z"));
+    const auto match = pattern.match(value.trimmed());
+    return match.hasMatch() ? QVersionNumber::fromString(match.captured(1)).normalized() : QVersionNumber();
+}
+}
+
 AutoUpdateChecker::AutoUpdateChecker(QObject *parent) : QObject(parent) {}
+
+QString AutoUpdateChecker::newerClientRelease(const QJsonObject &release, const QString &installed)
+{
+    if (release.value("draft").toBool(true) || release.value("prerelease").toBool(true)) return {};
+    const QString tag = release.value("tag_name").toString();
+    const auto offered = parseVersion(tag);
+    const auto current = parseVersion(installed);
+    if (!tag.startsWith('v') || offered.isNull() || current.isNull() || offered <= current) return {};
+    for (const auto &entry : release.value("assets").toArray()) {
+        const auto asset = entry.toObject();
+        if (asset.value("name").toString() == "MiniStream-Client-Setup.exe" &&
+            asset.value("state").toString() == "uploaded" &&
+            asset.value("size").toDouble() > 0) return tag;
+    }
+    return {};
+}
 
 void AutoUpdateChecker::start()
 {
     if (checking) return;
     QNetworkRequest request(QUrl(QStringLiteral("https://api.github.com/repos/jianhx189/jianhx-game-stream/releases/latest")));
-    request.setRawHeader("User-Agent", "MiniStream/" VERSION_STR);
+    request.setRawHeader("User-Agent", ("MiniStream/" + QCoreApplication::applicationVersion()).toUtf8());
     request.setRawHeader("Accept", "application/vnd.github+json");
     request.setTransferTimeout(10000);
     checking = true;
@@ -20,13 +50,10 @@ void AutoUpdateChecker::start()
         checking = false;
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) return;
-        const auto release = QJsonDocument::fromJson(reply->readAll()).object();
-        const QString tag = release.value("tag_name").toString();
-        static const QRegularExpression stable(QStringLiteral("\\Av([0-9]{1,6}\\.[0-9]{1,6}\\.[0-9]{1,6})\\z"));
-        const auto match = stable.match(tag);
-        if (!match.hasMatch() || release.value("draft").toBool(true) || release.value("prerelease").toBool(true)) return;
-        const auto version = match.captured(1);
-        if (QVersionNumber::fromString(version) > QVersionNumber::fromString(VERSION_STR))
-            emit updateAvailable(version, "https://github.com/jianhx189/jianhx-game-stream/releases/tag/" + tag);
+        const auto doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) return;
+        const auto tag = newerClientRelease(doc.object(), QCoreApplication::applicationVersion());
+        if (tag.isEmpty()) emit noUpdateAvailable();
+        else emit updateAvailable(tag.mid(1), repo + "/releases/tag/" + tag);
     });
 }

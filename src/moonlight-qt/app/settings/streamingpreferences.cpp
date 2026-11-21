@@ -49,6 +49,9 @@
 #define SER_REVERSESCROLL "reversescroll"
 #define SER_SWAPFACEBUTTONS "swapfacebuttons"
 #define SER_CAPTURESYSKEYS "capturesyskeys"
+#ifdef Q_OS_WIN32
+#define SER_WINDOWS_CAPTURESYSKEYS "ministream/windowsKeyboardRouting"
+#endif
 #define SER_KEEPAWAKE "keepawake"
 #define SER_STREAMINGMENU "streamingmenu"
 #define SER_LANGUAGE "language"
@@ -170,8 +173,15 @@ void StreamingPreferences::reload()
     showMenuTab = settings.value("ministream/showMenuTab", true).toBool();
     streamingMenuEnabled = settings.value(SER_STREAMINGMENU, true).toBool();
     enableHdr = settings.value(SER_HDR, false).toBool();
-    captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
-                                                         static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
+#ifdef Q_OS_WIN32
+    const auto legacyCapture = settings.value(SER_CAPTURESYSKEYS).toInt();
+    const auto defaultCapture = legacyCapture == CSK_FULLSCREEN ? CSK_FULLSCREEN : CSK_ALWAYS;
+    const auto savedCapture = settings.value(SER_WINDOWS_CAPTURESYSKEYS, defaultCapture).toInt();
+    captureSysKeysMode = savedCapture >= CSK_OFF && savedCapture <= CSK_ALWAYS ?
+                         static_cast<CaptureSysKeysMode>(savedCapture) : defaultCapture;
+#else
+    captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS, CSK_OFF).toInt());
+#endif
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
@@ -378,7 +388,11 @@ void StreamingPreferences::save()
     settings.setValue(SER_BACKGROUNDGAMEPAD, backgroundGamepad);
     settings.setValue(SER_REVERSESCROLL, reverseScrollDirection);
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
+#ifdef Q_OS_WIN32
+    settings.setValue(SER_WINDOWS_CAPTURESYSKEYS, captureSysKeysMode);
+#else
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
+#endif
     settings.setValue(SER_KEEPAWAKE, keepAwake);
     settings.setValue("ministream/menuShortcut", menuShortcut);
     settings.setValue("ministream/showMenuTab", showMenuTab);

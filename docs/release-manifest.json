@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "channel": "stable",
-  "created_utc": "2026-11-21T13:15:01.613319+00:00",
+  "created_utc": "2026-11-21T16:22:56.958020+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49381519,
-      "sha256": "040b907fe7f67684b2aae766d1fab0b5e86c3901c21eec3406ad7cbc3be4542f"
+      "size": 49381528,
+      "sha256": "db99d6e5f7fb80087e03e003d77771c367b01939395ab505c14a8023378dba93"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63537208,
-      "sha256": "0ff61d79d57b171efa05c8c462193d7542c62cd442c1d10f9ed69cdb6bfe18ef"
+      "size": 63539841,
+      "sha256": "40dfc03f5fc709623db694572de76b2d136f097061264f914fb4967537dafd2a"
     },
     {
-      "name": "MiniStream-2.3.2-Source.zip",
-      "size": 3160152,
-      "sha256": "771389bd7727533d11e9d886270add543192367c57fa77f19bd1b5b500c81955"
+      "name": "MiniStream-2.3.3-Source.zip",
+      "size": 3162685,
+      "sha256": "fcd560513659b9fc2a0bd55947bc7f8537b7efe818f39150c6146afe6fac9bac"
     }
   ],
   "sources": {
@@ -38,22 +38,23 @@
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
   "verification": {
-    "version": "2.3.2",
+    "version": "2.3.3",
     "passed": true,
     "results": [
       {
-        "name": "Client integration",
+        "name": "Isolated Qt/SDL checks",
         "status": "passed",
-        "evidence": "10 checks in an isolated Qt client linked with production objects: first run, malformed/valid invitations, settings entry, advanced options, persisted shortcut, navigation and native SDL menu-tab click dispatch."
+        "evidence": "12 checks including update version normalization, client setup asset presence, default system key policy, invitation, preferences and sidebar event"
       },
       {
-        "name": "Windows installers",
+        "name": "Windows packaging",
         "status": "passed",
-        "evidence": "Client and host built with MSVC/Qt and packaged using Inno Setup; both report 2.3.2."
+        "evidence": "MSVC/Qt and Inno Setup compiled both roles for version 2.3.3."
       }
     ],
     "not_covered": [
-      "Real game sessions over WAN, exclusive fullscreen across multiple GPU drivers, clean Windows installation."
+      "Physical Windows logo key on a real remote game session",
+      "Clean install or in-place upgrade of both new executables"
     ]
   },
   "limits": [
@@ -130,8 +131,8 @@
       },
       {
         "path": "MiniStream.exe",
-        "size": 3281408,
-        "sha256": "9af8d510782dc0affb9ef7ff5f44676b5f09b4e42e574d068084fef056bbaabf"
+        "size": 3319296,
+        "sha256": "d7495b7f774f4021309636f9767bb297cf716d27b79737eb57875c35f5499e3a"
       },
       {
         "path": "ministream.ico",
@@ -1852,8 +1853,8 @@
       },
       {
         "path": "console/MiniStreamHost.exe",
-        "size": 304128,
-        "sha256": "273fe39ae78a6c53f863885880abbbe273068b8f9670c2c8cc69593578cd7dbb"
+        "size": 309248,
+        "sha256": "3e091a6f5be11651c4b0692af9955ec4b7f89755664dd23898b8ca8590ee2bd7"
       },
       {
         "path": "console/msvcp140.dll",

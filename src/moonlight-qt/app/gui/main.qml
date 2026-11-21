@@ -23,8 +23,10 @@ ApplicationWindow {
     function openInvitation(data) { mslinkSetupDialog.openInvitation(data) }
     property string releaseVersion: ""
     property string releaseUrl: ""
+    property string clientVersion: Qt.application.version
     Connections {
         target: releaseChecker
+        function onNoUpdateAvailable() { window.releaseVersion = ""; window.releaseUrl = "" }
         function onUpdateAvailable(version, url) {
             window.releaseVersion = version
             window.releaseUrl = url
@@ -288,7 +290,7 @@ ApplicationWindow {
             }
             Rectangle { Layout.fillWidth: true; height: 1; color: theme.borderSoft }
             BrandButton { label: window.compact ? "" : "使用教程"; iconSource: "qrc:/res/help.svg"; Layout.fillWidth: true; onClicked: Qt.openUrlExternally("https://ministream.jianhx.com/tutorial.html") }
-            Text { visible: !window.compact; text: "MiniStream 2.3 · Workspace"; color: theme.textTertiary; font.pixelSize: 10 }
+            Text { visible: !window.compact; text: "MiniStream " + window.clientVersion + " · 主控端"; color: theme.textTertiary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Powered by jianhx2026"; color: theme.textSecondary; font.pixelSize: 10 }
             Text { visible: !window.compact; text: "Sunshine / Moonlight · GPLv3"; color: theme.textTertiary; font.pixelSize: 9 }
         }

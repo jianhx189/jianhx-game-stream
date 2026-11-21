@@ -268,6 +268,7 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+    if (m_Window) updateKeyboardGrabState();
 }
 
 void SdlInputHandler::notifyFocusLost()
@@ -280,6 +281,7 @@ void SdlInputHandler::notifyFocusLost()
         setCaptureActive(false);
     }
 
+    updateKeyboardGrabState();
     // Raise all keys that are currently pressed. If we don't do this, certain keys
     // used in shortcuts that cause focus loss (such as Alt+Tab) may get stuck down.
     raiseAllKeys();
@@ -287,6 +289,13 @@ void SdlInputHandler::notifyFocusLost()
 
 void SdlInputHandler::notifyFocusGained()
 {
+    updateKeyboardGrabState();
+}
+
+void SdlInputHandler::setLocalKeyboardActive(bool active)
+{
+    m_LocalKeyboardActive = active;
+    if (m_Window) updateKeyboardGrabState();
 }
 
 bool SdlInputHandler::isCaptureActive()
@@ -301,15 +310,15 @@ bool SdlInputHandler::isCaptureActive()
 
 void SdlInputHandler::updateKeyboardGrabState()
 {
-    bool shouldGrab = m_CaptureSystemKeysMode != StreamingPreferences::CSK_OFF && isCaptureActive();
-    if (shouldGrab) {
-        Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
-        if (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
-            !(windowFlags & SDL_WINDOW_FULLSCREEN)) {
-            // Ungrab if it's fullscreen only and we left fullscreen
-            shouldGrab = false;
-        }
-    }
+    if (!m_Window) return;
+    const Uint32 flags = SDL_GetWindowFlags(m_Window);
+    bool shouldGrab = !m_LocalKeyboardActive && (flags & SDL_WINDOW_INPUT_FOCUS) &&
+                      (m_CaptureSystemKeysMode == StreamingPreferences::CSK_ALWAYS ||
+                       (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
+                        (flags & SDL_WINDOW_FULLSCREEN)));
+#ifndef Q_OS_WIN32
+    shouldGrab = shouldGrab && isCaptureActive();
+#endif
 
     // Don't close the window on Alt+F4 when keyboard grab is enabled
     SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, shouldGrab ? "1" : "0");

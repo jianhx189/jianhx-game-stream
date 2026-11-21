@@ -1797,6 +1797,7 @@ void Session::setMenuOpen(bool open)
     // 否则点击会被 SDL 串流窗口抢走，浮层上的按钮点不到。
     // 菜单关闭后恢复捕获，避免回到游戏时鼠标失灵。
     if (m_InputHandler != nullptr) {
+        m_InputHandler->setLocalKeyboardActive(open);
         if (open) {
             m_PreMenuCapture = m_InputHandler->isCaptureActive();
             m_InputHandler->raiseAllKeys();
@@ -2457,8 +2458,8 @@ DispatchDeferredCleanup:
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 
-    // Uncapture the mouse and hide the window immediately,
-    // so we can return to the Qt GUI ASAP.
+    // Hand input back before returning to the Qt GUI.
+    m_InputHandler->setLocalKeyboardActive(true);
     m_InputHandler->setCaptureActive(false);
     SDL_EnableScreenSaver();
     SDL_SetHint(SDL_HINT_TIMER_RESOLUTION, "0");

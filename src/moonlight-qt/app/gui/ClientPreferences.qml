@@ -22,7 +22,39 @@ ScrollView {
         property string title
         Label { text: parent.title; Layout.fillWidth: true; color: theme.text; font.pixelSize: 14 }
     }
-    component Option: ComboBox { Layout.preferredWidth: 180; palette.button: theme.surfaceAlt }
+    component Option: ComboBox {
+        id: choice
+        Layout.preferredWidth: 208
+        palette.button: theme.surfaceAlt
+        background: Rectangle {
+            radius: theme.radiusControl
+            color: choice.hovered ? theme.surfaceHover : theme.surfaceAlt
+            border.color: choice.activeFocus ? theme.primary : theme.border
+        }
+        indicator: Text {
+            x: choice.width - width - 12
+            y: (choice.height - height) / 2
+            text: "⌄"
+            color: theme.textSecondary
+            font.pixelSize: 17
+        }
+    }
+    component PreferenceSwitch: Switch {
+        id: toggle
+        indicator: Rectangle {
+            implicitWidth: 38; implicitHeight: 21
+            x: toggle.leftPadding; y: (toggle.height - height) / 2
+            radius: 11
+            color: toggle.checked ? theme.primary : theme.surfaceAlt
+            border.color: toggle.activeFocus ? theme.text : theme.border
+            Rectangle {
+                width: 15; height: 15; radius: 8
+                y: 3; x: toggle.checked ? 20 : 3
+                color: toggle.checked ? theme.canvas : theme.textSecondary
+                Behavior on x { NumberAnimation { duration: 145; easing.type: Easing.OutCubic } }
+            }
+        }
+    }
     ColumnLayout {
         id: options
         x: 24; y: 16; width: Math.min(720, page.availableWidth - 48); spacing: 8
@@ -65,12 +97,12 @@ ScrollView {
         Section { text: "菜单与输入" }
         SettingRow {
             title: "串流菜单"
-            Switch { checked: page.prefs.streamingMenuEnabled; onToggled: page.setPref("streamingMenuEnabled", checked) }
+            PreferenceSwitch { checked: page.prefs.streamingMenuEnabled; onToggled: page.setPref("streamingMenuEnabled", checked) }
         }
         SettingRow {
             enabled: page.prefs.streamingMenuEnabled
             title: "显示侧边菜单按钮"
-            Switch { checked: page.prefs.showMenuTab; onToggled: page.setPref("showMenuTab", checked) }
+            PreferenceSwitch { checked: page.prefs.showMenuTab; onToggled: page.setPref("showMenuTab", checked) }
         }
         SettingRow {
             enabled: page.prefs.streamingMenuEnabled
@@ -92,6 +124,14 @@ ScrollView {
         SettingRow {
             title: "鼠标输入"
             Option { model: ["桌面 · 绝对坐标", "游戏 · 相对位移"]; currentIndex: page.prefs.absoluteMouseMode ? 0 : 1; onActivated: page.setPref("absoluteMouseMode", currentIndex === 0) }
+        }
+        SettingRow {
+            title: "Win 键与系统快捷键"
+            Option {
+                model: ["保留在本机", "全屏时发给被控端", "串流聚焦时发给被控端"]
+                currentIndex: page.prefs.captureSysKeysMode
+                onActivated: page.setPref("captureSysKeysMode", currentIndex)
+            }
         }
         Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: theme.textSecondary; text: "指针锁定时可按 " + page.prefs.menuShortcut + " 打开菜单。画面设置在下次串流时生效。" }
         BrandButton { label: page.advanced ? "收起高级选项" : "展开高级选项"; onClicked: page.advanced = !page.advanced }
@@ -123,7 +163,7 @@ ScrollView {
                     required property var modelData
                     id: advancedRow
                     title: modelData[1]
-                    Switch { checked: page.prefs[advancedRow.modelData[0]]; onToggled: page.setPref(advancedRow.modelData[0], checked) }
+                    PreferenceSwitch { checked: page.prefs[advancedRow.modelData[0]]; onToggled: page.setPref(advancedRow.modelData[0], checked) }
                 }
             }
             BrandButton { label: "其他设备与平台选项"; onClicked: navigateTo("qrc:/gui/SettingsView.qml", SettingsView) }

@@ -7,6 +7,10 @@ MiniStream combines **Sunshine and Moonlight-Qt** with a connection wizard, nati
 
 No MiniStream cloud account is required. You manage your host, credentials and network. Provide a reachable LAN, FRP deployment or another trusted path; MiniStream does not operate a public relay or provide automatic NAT traversal.
 
+## MiniStream v2.3.3
+
+Improves Windows key forwarding and update detection, and refreshes setup progress and controls on both ends.
+
 ## Client changes in v2.3.2
 
 Paste the host invitation on first launch. Open the in-stream side tab to see the active route and stream RTT. Customize the menu shortcut under streaming preferences.
@@ -62,7 +66,7 @@ These are actual MiniStream 2.2 program windows captured offline with no configu
 
 Sunshine management credentials enable optional automatic pairing. Otherwise follow the manual PIN flow. During a stream, the side tab or your configured shortcut (default `F12`) opens mouse mode, display, statistics and disconnect controls.
 
-Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. Use the v2.3.2 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
+Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. Use the v2.3.3 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
 
 ## How it works
 

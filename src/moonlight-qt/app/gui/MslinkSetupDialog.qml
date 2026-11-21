@@ -86,6 +86,11 @@ Dialog {
         else if (MslinkTunnel.tunnelUp) discoverHost()
         else if (!MslinkTunnel.running) window.reconnectTunnel()
     }
+    enter: Transition {
+        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 155; easing.type: Easing.OutCubic }
+        NumberAnimation { property: "scale"; from: 0.985; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    }
+    exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: 115 } }
     onClosed: { link.clear(); candidate = null; problem = "" }
     contentItem: ColumnLayout {
         spacing: 14
@@ -102,6 +107,14 @@ Dialog {
             Layout.fillWidth: true
             visible: dialog.step === "import"
             placeholderText: "粘贴完整连接链接"
+            placeholderTextColor: theme.textTertiary
+            color: theme.text
+            Accessible.name: "被控端邀请链接"
+            background: Rectangle {
+                radius: theme.radiusControl
+                color: theme.canvas
+                border.color: link.activeFocus ? theme.primary : theme.border
+            }
             echoMode: TextInput.Password
             selectByMouse: true
             onTextEdited: dialog.problem = ""

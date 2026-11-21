@@ -1,7 +1,9 @@
-# MiniStream 2.3.2
+# MiniStream 2.3.3
 
-主控端首次启动支持粘贴被控端邀请。已有连接配置会自动重连，切换正在使用的隧道前会提示确认。局域网设备仍可手动添加。
+- Windows 主控端默认在串流窗口聚焦时将 Win 键和系统快捷键发给被控端。在「串流偏好」可切换到仅全屏捕获或留在本机。
+- 更新检查以当前运行的客户端版本为准。相同或更低版本、预览版、草稿或仍无可用主控端安装包的发布均不会提示更新。
+- 两端安装器加入带真实进度和百分比的 MiniStream 部署卡。主控端调整导入对话框、设置控件和键盘焦点样式。被控端增加导航过渡，并明确区分邀请链接、FRP 配置、地址和口令的复制反馈。
 
-串流时点击左侧菜单或按 F12 查看当前通道与串流 RTT。菜单保留性能统计、鼠标模式、全屏、最小化和断开操作。在「串流偏好」可关闭侧栏，或设置 F1–F12 搭配 Ctrl+Shift、Ctrl+Alt。游戏锁定指针时可用快捷键打开菜单，Esc 返回。新 Windows 配置默认无边框全屏。
+## 验证范围
 
-The client now opens with invitation import, shows route and stream RTT in its session menu, and supports configurable shortcuts and a clickable side tab. The host installer is rebuilt for version alignment. Existing hosts running 2.3.1 use the same tunnel protocol.
+Windows MSVC / Qt 与 Inno Setup 构建通过。隔离客户端验证包含版本比较、首启导入、设置保存与侧栏事件。真实跨网游戏、实体 Win 键在不同 Windows 环境中的转发、完整安装和升级流程待实机覆盖。

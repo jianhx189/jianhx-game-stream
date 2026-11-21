@@ -440,19 +440,19 @@ class Console final : public QMainWindow {
         return page;
     }
 
-    void copyText(const QString &text, bool credential)
+    void copyText(const QString &text, bool credential, const QString &label = QStringLiteral("内容"))
     {
         if (text.isEmpty()) { setupNotice->setText("请先填写或选择有效的连接地址。"); return; }
         const auto owner = reinterpret_cast<HWND>(winId());
         if (!credential) {
             QApplication::clipboard()->setText(text);
-            setupNotice->setText("已复制。");
+            setupNotice->setText(QStringLiteral("已复制%1。").arg(label));
             return;
         }
         if (clipboardSequence) HostSetup::clearCredential(owner, clipboardSequence);
         clipboardSequence = HostSetup::copyCredential(owner, text);
         if (!clipboardSequence) { setupNotice->setText("剪贴板被占用，请稍后重试。"); return; }
-        setupNotice->setText("已复制口令。仅发给信任的人，60 秒后自动清除本次复制。");
+        setupNotice->setText(QStringLiteral("已复制%1 · 60 秒后清除剪贴板。").arg(label));
         clipboardTimer.start(60000);
     }
 
@@ -533,7 +533,7 @@ class Console final : public QMainWindow {
         const int tcpPort = connectionTcp, udpPort = connectionUdp;
         const QJsonObject invite{{"v",1},{"mode",frp ? "frp" : "lan"},{"ip",ip},{"tcp",tcpPort},{"udp",udpPort},{"key",password}};
         const auto payload = QJsonDocument(invite).toJson(QJsonDocument::Compact).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
-        copyText("https://ministream.jianhx.com/connect.html#" + QString::fromLatin1(payload), true);
+        copyText("https://ministream.jianhx.com/connect.html#" + QString::fromLatin1(payload), true, QStringLiteral("邀请链接"));
         if (clipboardSequence) setupNotice->setText("邀请链接已复制。链接含隧道口令，仅私发给信任的人。");
     }
 
@@ -544,7 +544,7 @@ class Console final : public QMainWindow {
             setupNotice->setText("无法读取有效口令。请确认是完整安装目录，或点击「更换隧道口令」。");
             return;
         }
-        copyText(password, true);
+        copyText(password, true, QStringLiteral("隧道口令"));
     }
 
     QWidget *setupPage()
@@ -674,7 +674,7 @@ class Console final : public QMainWindow {
         copyConnection = button("生成并复制邀请链接", [this] { shareInvitation(); }, "inviteAction");
         copyRow->addStretch();
         frpCopy = button("复制 frpc 代理段", [this] {
-            copyText(frpTemplate, false);
+            copyText(frpTemplate, false, QStringLiteral("FRP 配置"));
             setupNotice->setText("已复制 TCP 和 UDP 代理段。请合并到现有 frpc 配置。");
         });
         copyRow->addWidget(frpCopy);
@@ -682,7 +682,7 @@ class Console final : public QMainWindow {
         credentials->setText("更多");
         credentials->setPopupMode(QToolButton::InstantPopup);
         auto *menu = new QMenu(credentials);
-        copyEndpoint = menu->addAction("复制地址", this, [this] { copyText(connectionAddress, false); });
+        copyEndpoint = menu->addAction("复制地址", this, [this] { copyText(connectionAddress, false, QStringLiteral("连接地址")); });
         menu->addAction("复制隧道口令", this, [this] { copyTunnelPassword(); });
         menu->addAction("更换隧道口令", this, [this] { action("password", "tunnel"); });
         credentials->setMenu(menu);
@@ -1040,9 +1040,9 @@ public:
             QPushButton{background:#1b2942;border:1px solid #2c3c5a;border-radius:7px;padding:7px 15px;color:#b1c2dd}
             QPushButton:hover{background:#243653;border-color:#4a719b;color:#f0f5ff}
             QPushButton#primary{background:#1d5167;color:#b7edff;border-color:#3786a8}
-            QPushButton#primary:hover{background:#28667f}QPushButton#danger{color:#ff8296}
+            QPushButton#primary:hover{background:#28667f} QPushButton:pressed{background:#121e33;border-color:#66c9f2}QPushButton#danger{color:#ff8296}
             QPushButton#nav{background:transparent;color:#7f95b7;border:0;text-align:left;padding:13px 18px;font-size:12px;border-radius:7px}
-            QPushButton#nav:checked{background:#1d3550;color:#8cddfa;border-left:3px solid #66c9f2}
+            QPushButton#nav:checked{background:#1d3550;color:#b8edff;border-left:3px solid #66c9f2;font-weight:700}
             QPushButton#nav:hover{background:#1b2942;color:#f0f5ff}QPushButton:disabled{color:#526580}
             QPushButton:focus,QLineEdit:focus,QComboBox:focus,QSpinBox:focus{border-color:#66c9f2}
             QLineEdit,QSpinBox,QComboBox{background:#1b2942;border:1px solid #2c3c5a;border-radius:6px;padding:9px;min-width:160px;color:#f0f5ff}
@@ -1097,7 +1097,21 @@ public:
         const QStringList subtitles{"查看后台服务和当前连接。", "查看链路质量与发送队列。", "查看主控端上报的画面与处理耗时。", "核对本机服务、防火墙和登录自启。", "配置主控端访问地址和端口。"};
         for (int i = 0; i < names.size(); ++i) {
             auto *nav = button(names[i], [this, i, names, subtitles] {
+                const bool changed = pages->currentIndex() != i;
                 pages->setCurrentIndex(i);
+                if (changed && QApplication::isEffectEnabled(Qt::UI_AnimateMenu) &&
+                    pages->currentWidget()->graphicsEffect() == nullptr) {
+                    auto *page = pages->currentWidget();
+                    auto *fade = new QGraphicsOpacityEffect(page);
+                    page->setGraphicsEffect(fade);
+                    auto *transition = new QPropertyAnimation(fade, "opacity", page);
+                    transition->setDuration(165);
+                    transition->setStartValue(0.72);
+                    transition->setEndValue(1.0);
+                    transition->setEasingCurve(QEasingCurve::OutCubic);
+                    connect(transition, &QPropertyAnimation::finished, page, [page] { page->setGraphicsEffect(nullptr); });
+                    transition->start(QAbstractAnimation::DeleteWhenStopped);
+                }
                 setupFooter->setVisible(i == 4);
                 notice->setVisible(i != 4);
                 if (i == 4) refreshSetup();
@@ -1242,7 +1256,7 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setOrganizationName("MiniStream");
     app.setApplicationName("MiniStreamHost");
-    app.setApplicationVersion("2.3.2");
+    app.setApplicationVersion("2.3.3");
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();
