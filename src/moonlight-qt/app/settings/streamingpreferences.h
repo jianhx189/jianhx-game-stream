@@ -132,6 +132,8 @@ public:
     Q_PROPERTY(bool enableMdns MEMBER enableMdns NOTIFY enableMdnsChanged)
     Q_PROPERTY(bool quitAppAfter MEMBER quitAppAfter NOTIFY quitAppAfterChanged)
     Q_PROPERTY(bool absoluteMouseMode MEMBER absoluteMouseMode NOTIFY absoluteMouseModeChanged)
+    Q_PROPERTY(QString menuShortcut MEMBER menuShortcut NOTIFY menuShortcutChanged)
+    Q_PROPERTY(bool showMenuTab MEMBER showMenuTab NOTIFY showMenuTabChanged)
     Q_PROPERTY(bool streamingMenuEnabled MEMBER streamingMenuEnabled NOTIFY streamingMenuEnabledChanged)
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
@@ -175,6 +177,8 @@ public:
     bool enableMdns;
     bool quitAppAfter;
     bool absoluteMouseMode;
+    QString menuShortcut = "F12";
+    bool showMenuTab = true;
     bool streamingMenuEnabled = true;
     bool absoluteTouchMode;
     bool framePacing;
@@ -216,6 +220,8 @@ signals:
     void enableMdnsChanged();
     void quitAppAfterChanged();
     void absoluteMouseModeChanged();
+    void menuShortcutChanged();
+    void showMenuTabChanged();
     void streamingMenuEnabledChanged();
     void absoluteTouchModeChanged();
     void audioConfigChanged();

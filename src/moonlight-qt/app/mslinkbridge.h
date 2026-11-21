@@ -15,6 +15,7 @@
 #pragma once
 
 #include <QObject>
+#include "invitation.h"
 #include <QString>
 #include <QTimer>
 #include <QVariantList>
@@ -80,6 +81,11 @@ public:
     // 最近 300 个约 1 秒采样点 / 最近 100 条事件；缓存 1 秒，QML 同时读两个属性也只解析一次。
     QVariantList history() const;
     QVariantList events() const;
+    Q_INVOKABLE QVariantMap parseInvitation(const QString& input) const {
+        const auto link = input.trimmed();
+        const QString web = QStringLiteral("https://ministream.jianhx.com/connect.html#");
+        return decodeInvitation(link.startsWith(web) ? QStringLiteral("ministream://connect/#") + link.mid(web.size()) : link);
+    }
     Q_INVOKABLE QVariantMap metricsSnapshot() const;
     Q_INVOKABLE QString formatBytes(qint64 bytes) const;
     Q_INVOKABLE QString formatRate(qint64 bytesPerSecond) const;

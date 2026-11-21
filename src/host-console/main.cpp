@@ -1242,7 +1242,7 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setOrganizationName("MiniStream");
     app.setApplicationName("MiniStreamHost");
-    app.setApplicationVersion("2.3.1");
+    app.setApplicationVersion("2.3.2");
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();

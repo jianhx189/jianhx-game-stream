@@ -38,6 +38,11 @@
 #include <QImage>
 #include <QGuiApplication>
 #include <QCursor>
+#include <QKeySequence>
+#include "mslinkbridge.h"
+#ifdef Q_OS_WIN32
+#include "menutab_win.h"
+#endif
 #include <QScreen>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -1767,6 +1772,19 @@ void Session::quitStream()
     SDL_PushEvent(&event);
 }
 
+QString Session::menuStatus() const
+{
+    QString route = tr("直接连接");
+    auto tunnel = MslinkTunnel::get();
+    if (m_Computer->activeAddress.address() == tunnel->localServiceEndpoint() && tunnel->configured()) {
+        route = !tunnel->tunnelUp() ? tr("隧道未认证") : tunnel->udpDirectOk() ? tr("UDP 通道") :
+                tunnel->udpViaTcp() ? tr("TCP 兼容通道") : tr("通道探测中");
+    }
+    uint32_t rtt = 0, variance = 0;
+    const QString delay = LiGetEstimatedRttInfo(&rtt, &variance) ? QString::number(rtt) + " ms" : QStringLiteral("—");
+    return tr("%1 · %2\n串流 RTT  %3").arg(m_Computer->name, route, delay);
+}
+
 void Session::setMenuOpen(bool open)
 {
     if (m_StreamMenuOpen == open) {
@@ -1779,7 +1797,11 @@ void Session::setMenuOpen(bool open)
     // 否则点击会被 SDL 串流窗口抢走，浮层上的按钮点不到。
     // 菜单关闭后恢复捕获，避免回到游戏时鼠标失灵。
     if (m_InputHandler != nullptr) {
-        m_InputHandler->setCaptureActive(!open);
+        if (open) {
+            m_PreMenuCapture = m_InputHandler->isCaptureActive();
+            m_InputHandler->raiseAllKeys();
+        }
+        m_InputHandler->setCaptureActive(!open && m_PreMenuCapture);
     }
 
     if (!open && m_Window != nullptr) {
@@ -1925,7 +1947,7 @@ void Session::exec()
 #ifdef Q_OS_DARWIN
     std::string windowName = QString(m_Computer->name).toStdString();
 #else
-    std::string windowName = QString(m_Computer->name + " - Moonlight").toStdString();
+    std::string windowName = QString(m_Computer->name + " - MiniStream").toStdString();
 #endif
 
     m_Window = SDL_CreateWindow(windowName.c_str(),
@@ -2041,6 +2063,12 @@ void Session::exec()
 
     // Hijack this thread to be the SDL main thread. We have to do this
     // because we want to suspend all Qt processing until the stream is over.
+    const auto shortcut = QKeySequence::fromString(m_Preferences->menuShortcut, QKeySequence::PortableText);
+    const auto menuKey = shortcut.isEmpty() ? QKeyCombination(Qt::Key_F12) : shortcut[0];
+    SDL_Scancode swallowedKey = SDL_SCANCODE_UNKNOWN;
+#ifdef Q_OS_WIN32
+    StreamMenuTab menuTab(m_Window, m_Preferences->streamingMenuEnabled && m_Preferences->showMenuTab);
+#endif
     SDL_Event event;
     for (;;) {
         // MiniStream：浮层菜单打开期间要把 Qt 事件循环转起来，
@@ -2091,6 +2119,12 @@ void Session::exec()
 
         case SDL_USEREVENT:
             switch (event.user.code) {
+#ifdef Q_OS_WIN32
+            case StreamMenuTab::openEvent:
+                if (!m_StreamMenuOpen) emit menuRequested();
+                menuTab.update(m_StreamMenuOpen);
+                break;
+#endif
             case SDL_CODE_FRAME_READY:
                 if (m_VideoDecoder != nullptr) {
                     m_VideoDecoder->renderFrameOnMainThread();
@@ -2131,6 +2165,9 @@ void Session::exec()
 
         case SDL_WINDOWEVENT:
             // Early handling of some events
+#ifdef Q_OS_WIN32
+            menuTab.update(m_StreamMenuOpen);
+#endif
             switch (event.window.event) {
             case SDL_WINDOWEVENT_FOCUS_LOST:
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2336,33 +2373,27 @@ void Session::exec()
         case SDL_KEYUP:
         case SDL_KEYDOWN:
 
-            // MiniStream：浮层菜单热键（F12 或 Ctrl+Alt+Shift+X）
-            //
-            // 这些按键不再转发给被控端，避免 F12 在游戏里被误触发。
-            // 注意 Ctrl+Alt+Shift+X 原本是 moonlight 的“全屏切换”热键，
-            // 现在改由浮层菜单里的“全屏 / 窗口”按钮承担（切换效果完全一样）。
-            if (m_Preferences->streamingMenuEnabled) {
-                bool isMenuHotkey = (event.key.keysym.sym == SDLK_F12);
-
-                if (!isMenuHotkey &&
-                        (event.key.keysym.sym == SDLK_x ||
-                         event.key.keysym.scancode == SDL_SCANCODE_X) &&
-                        (event.key.keysym.mod & KMOD_CTRL) &&
-                        (event.key.keysym.mod & KMOD_ALT) &&
-                        (event.key.keysym.mod & KMOD_SHIFT)) {
-                    isMenuHotkey = true;
-                }
-
-                if (isMenuHotkey) {
-                    if (event.type == SDL_KEYDOWN) {
-                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                    "MiniStream: stream menu hotkey pressed");
-                        emit menuRequested();
-                    }
+            if (event.type == SDL_KEYUP && swallowedKey != SDL_SCANCODE_UNKNOWN &&
+                event.key.keysym.scancode == swallowedKey) {
+                swallowedKey = SDL_SCANCODE_UNKNOWN;
+                break;
+            }
+            if (event.type == SDL_KEYDOWN && m_Preferences->streamingMenuEnabled &&
+                event.key.keysym.sym >= SDLK_F1 && event.key.keysym.sym <= SDLK_F12) {
+                Qt::KeyboardModifiers modifiers;
+                const auto mod = event.key.keysym.mod;
+                if (mod & KMOD_CTRL) modifiers |= Qt::ControlModifier;
+                if (mod & KMOD_ALT) modifiers |= Qt::AltModifier;
+                if (mod & KMOD_SHIFT) modifiers |= Qt::ShiftModifier;
+                if (mod & KMOD_GUI) modifiers |= Qt::MetaModifier;
+                const int key = Qt::Key_F1 + (event.key.keysym.sym - SDLK_F1);
+                if (key == menuKey.key() && modifiers == menuKey.keyboardModifiers()) {
+                    swallowedKey = event.key.keysym.scancode;
+                    if (!event.key.repeat) emit menuRequested();
                     break;
                 }
             }
-
+            if (m_StreamMenuOpen) break;
             m_InputHandler->handleKeyEvent(&event.key);
             break;
         case SDL_MOUSEBUTTONDOWN:

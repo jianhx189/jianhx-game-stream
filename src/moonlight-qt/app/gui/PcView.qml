@@ -83,28 +83,12 @@ CenteredGridView {
         return model
     }
 
-    Row {
+    Column {
         anchors.centerIn: parent
-        spacing: 5
-        width: Math.max(180, pcGrid.width - 48)
+        spacing: 12
         visible: pcGrid.count === 0
-
-        BusyIndicator {
-            id: searchSpinner
-            visible: StreamingPreferences.enableMdns
-            running: visible
-        }
-
-        Label {
-            width: parent.width - (searchSpinner.visible ? searchSpinner.width : 0) - 12
-            height: Math.max(80, implicitHeight)
-            elide: Label.ElideRight
-            text: StreamingPreferences.enableMdns ? qsTr("Searching for compatible hosts on your local network...")
-                                                  : qsTr("还没有添加电脑\n点击右上角「连接设置」填写自己的主机地址，或添加局域网电脑。")
-            font.pixelSize: 17
-            verticalAlignment: Text.AlignVCenter
-            wrapMode: Text.Wrap
-        }
+        Label { anchors.horizontalCenter: parent.horizontalCenter; text: "还没有设备"; font.pixelSize: 20 }
+        BrandButton { anchors.horizontalCenter: parent.horizontalCenter; accent: true; label: "导入被控端链接"; onClicked: window.importLink() }
     }
 
     header: Item {

@@ -116,6 +116,7 @@ public:
     //   toggleFullScreenMode() —— 复用已有的 toggleFullscreen()（原 Ctrl+Alt+Shift+X 的行为）
     //   minimizeStreamWindow() —— SDL_MinimizeWindow()
     // ------------------------------------------------------------------
+    QString menuStatus() const;
     Q_INVOKABLE void quitStream();
     Q_INVOKABLE void setMenuOpen(bool open);
     Q_INVOKABLE void toggleStatsOverlay();
@@ -288,6 +289,7 @@ private:
 
     // MiniStream：浮层菜单是否正打开着。打开时 SDL 主循环要让出 Qt 事件循环
     // （QML 浮层窗口才能重绘并接收点击），并释放输入捕获。
+    bool m_PreMenuCapture = false;
     bool m_StreamMenuOpen;
 
     bool m_AsyncConnectionSuccess;

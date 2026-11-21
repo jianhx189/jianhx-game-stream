@@ -41,6 +41,7 @@ public:
     void setAbsoluteMouseMode(bool absolute);
 
     // ---- 菜单开关 ----
+    Q_INVOKABLE QString connectionStatus() const;
     Q_INVOKABLE void openMenu();
     Q_INVOKABLE void closeMenu();
     Q_INVOKABLE void toggleMenu();

@@ -7,6 +7,10 @@ MiniStream combines **Sunshine and Moonlight-Qt** with a connection wizard, nati
 
 No MiniStream cloud account is required. You manage your host, credentials and network. Provide a reachable LAN, FRP deployment or another trusted path; MiniStream does not operate a public relay or provide automatic NAT traversal.
 
+## Client changes in v2.3.2
+
+Paste the host invitation on first launch. Open the in-stream side tab to see the active route and stream RTT. Customize the menu shortcut under streaming preferences.
+
 ## What's in v2.3.1
 
 LAN mode selects a local IPv4 address. In FRP mode enter the forwarded IPv4 address and override ports only when they differ. The host copies the two frpc proxy definitions and issues a private browser invitation from the configured public address and ports. Manage frps separately and validate the public TCP and UDP routes from the client. Open it on a Windows PC with the client installed. The link contains the tunnel credential. Initial Sunshine pairing still requires authorization.
@@ -46,19 +50,19 @@ DPAPI only protects local files that the same Windows user can decrypt; password
 | --- | --- |
 | ![Actual controller window without configured devices](web/assets/client-home.jpg) | ![Actual host console awaiting telemetry](web/assets/host-overview.jpg) |
 
-![Actual connection wizard](web/assets/client-setup.jpg)
+![Actual connection wizard](web/assets/client-import-232.png)
 
 These are actual MiniStream 2.2 program windows captured offline with no configured devices and no active session. They show the interface and information structure, not performance, and charts are never padded with demo data.
 
 ## Get connected
 
 1. Install [Host](https://github.com/jianhx189/jianhx-game-stream/releases/latest) on the PC running the desktop or game. Keep your tunnel password and Sunshine management details private.
-2. On a LAN, use the host's LAN address. Across networks configure separate TCP and UDP forwarding. Default local ports are **TCP 14738 / UDP 14739**; public ports may differ. Enter the actual public ports on the controller.
-3. Install [Client](https://github.com/jianhx189/jianhx-game-stream/releases/latest) on the PC you operate, complete the wizard and pairing, then launch a desktop or application.
+2. On a LAN, use the host's LAN address. Across networks configure separate TCP and UDP forwarding. Default local ports are **TCP 14738 / UDP 14739**; public ports may differ. Set the actual public ports on the host before copying its invitation.
+3. Install [Client](https://github.com/jianhx189/jianhx-game-stream/releases/latest) on the PC you operate, paste the host invitation and complete pairing, then launch a desktop or application.
 
-Sunshine management credentials enable optional automatic pairing. Otherwise follow the manual PIN flow. During a stream, `F12` or `Ctrl+Alt+Shift+X` opens mouse mode, display, statistics and disconnect controls.
+Sunshine management credentials enable optional automatic pairing. Otherwise follow the manual PIN flow. During a stream, the side tab or your configured shortcut (default `F12`) opens mouse mode, display, statistics and disconnect controls.
 
-Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. Use the v2.3.1 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
+Verify SHA-256 against `SHA256SUMS.txt` from the same release. End active sessions before upgrading. Install over the existing host directory to preserve configuration/pairings and update both ends together. Older controller connections may need to be entered again: 2.1.3 and later migrate plaintext passwords to DPAPI, which 2.1.2 and earlier cannot read, so a downgrade requires re-entering them. Upgrade any 2.1.3 installation to 2.1.4 or later to fix first-save failures and leaked listening sockets. Use the v2.3.2 Release page and its `release-manifest.json` for downloads and hashes, and keep both ends on the same version.
 
 ## How it works
 

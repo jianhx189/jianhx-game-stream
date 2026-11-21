@@ -32,7 +32,7 @@ Flickable {
         return live.tunnel_up ? "正在探测 UDP" : "等待隧道连接"
     }
     function advice() {
-        if (!live.tunnel_up) return "尚未建立认证会话。先在连接配置中确认地址、端口和口令。"
+        if (!live.tunnel_up) return "尚未建立认证会话。请导入被控端生成的连接链接。"
         if (live.transport === "tcp_fallback") return "UDP 探测尚未确认，实时数据正在走 TCP 兼容通道。检查 UDP 转发与回包源地址。"
         if (live.queued_bytes > 1048576) return "发送队列已偏高，可能存在带宽不足或突发拥塞。观察吞吐和重连变化。"
         if (hasMedia && media.network_frame_drop_percent > 2) return "媒体网络丢帧偏高。优先检查链路质量，不等同于物理 UDP 丢包率。"

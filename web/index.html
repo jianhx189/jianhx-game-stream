@@ -21,7 +21,7 @@
   <meta property="og:url" content="https://ministream.jianhx.com/">
   <meta property="og:image" content="https://ministream.jianhx.com/assets/social-card.svg">
   <meta name="twitter:card" content="summary">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"MiniStream","softwareVersion":"2.3.1","applicationCategory":"MultimediaApplication","operatingSystem":"Windows","url":"https://ministream.jianhx.com/","downloadUrl":"https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1","description":"Windows game and desktop streaming based on Sunshine and Moonlight, with native workspaces and a self-hosted mslink tunnel.","codeRepository":"https://github.com/jianhx189/jianhx-game-stream"}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"MiniStream","softwareVersion":"2.3.2","applicationCategory":"MultimediaApplication","operatingSystem":"Windows","url":"https://ministream.jianhx.com/","downloadUrl":"https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.2","description":"Windows game and desktop streaming based on Sunshine and Moonlight, with native workspaces and a self-hosted mslink tunnel.","codeRepository":"https://github.com/jianhx189/jianhx-game-stream"}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"如何通过邀请连接到游戏主机？","acceptedAnswer":{"@type":"Answer","text":"局域网模式自动选取网卡地址。使用 FRP 时填入穿透后的 IPv4，并按实际映射填写公网端口。生成邀请后私发给装有主控端的 Windows 电脑，在浏览器中打开即可启动连接。"}},{"@type":"Question","name":"FRP 的公网端口和本机端口不同怎么填？","acceptedAnswer":{"@type":"Answer","text":"勾选自定义公网与内网端口映射，按 TCP、UDP 各填一组。把代理段合并到自己的 frpc 配置，再从外网主控端测试 TCP 和 UDP。"}}]}</script>
 </head>
 <body>
@@ -102,7 +102,7 @@
       <div class="feature-row">
         <article class="feature-card"><span class="icon" aria-hidden="true">↗</span><h3>口令随时可更换</h3><p>在被控端设置新口令，再到主控端更新并重新连接。自动配对使用独立的 Sunshine 管理密码。</p></article>
         <article class="feature-card"><span class="icon" aria-hidden="true">⌁</span><h3>数据来自真实上报</h3><p>没有数据或样本过期时显示“—”。隧道 RTT 不等于端到端操作延迟，网络丢帧不等于 IP 丢包率。</p></article>
-        <article class="feature-card"><span class="icon" aria-hidden="true">F12</span><h3>串流中仍可控制</h3><p>使用 F12 或 Ctrl+Alt+Shift+X 打开菜单，切换鼠标模式、性能统计、显示方式或断开连接。</p></article>
+        <article class="feature-card"><span class="icon" aria-hidden="true">F12</span><h3>串流中仍可控制</h3><p>点击侧边菜单或按自定义快捷键（默认 F12），查看连接通道与串流 RTT，切换鼠标模式、性能统计、显示方式或断开连接。</p></article>
       </div>
     </section>
 
@@ -115,7 +115,7 @@
         <div class="real-shots">
           <figure><a href="assets/client-home.jpg"><img src="assets/client-home.jpg" alt="MiniStream 主控端真实程序设备首页，离线测试状态" loading="lazy"></a><figcaption>主控端 · 设备首页与连接入口<span>新版真实程序 / 离线或测试状态</span></figcaption></figure>
           <figure><a href="assets/host-overview.jpg"><img src="assets/host-overview.jpg" alt="MiniStream 2.3 被控端真实程序概览，显示本机服务与等待中的遥测" loading="lazy"></a><figcaption>被控端 · 服务、会话与真实遥测<span>新版真实程序 / 离线或测试状态</span></figcaption></figure>
-          <figure><a href="assets/client-setup.jpg"><img src="assets/client-setup.jpg" alt="MiniStream 主控端真实连接向导，测试状态" loading="lazy"></a><figcaption>连接向导 · 选择自己的网络路径<span>新版真实程序 / 离线或测试状态</span></figcaption></figure>
+          <figure><a href="assets/client-import-232.png"><img src="assets/client-import-232.png" alt="MiniStream 主控端首次启动的邀请导入界面" loading="lazy"></a><figcaption>导入链接 · 粘贴被控端邀请<span>新版真实程序 / 离线或测试状态</span></figcaption></figure>
         </div>
         <p class="preview-note">这些截图不表示真实游戏性能，也不构成帧率、延迟或兼容性承诺。实际体验取决于硬件、驱动与网络链路。</p>
       </div>
@@ -138,12 +138,12 @@
 
     <section class="wrap section" id="download">
       <div class="release-strip">
-        <div><div class="eyebrow">04 / DOWNLOAD</div><h2>MiniStream 2.3</h2><p id="release-info" aria-live="polite">下载目标 v2.3.1 · 发布清单与 SHA-256 以 GitHub Release 为准。</p></div>
+        <div><div class="eyebrow">04 / DOWNLOAD</div><h2>MiniStream 2.3</h2><p id="release-info" aria-live="polite">下载目标 v2.3.2 · 发布清单与 SHA-256 以 GitHub Release 为准。</p></div>
         <a class="button ghost" href="changelog.html">查看 2.3 更新 <span aria-hidden="true">→</span></a>
       </div>
       <div class="download-grid">
-        <article class="download-card"><span class="tag">HOST / 被控端</span><h3>安装在运行游戏的电脑</h3><p>保存隧道口令与 Sunshine 管理信息，配置本机服务、端口和网络路径。</p><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1">下载被控端 <span aria-hidden="true">↓</span></a></article>
-        <article class="download-card"><span class="tag">CLIENT / 主控端</span><h3>安装在你操作的电脑</h3><p>填写自己的地址、端口与凭据，完成配对后从设备列表进入桌面或游戏。</p><a class="button primary" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.1">下载主控端 <span aria-hidden="true">↓</span></a></article>
+        <article class="download-card"><span class="tag">HOST / 被控端</span><h3>安装在运行游戏的电脑</h3><p>保存隧道口令与 Sunshine 管理信息，配置本机服务、端口和网络路径。</p><a class="button primary" data-file="MiniStream-Host-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.2">下载被控端 <span aria-hidden="true">↓</span></a></article>
+        <article class="download-card"><span class="tag">CLIENT / 主控端</span><h3>安装在你操作的电脑</h3><p>填写自己的地址、端口与凭据，完成配对后从设备列表进入桌面或游戏。</p><a class="button primary" data-file="MiniStream-Client-Setup.exe" href="https://github.com/jianhx189/jianhx-game-stream/releases/tag/v2.3.2">下载主控端 <span aria-hidden="true">↓</span></a></article>
       </div>
       <p class="checksum">下载后与 GitHub Release 中的 SHA256SUMS.txt 对照，核对安装包完整性。</p>
     </section>

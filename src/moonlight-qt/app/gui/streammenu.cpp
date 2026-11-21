@@ -138,6 +138,11 @@ void StreamMenu::setMenuOpen(bool open)
     emit menuOpenChanged();
 }
 
+QString StreamMenu::connectionStatus() const
+{
+    return session() && m_MenuOpen ? session()->menuStatus() : QString();
+}
+
 void StreamMenu::openMenu()
 {
     setMenuOpen(true);

@@ -1,13 +1,7 @@
-# MiniStream 2.3.1
+# MiniStream 2.3.2
 
-- 被控端重构连接设置页。局域网与 FRP 独立切换，邀请和代理复制操作固定在底部。
-- 勾选自定义映射后，可独立设置 TCP、UDP 的公网端口和本机隧道端口。内网端口与监听配置不一致时，界面会引导应用更改。
-- 复制项仅包含两条 frpc 代理配置。frps 由用户自行管理，被控端生成邀请时不连接 frps，也不发起公网探测。请从外网主控端验证 TCP 与 UDP。
+主控端首次启动支持粘贴被控端邀请。已有连接配置会自动重连，切换正在使用的隧道前会提示确认。局域网设备仍可手动添加。
 
-到主机下载 Host，到操作电脑下载 Client。结束串流后在原目录覆盖升级。请对照本版本的 SHA-256 校验安装文件。
+串流时点击左侧菜单或按 F12 查看当前通道与串流 RTT。菜单保留性能统计、鼠标模式、全屏、最小化和断开操作。在「串流偏好」可关闭侧栏，或设置 F1–F12 搭配 Ctrl+Shift、Ctrl+Alt。游戏锁定指针时可用快捷键打开菜单，Esc 返回。新 Windows 配置默认无边框全屏。
 
-## English
-
-The Host connection settings have separate LAN and FRP views, a fixed invitation bar and separate public-to-local TCP and UDP port mappings. Copy the proxy definitions into your existing frpc configuration. Manage frps independently and test public connectivity from the client.
-
-[使用教程](https://ministream.jianhx.com/tutorial.html) · [English overview](https://ministream.jianhx.com/en.html)
+The client now opens with invitation import, shows route and stream RTT in its session menu, and supports configurable shortcuts and a clickable side tab. The host installer is rebuilt for version alignment. Existing hosts running 2.3.1 use the same tunnel protocol.

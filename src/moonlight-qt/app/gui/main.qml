@@ -19,6 +19,7 @@ import StreamMenu 1.0
 //  页面切换仍走 StackView；与 backend 的调用关系保持原样。
 // =============================================================================
 ApplicationWindow {
+    function importLink() { mslinkSetupDialog.beginImport() }
     function openInvitation(data) { mslinkSetupDialog.openInvitation(data) }
     property string releaseVersion: ""
     property string releaseUrl: ""
@@ -194,6 +195,12 @@ ApplicationWindow {
         }
     }
 
+    function openPreferences() {
+        workspacePage = "devices"
+        navigateTo("qrc:/gui/ClientPreferences.qml", ClientPreferences)
+    }
+    Shortcut { sequence: StandardKey.Preferences; onActivated: window.openPreferences() }
+
     function goBack() {
         if (clearOnBack) {
             // Pop all items except the first one
@@ -212,9 +219,9 @@ ApplicationWindow {
     // 重新连接 mslink 隧道（保持主机列表不变）
     function reconnectTunnel() {
         if (!MslinkTunnel.configured) {
-            tunnelActionMessage = "尚未配置被控端，请先填写地址和口令"
+            tunnelActionMessage = "请先导入被控端的连接链接"
             tunnelMessageTimer.restart()
-            mslinkSetupDialog.open()
+            window.importLink()
             return
         }
 
@@ -224,6 +231,7 @@ ApplicationWindow {
                                                 MslinkTunnel.password)
         if (err !== "") {
             tunnelActionMessage = err
+            mslinkSetupDialog.step = "status"
             mslinkSetupDialog.open()
         }
         else {
@@ -245,7 +253,7 @@ ApplicationWindow {
     property string workspacePage: "devices"
     function metric(value, suffix, digits) { return typeof value === "number" && isFinite(value) ? value.toFixed(digits) + suffix : "—" }
     function showWorkspacePage(page) {
-        if (page === "experience" && stackView.depth > 1) stackView.pop(null)
+        if (stackView.depth > 1) stackView.pop(null)
         workspacePage = page
     }
 
@@ -257,7 +265,7 @@ ApplicationWindow {
         ColumnLayout {
             anchors.fill: parent; anchors.margins: window.compact ? 10 : 20; spacing: 10
             Text { visible: !window.compact; text: "CONTROL / 主控工作台"; color: theme.primary; font.pixelSize: 9; font.letterSpacing: 1.6; Layout.topMargin: 16; Layout.bottomMargin: 16 }
-            BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "devices"; onClicked: window.showWorkspacePage("devices") }
+            BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "devices" && stackView.depth === 1; onClicked: window.showWorkspacePage("devices") }
             BrandButton { label: window.compact ? "" : "体验监测"; iconSource: "qrc:/res/activity.svg"; ToolTip.text: "体验监测"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "experience"; onClicked: window.showWorkspacePage("experience") }
             BrandButton {
                 visible: window.releaseVersion !== ""
@@ -269,8 +277,7 @@ ApplicationWindow {
                 accent: true
                 onClicked: Qt.openUrlExternally(window.releaseUrl)
             }
-            BrandButton { label: window.compact ? "" : "连接配置"; iconSource: "qrc:/res/network.svg"; ToolTip.text: "连接配置"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: mslinkSetupDialog.open() }
-            BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; onClicked: { window.showWorkspacePage("devices"); settingsButton.clicked() } }
+            BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: stackView.currentItem instanceof ClientPreferences; onClicked: window.openPreferences() }
             Item { Layout.fillHeight: true }
             Rectangle { visible: !window.compact; Layout.fillWidth: true; height: 66; radius: 10; color: theme.surface; border.color: theme.borderSoft
                 Column { anchors.fill: parent; anchors.margins: 11; spacing: 4
@@ -569,16 +576,16 @@ ApplicationWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: mslinkSetupDialog.open()
+                    onClicked: { mslinkSetupDialog.step = "status"; mslinkSetupDialog.open() }
                 }
 
                 ToolTip.visible: tunnelChipMouse.containsMouse
                 ToolTip.delay: 500
                 ToolTip.text: MslinkTunnel.running ? MslinkTunnel.statusText
-                                                   : "隧道未运行。点击填写被控端地址和连接口令。"
+                                                   : "点击查看隧道连接状态。"
             }
 
-            BrandButton { label: "连接设置"; accent: !window.tunnelConnected; onClicked: mslinkSetupDialog.open() }
+            BrandButton { label: "导入链接"; accent: !window.tunnelConnected; onClicked: window.importLink() }
             BrandButton {
                 id: reconnectButton
                 visible: !window.compact
@@ -605,42 +612,19 @@ ApplicationWindow {
                 Shortcut {
                     id: newPcShortcut
                     sequence: StandardKey.New
-                    onActivated: addPcButton.clicked()
+                    onActivated: window.importLink()
                 }
 
                 ToolTip.delay: 800
                 ToolTip.timeout: 3000
                 ToolTip.visible: hovered
-                ToolTip.text: "手动添加主机" + (newPcShortcut.nativeText ? (" (" + newPcShortcut.nativeText + ")") : "")
+                ToolTip.text: "手动添加局域网电脑"
 
                 Keys.onDownPressed: {
                     stackView.currentItem.forceActiveFocus(Qt.TabFocus)
                 }
             }
 
-            BrandButton {
-                id: settingsButton
-                label: window.compact ? "" : "设置"
-                iconSource: "qrc:/res/settings.svg"
-                fontSize: 12
-                Layout.alignment: Qt.AlignVCenter
-                onClicked: navigateTo("qrc:/gui/SettingsView.qml", SettingsView)
-
-                Keys.onDownPressed: {
-                    stackView.currentItem.forceActiveFocus(Qt.TabFocus)
-                }
-
-                Shortcut {
-                    id: settingsShortcut
-                    sequence: StandardKey.Preferences
-                    onActivated: settingsButton.clicked()
-                }
-
-                ToolTip.delay: 800
-                ToolTip.timeout: 3000
-                ToolTip.visible: hovered
-                ToolTip.text: "设置" + (settingsShortcut.nativeText ? (" (" + settingsShortcut.nativeText + ")") : "")
-            }
         }
     }
 

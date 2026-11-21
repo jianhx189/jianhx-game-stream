@@ -1,4 +1,10 @@
 # MiniStream 开发交接与维护手册
+## 2.3.2 主控端交接
+
+首启和工具栏共用 `MslinkSetupDialog.qml`。浏览器协议与粘贴邀请均调用 `decodeInvitation` 校验，使用统一的隧道认证与主机发现流程。邀请不能写入日志。自定义设置页位于 `ClientPreferences.qml`，与原有 Qt 偏好共用持久化。菜单快捷键和侧栏开关分别保存为 `ministream/menuShortcut` 和 `ministream/showMenuTab`。
+
+Windows 侧栏由 `streaming/menutab_win.h` 作为 SDL 窗口的无激活所有者弹窗创建。点击通过 SDL 用户事件交回当前会话。热键在 SDL 键盘分发中匹配，菜单由 `StreamMenuWindow.qml` 显示，串流 RTT 来自当前媒体会话。回归时覆盖首启、无效链接、更换主机确认、设置持久化、游戏锁定鼠标、双屏移动和最小化恢复。
+
 
 本文适用于 2.3.1。此文是当前实现的接管入口，历史实验、旧原型说明与过往测试记录不能替代本文。发布的具体文件哈希、上游来源和验证结果以同版本 `release-manifest.json` 为准。
 

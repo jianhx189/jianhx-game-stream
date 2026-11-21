@@ -109,7 +109,7 @@ void StreamingPreferences::reload()
 
     int defaultVer = settings.value(SER_DEFAULTVER, 0).toInt();
 
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || defined(Q_OS_WIN32)
     recommendedFullScreenMode = WindowMode::WM_FULLSCREEN_DESKTOP;
 #else
     // Wayland doesn't support modesetting, so use fullscreen desktop mode
@@ -166,6 +166,8 @@ void StreamingPreferences::reload()
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
     // MiniStream：串流中浮层菜单（Ctrl+Alt+Shift+X / F12）默认开启
+    menuShortcut = settings.value("ministream/menuShortcut", "F12").toString();
+    showMenuTab = settings.value("ministream/showMenuTab", true).toBool();
     streamingMenuEnabled = settings.value(SER_STREAMINGMENU, true).toBool();
     enableHdr = settings.value(SER_HDR, false).toBool();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
@@ -378,6 +380,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+    settings.setValue("ministream/menuShortcut", menuShortcut);
+    settings.setValue("ministream/showMenuTab", showMenuTab);
     settings.setValue(SER_STREAMINGMENU, streamingMenuEnabled);
 }
 

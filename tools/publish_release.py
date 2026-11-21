@@ -14,6 +14,7 @@ parser.add_argument('--version',required=True)
 parser.add_argument('--proxy',default='')
 parser.add_argument('--repo',default='jianhx189/jianhx-game-stream')
 parser.add_argument('--cf-project',default='jianhx-game-stream')
+parser.add_argument('--github-only', action='store_true', help='Publish the release and GitHub Pages sources; skip the Cloudflare Pages mirror.')
 args=parser.parse_args()
 ROOT=args.root.resolve();TAG='v'+args.version
 if args.proxy:os.environ['HTTPS_PROXY']=os.environ['HTTP_PROXY']=args.proxy
@@ -124,6 +125,9 @@ api('/topics','PUT',{'names':['game-streaming','remote-gaming','remote-desktop',
 print('REGULAR_RELEASE_PUBLISHED',release['html_url'],flush=True)
 
 website_commit=commit_files({k:v for k,v in items.items() if k.startswith('web/dist/')},'site: publish '+args.version+' downloads, English introduction and guides')
+if args.github_only:
+    print('GITHUB_PUBLICATION', source_commit, website_commit, release['html_url'], flush=True)
+    raise SystemExit(0)
 if not account:
     accounts=cf('/accounts?per_page=50')
     if len(accounts)!=1:raise RuntimeError('Cloudflare token must identify exactly one account or provide account')

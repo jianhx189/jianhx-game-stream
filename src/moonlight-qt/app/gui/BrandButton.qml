@@ -20,6 +20,7 @@ Button {
     implicitHeight: 38
     implicitWidth: label.length > 0 ? (contentRow.implicitWidth + 20)
                                     : (iconSource.length > 0 ? 34 : 80)
+    Accessible.name: control.label || control.ToolTip.text
     padding: 0
     hoverEnabled: true
     focusPolicy: Qt.TabFocus
@@ -48,7 +49,7 @@ Button {
             id: labelText
             visible: control.label.length > 0
             text: control.label
-            color: control.accent ? "#ffffff"
+            color: control.accent ? theme.canvas
                                   : (control.enabled ? theme.text : theme.textTertiary)
             font.pixelSize: control.fontSize
             font.family: theme.fontFamily

@@ -8,6 +8,10 @@ MiniStream 基于 **Sunshine + Moonlight-Qt**，为个人游戏与桌面串流�
 
 不需要 MiniStream 云账号。你管理自己的主机、凭据和网络；跨网络需自备可达的 FRP 或可信网络。项目不提供公共服务器，也不等同于自动 NAT 打洞服务。
 
+## v2.3.2 主控端
+
+首次启动粘贴被控端邀请即可连接。串流时点击左侧菜单按钮查看当前通道和串流 RTT。「串流偏好」支持调整 F1–F12 快捷键与修饰键。
+
 ## v2.3.1 被控端控制台
 
 - **局域网连接**自动选取网卡地址。**FRP 穿透连接**支持分别设置 TCP 与 UDP 的公网端口和本机隧道端口。被控端生成 frpc 代理段与邀请，frps 由用户管理。请从外网主控端验证公网通路。
@@ -45,7 +49,7 @@ DPAPI 只保护“同一 Windows 用户可解”的本地文件，口令在内�
 | --- | --- |
 | ![主控端真实设备首页，未添加设备状态](web/assets/client-home.jpg) | ![被控端真实控制台，等待遥测状态](web/assets/host-overview.jpg) |
 
-![连接向导真实窗口](web/assets/client-setup.jpg)
+![邀请导入真实窗口](web/assets/client-import-232.png)
 
 截图为实际程序窗口，拍摄于主控端未添加设备、被控端等待遥测的离线状态；只展示界面与信息结构，不作为性能承诺，也不会用演示数据填充曲线。
 
@@ -53,11 +57,11 @@ DPAPI 只保护“同一 Windows 用户可解”的本地文件，口令在内�
 
 1. 在运行游戏的电脑安装 [被控端 Host](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，打开「连接设置」复制隧道口令和主控端连接信息。
 2. 同一局域网填写主机局域网地址；跨网络分别配置 TCP、UDP 转发。默认本机端口为 TCP **14738**、UDP **14739**；公网端口可以不同，主控端填写实际公网端口。
-3. 在操作电脑安装 [主控端 Client](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，完成连接向导和配对，打开桌面或游戏。
+3. 在操作电脑安装 [主控端 Client](https://github.com/jianhx189/jianhx-game-stream/releases/latest)，粘贴被控端的邀请链接并按提示配对，打开桌面或游戏。
 
-Sunshine 管理密码用于可选自动配对；未提供时按提示完成手动 PIN 配对。串流中用 `F12` 或 `Ctrl+Alt+Shift+X` 打开菜单，调整鼠标模式、全屏和统计。
+Sunshine 管理密码用于可选自动配对；未提供时按提示完成手动 PIN 配对。串流中点左侧菜单按钮或按设置的快捷键（默认 `F12`） 打开菜单，调整鼠标模式、全屏和统计。
 
-用 `Get-FileHash .\MiniStream-Host-Setup.exe -Algorithm SHA256` 校验文件，与同版本 Release 的 `SHA256SUMS.txt` 对照。升级前结束当前串流，在已有安装目录覆盖升级；两端建议使用同一版本。旧式主控端配置可能需要在新向导重新填写：2.1.3 起会把旧明文口令迁移为 DPAPI 密文，回退到旧版本时旧程序读不到口令，需要重新填写。若仍在使用 2.1.3，请覆盖升级到 2.1.4 或更新版本，以修复首次保存失败与启动失败残留 socket 的问题。下载与校验以 v2.3.1 Release 页面和同版 `release-manifest.json` 为准，不要混装两端版本。
+用 `Get-FileHash .\MiniStream-Host-Setup.exe -Algorithm SHA256` 校验文件，与同版本 Release 的 `SHA256SUMS.txt` 对照。升级前结束当前串流，在已有安装目录覆盖升级；两端建议使用同一版本。旧式主控端配置可能需要在新向导重新填写：2.1.3 起会把旧明文口令迁移为 DPAPI 密文，回退到旧版本时旧程序读不到口令，需要重新填写。若仍在使用 2.1.3，请覆盖升级到 2.1.4 或更新版本，以修复首次保存失败与启动失败残留 socket 的问题。下载与校验以 v2.3.2 Release 页面和同版 `release-manifest.json` 为准，不要混装两端版本。
 
 ## 连接原理
 

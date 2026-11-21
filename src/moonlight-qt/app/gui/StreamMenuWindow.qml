@@ -6,6 +6,7 @@ import QtQuick.Window
 import QtQuick.Controls.Basic
 
 import StreamMenu 1.0
+import StreamingPreferences 1.0
 
 // =============================================================================
 //  StreamMenuWindow.qml —— MiniStream 串流中的浮层菜单
@@ -18,7 +19,9 @@ Window {
     id: menuWindow
 
     width: 320
-    height: 366
+    height: 408
+    property string connectionStatus: ""
+    Timer { interval: 1000; running: menuWindow.visible; repeat: true; onTriggered: menuWindow.connectionStatus = StreamMenu.connectionStatus() }
 
     visible: StreamMenu.menuOpen
     color: "transparent"
@@ -44,7 +47,7 @@ Window {
         },
         {
             key: "stats",
-            title: "性能统计：" + (StreamMenu.statsOverlayEnabled ? "关" : "开"),
+            title: "性能统计：" + (StreamMenu.statsOverlayEnabled ? "已开启" : "已关闭"),
             detail: "显示帧率 / 码率 / 延迟",
             accent: false
         },
@@ -69,7 +72,7 @@ Window {
         {
             key: "close",
             title: "关闭菜单",
-            detail: "也可以按 F12 / Esc",
+            detail: StreamingPreferences.menuShortcut + " / Esc",
             accent: false
         }
     ]
@@ -108,6 +111,7 @@ Window {
         console.log("MiniStream: StreamMenuWindow visible =", visible,
                     "x =", x, "y =", y, "screen =", menuWindow.screen)
         if (visible) {
+            connectionStatus = StreamMenu.connectionStatus()
             recenter()
             raise()
             requestActivate()
@@ -116,7 +120,8 @@ Window {
 
     // 菜单窗口自己拿到键盘焦点后，F12 / Esc 也能关闭
     Shortcut {
-        sequence: "F12"
+        autoRepeat: false
+        sequence: StreamingPreferences.menuShortcut
         onActivated: StreamMenu.closeMenu()
     }
 
@@ -155,7 +160,7 @@ Window {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: 10
-            height: 38
+            height: 76
 
             Column {
                 anchors.left: parent.left
@@ -172,7 +177,9 @@ Window {
                 }
 
                 Text {
-                    text: "F12 或 Ctrl + Alt + Shift + X 呼出"
+                    text: menuWindow.connectionStatus
+                    width: menuWindow.width - 40
+                    elide: Text.ElideRight
                     color: theme.textTertiary
                     font.pixelSize: 10
                     font.family: theme.fontFamily

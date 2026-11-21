@@ -1,23 +1,23 @@
 {
   "product": "MiniStream",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "channel": "stable",
-  "created_utc": "2026-11-20T16:59:41.031068+00:00",
+  "created_utc": "2026-11-21T13:15:01.613319+00:00",
   "files": [
     {
       "name": "MiniStream-Client-Setup.exe",
-      "size": 49385932,
-      "sha256": "b066320a7acc72d81ea9175bd2213d8f0e214a6aa71d7181d736d9dce25f30ea"
+      "size": 49381519,
+      "sha256": "040b907fe7f67684b2aae766d1fab0b5e86c3901c21eec3406ad7cbc3be4542f"
     },
     {
       "name": "MiniStream-Host-Setup.exe",
-      "size": 63534838,
-      "sha256": "22a5cb8c22a1576b1934fe1adc21243ed6428f516b6a90a3ee53b63c01aafaf9"
+      "size": 63537208,
+      "sha256": "0ff61d79d57b171efa05c8c462193d7542c62cd442c1d10f9ed69cdb6bfe18ef"
     },
     {
-      "name": "MiniStream-2.3.1-Source.zip",
-      "size": 2981865,
-      "sha256": "acb639e008f83f1d9c1ce1ea40566a5bd8b183d17a51338b6f6e7083f236a3af"
+      "name": "MiniStream-2.3.2-Source.zip",
+      "size": 3160152,
+      "sha256": "771389bd7727533d11e9d886270add543192367c57fa77f19bd1b5b500c81955"
     }
   ],
   "sources": {
@@ -38,29 +38,22 @@
   "compiler": "MSVC 14.44 x64 / Qt 6.9.3",
   "privacy": "Private configuration, Sunshine config, logs, dumps and state files excluded; explicit package input scan passed.",
   "verification": {
-    "version": "2.3.1",
+    "version": "2.3.2",
     "passed": true,
     "results": [
       {
-        "name": "Tunnel regression",
+        "name": "Client integration",
         "status": "passed",
-        "evidence": "CTest 7/7 on Windows."
+        "evidence": "10 checks in an isolated Qt client linked with production objects: first run, malformed/valid invitations, settings entry, advanced options, persisted shortcut, navigation and native SDL menu-tab click dispatch."
       },
       {
-        "name": "Host connection settings",
+        "name": "Windows installers",
         "status": "passed",
-        "evidence": "Qt application-level test at 760x560 and 1000x660. Verified no horizontal overflow in the setup screen, available fixed invitation action, LAN/FRP switching, independent TCP/UDP public and local ports, local port mismatch handling, saved mappings and proxy-only clipboard output."
-      },
-      {
-        "name": "Installers",
-        "status": "passed",
-        "evidence": "Both applications rebuilt with MSVC/Qt and packaged using Inno Setup. Both installers report ProductVersion 2.3.1."
+        "evidence": "Client and host built with MSVC/Qt and packaged using Inno Setup; both report 2.3.2."
       }
     ],
     "not_covered": [
-      "Fresh Windows VM and in-place installation with these exact 2.3.1 installers",
-      "Real external FRP, browser handoff, and long-duration game sessions across WAN",
-      "Independent security audit and Authenticode signing"
+      "Real game sessions over WAN, exclusive fullscreen across multiple GPU drivers, clean Windows installation."
     ]
   },
   "limits": [
@@ -137,8 +130,8 @@
       },
       {
         "path": "MiniStream.exe",
-        "size": 3290624,
-        "sha256": "df78cce4f4285bd710ed0da25382f95421a8ddb89d2e657782fe39e23415ef19"
+        "size": 3281408,
+        "sha256": "9af8d510782dc0affb9ef7ff5f44676b5f09b4e42e574d068084fef056bbaabf"
       },
       {
         "path": "ministream.ico",
@@ -1860,7 +1853,7 @@
       {
         "path": "console/MiniStreamHost.exe",
         "size": 304128,
-        "sha256": "9e67b8ee6325fffd06d5a6eec1949edf73e30e0fa163bd63c619b45b9c37bf69"
+        "sha256": "273fe39ae78a6c53f863885880abbbe273068b8f9670c2c8cc69593578cd7dbb"
       },
       {
         "path": "console/msvcp140.dll",
