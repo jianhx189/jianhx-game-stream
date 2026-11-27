@@ -7,6 +7,7 @@
 #include <cmath>
 #include "ui_components.h"
 #include "host_setup.h"
+#include "invitation_pairing.h"
 
 class ConnectionPulse final : public QWidget {
     QVariantAnimation animation;
@@ -102,6 +103,7 @@ class Console final : public QMainWindow {
     QPlainTextEdit *logs = nullptr;
     QComboBox *logKind = nullptr, *eventLevel = nullptr;
     QSpinBox *tcp = nullptr, *udp = nullptr, *timeout = nullptr;
+    QToolButton *advancedConfig = nullptr;
     QPushButton *save = nullptr;
     QTimer timer, clipboardTimer, checkDeadline;
     QProcess selfCheck;
@@ -110,7 +112,8 @@ class Console final : public QMainWindow {
     bool exiting = false, trayHintShown = false;
     DWORD clipboardSequence = 0;
     ConnectionPulse *pulse = nullptr;
-    QPushButton *setupNav = nullptr, *serviceNav = nullptr, *checkButton = nullptr;
+    InvitationPairing pairing{this};
+    QPushButton *serviceNav = nullptr, *checkButton = nullptr;
     QLabel *checkResult = nullptr, *stepHint = nullptr, *routeStatus = nullptr;
     QLabel *summary = nullptr, *setupNotice = nullptr, *mappingStatus = nullptr;
     QWidget *lanFields = nullptr, *frpFields = nullptr;
@@ -307,29 +310,7 @@ class Console final : public QMainWindow {
         return card;
     }
 
-    QWidget *overviewPage() {
-        auto *page = makePage("服务状态、当前认证会话与待处理事项。监听端口不等于已认证连接。 ");
-        page->layout()->addWidget(hero("正在检查主机", "状态会自动刷新"));
-        auto *start = new QHBoxLayout;
-        start->addWidget(button("局域网连接", [this] { templateMode->setCurrentIndex(0); setupNav->click(); }, "primary"));
-        start->addWidget(button("FRP 穿透连接", [this] { templateMode->setCurrentIndex(1); setupNav->click(); }));
-        start->addWidget(button("运行本机自检", [this] { serviceNav->click(); runSelfCheck(); }));
-        start->addStretch();
-        qobject_cast<QVBoxLayout *>(page->layout())->addLayout(start);
-        auto *metricHost = new QWidget;
-        metricHost->setStyleSheet("background:transparent");
-        auto *grid = new QGridLayout(metricHost);
-        grid->setContentsMargins(0, 0, 0, 0);
-        grid->setSpacing(12);
-        rtt = new Ui::Metric("隧道往返延迟", "TCP 心跳 RTT · 非端到端操作延迟", Ui::Primary);
-        fps = new Ui::Metric("实际渲染帧率", "来自已连接主控端的媒体采样", Ui::Accent);
-        traffic = new Ui::Metric("主机发送速率", "TCP + UDP 隧道有效字节差分", Ui::Success);
-        drop = new Ui::Metric("网络丢帧率", "媒体丢帧，不等同于 IP 丢包率", Ui::Warning);
-        decode = new Ui::Metric("解码耗时", "主控端每帧平均解码时间", Ui::Primary);
-        queue = new Ui::Metric("帧排队耗时", "主控端每帧平均呈现等待", Ui::Accent);
-        const QList<Ui::Metric *> metrics{rtt, fps, traffic, drop, decode, queue};
-        for (int i = 0; i < metrics.size(); ++i) grid->addWidget(metrics[i], i / 3, i % 3);
-        page->layout()->addWidget(metricHost);
+    QWidget *connectedDevices() {
         auto *list = Ui::card();
         auto *layout = new QVBoxLayout(list);
         layout->setContentsMargins(20, 16, 20, 16);
@@ -353,13 +334,13 @@ class Console final : public QMainWindow {
         deviceDetail = Ui::text("等待新版隧道提供会话数据。监听状态不代表已经连接。", "muted");
         deviceDetail->setWordWrap(true);
         layout->addWidget(deviceDetail);
-        page->layout()->addWidget(list);
-        qobject_cast<QVBoxLayout *>(page->layout())->addStretch();
-        return page;
+        return list;
     }
 
     QWidget *qualityPage() {
-        auto *page = makePage("从 RTT、吞吐、队列和 UDP 探测逐层定位链路问题。缺失或过期数据不会补成演示曲线。 ");
+        auto *page = makePage({});
+        page->layout()->addWidget(mediaMetrics());
+        page->layout()->addWidget(Ui::text("链路与趋势", "sectionTitle"));
         auto *metricHost = new QWidget;
         metricHost->setStyleSheet("background:transparent");
         auto *grid = new QGridLayout(metricHost);
@@ -373,8 +354,10 @@ class Console final : public QMainWindow {
         drops = new Ui::Metric("本地丢弃", "未就绪、超限或重放拒绝", Ui::Warning);
         probes = new Ui::Metric("UDP 探测 / 应答", "小包探测不等于持续媒体吞吐", Ui::Primary);
         errors = new Ui::Metric("认证拒绝 / 回包错误", "无效包不会更新重放窗口", Ui::Danger);
-        const QList<Ui::Metric *> metrics{jitter, tcpFlows, udpFlows, queued, reconnects, drops, probes, errors};
-        for (int i = 0; i < metrics.size(); ++i) grid->addWidget(metrics[i], i / 4, i % 4);
+        rtt = new Ui::Metric("往返延迟", "隧道心跳", Ui::Primary);
+        traffic = new Ui::Metric("主机发送速率", "TCP 与 UDP 有效吞吐", Ui::Success);
+        const QList<Ui::Metric *> metrics{rtt, jitter, traffic, queued, tcpFlows, udpFlows, reconnects, drops, probes, errors};
+        for (int i = 0; i < metrics.size(); ++i) grid->addWidget(metrics[i], i / 3, i % 3);
         page->layout()->addWidget(metricHost);
         auto *chartHost = new QWidget;
         chartHost->setStyleSheet("background:transparent");
@@ -410,8 +393,9 @@ class Console final : public QMainWindow {
         return page;
     }
 
-    QWidget *mediaPage() {
-        auto *page = makePage("这些指标由主控端解码器经认证隧道回传。未开始串流或超过 5 秒无新报告时显示 —。 ");
+    QWidget *mediaMetrics() {
+        auto *page = makePage({});
+        page->layout()->addWidget(Ui::text("当前串流", "sectionTitle"));
         auto *metricHost = new QWidget;
         metricHost->setStyleSheet("background:transparent");
         auto *grid = new QGridLayout(metricHost);
@@ -429,14 +413,6 @@ class Console final : public QMainWindow {
         const QList<Ui::Metric *> metrics{receivedFps, fps, bitrate, resolution, drop, decode, queue, render, hostProcessing};
         for (int i = 0; i < metrics.size(); ++i) grid->addWidget(metrics[i], i / 3, i % 3);
         page->layout()->addWidget(metricHost);
-        auto *hint = Ui::card();
-        auto *layout = new QVBoxLayout(hint);
-        layout->setContentsMargins(20, 16, 20, 16);
-        auto *text = Ui::text("如何使用：先看网络丢帧与 RTT，再看解码与排队。解码正常但排队升高，优先检查呈现节奏和显示刷新率；RTT 不是端到端操作延迟。", "muted");
-        text->setWordWrap(true);
-        layout->addWidget(text);
-        page->layout()->addWidget(hint);
-        qobject_cast<QVBoxLayout *>(page->layout())->addStretch();
         return page;
     }
 
@@ -531,10 +507,15 @@ class Console final : public QMainWindow {
         const bool frp = templateMode->currentIndex() == 1;
         const auto ip = connectionAddress;
         const int tcpPort = connectionTcp, udpPort = connectionUdp;
-        const QJsonObject invite{{"v",1},{"mode",frp ? "frp" : "lan"},{"ip",ip},{"tcp",tcpPort},{"udp",udpPort},{"key",password}};
+        QJsonObject invite{{"v",1},{"mode",frp ? "frp" : "lan"},{"ip",ip},{"tcp",tcpPort},{"udp",udpPort},{"key",password}};
+        const auto approval = cfg("mslink-host.ini", "target", "127.0.0.1") == "127.0.0.1"
+            ? pairing.issue(root) : QJsonObject();
+        for (auto item = approval.begin(); item != approval.end(); ++item) invite.insert(item.key(), item.value());
         const auto payload = QJsonDocument(invite).toJson(QJsonDocument::Compact).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
         copyText("https://ministream.jianhx.com/connect.html#" + QString::fromLatin1(payload), true, QStringLiteral("邀请链接"));
-        if (clipboardSequence) setupNotice->setText("邀请链接已复制。链接含隧道口令，仅私发给信任的人。");
+        if (clipboardSequence) setupNotice->setText(approval.isEmpty()
+            ? "邀请已复制。首次配对时需要在 Sunshine 输入 PIN。"
+            : "邀请已复制。自动配对授权 10 分钟内可使用一次，请保持控制台在托盘运行。");
     }
 
     void copyTunnelPassword()
@@ -643,6 +624,7 @@ class Console final : public QMainWindow {
         mappingStatus->setWordWrap(true);
         mapping->addWidget(mappingStatus, 4, 0, 1, 4);
         applyMapping = button("在服务设置中应用内网端口", [this] {
+            advancedConfig->setChecked(true);
             tcp->setValue(privateTcp->value());
             udp->setValue(privateUdp->value());
             serviceNav->click();
@@ -693,6 +675,9 @@ class Console final : public QMainWindow {
         details->addLayout(copyRow);
         details->addWidget(routeStatus);
         details->addWidget(setupNotice);
+        page->layout()->addWidget(setupFooter);
+        page->layout()->addWidget(hero("正在检查主机", "状态会自动刷新"));
+        page->layout()->addWidget(connectedDevices());
         qobject_cast<QVBoxLayout *>(page->layout())->addStretch();
         connect(templateMode, &QTabBar::currentChanged, this, [this](int index) {
             QSettings().setValue(settingsKey("template"), index);
@@ -796,6 +781,16 @@ class Console final : public QMainWindow {
         }
         page->layout()->addWidget(services);
         auto *config = Ui::card();
+        advancedConfig = new QToolButton;
+        advancedConfig->setText("监听端口与超时");
+        advancedConfig->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        advancedConfig->setArrowType(Qt::RightArrow);
+        advancedConfig->setCheckable(true);
+        connect(advancedConfig, &QToolButton::toggled, config, &QWidget::setVisible);
+        connect(advancedConfig, &QToolButton::toggled, this, [this](bool open) {
+            advancedConfig->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+        });
+        page->layout()->addWidget(advancedConfig);
         auto *form = new QFormLayout(config);
         form->setContentsMargins(22, 18, 22, 18);
         form->setVerticalSpacing(14);
@@ -812,9 +807,11 @@ class Console final : public QMainWindow {
         hint->setWordWrap(true);
         form->addRow(hint);
         page->layout()->addWidget(config);
+        config->hide();
         auto *diagnostics = Ui::card();
         auto *logLayout = new QVBoxLayout(diagnostics);
         logLayout->setContentsMargins(20, 15, 20, 15);
+        logLayout->addWidget(Ui::text("日志与导出", "sectionTitle"));
         auto *row = new QHBoxLayout;
         logKind = new QComboBox;
         logKind->addItem("管理操作", "gui-action.log");
@@ -1093,10 +1090,11 @@ public:
         side->addSpacing(16);
         pages = new QStackedWidget;
         auto *group = new QButtonGroup(this);
-        const QStringList names{"主机概览", "连接质量", "媒体会话", "服务与诊断", "连接设置"};
-        const QStringList subtitles{"查看后台服务和当前连接。", "查看链路质量与发送队列。", "查看主控端上报的画面与处理耗时。", "核对本机服务、防火墙和登录自启。", "配置主控端访问地址和端口。"};
+        const QStringList names{"连接", "串流质量", "服务与诊断"};
+        const QStringList titles{"你要如何连接", "串流质量", "服务与诊断"};
+        const QStringList subtitles{"选择网络方式，生成发给主控端的邀请。", "查看当前媒体会话与连接趋势。", "检查本机服务、防火墙与登录自启。"};
         for (int i = 0; i < names.size(); ++i) {
-            auto *nav = button(names[i], [this, i, names, subtitles] {
+            auto *nav = button(names[i], [this, i, titles, subtitles] {
                 const bool changed = pages->currentIndex() != i;
                 pages->setCurrentIndex(i);
                 if (changed && QApplication::isEffectEnabled(Qt::UI_AnimateMenu) &&
@@ -1112,19 +1110,16 @@ public:
                     connect(transition, &QPropertyAnimation::finished, page, [page] { page->setGraphicsEffect(nullptr); });
                     transition->start(QAbstractAnimation::DeleteWhenStopped);
                 }
-                setupFooter->setVisible(i == 4);
-                notice->setVisible(i != 4);
-                if (i == 4) refreshSetup();
+                if (i == 0) refreshSetup();
                 static_cast<QScrollArea *>(pages->currentWidget())->verticalScrollBar()->setValue(0);
-                headline->setText(names[i]);
+                headline->setText(titles[i]);
                 subtitle->setText(subtitles[i]);
                 refresh();
             }, "nav");
             nav->setCheckable(true);
             group->addButton(nav);
             if (i == 0) nav->setChecked(true);
-            if (i == 3) serviceNav = nav;
-            if (i == 4) setupNav = nav;
+            if (i == 2) serviceNav = nav;
             side->addWidget(nav);
         }
         side->addStretch();
@@ -1144,7 +1139,7 @@ public:
         auto *titleColumn = new QVBoxLayout;
         titleColumn->setSpacing(5);
         titleColumn->addWidget(Ui::text("MINISTREAM / HOST CONSOLE", "eyebrow"));
-        headline = Ui::text("主机概览", "title");
+        headline = Ui::text(titles[0], "title");
         titleColumn->addWidget(headline);
         subtitle = Ui::text(subtitles[0], "muted");
         titleColumn->addWidget(subtitle);
@@ -1160,14 +1155,10 @@ public:
             scroll->setWidget(page);
             pages->addWidget(scroll);
         };
-        addPage(overviewPage());
-        addPage(qualityPage());
-        addPage(mediaPage());
-        addPage(servicePage());
         addPage(setupPage());
+        addPage(qualityPage());
+        addPage(servicePage());
         body->addWidget(pages, 1);
-        body->addWidget(setupFooter);
-        setupFooter->hide();
         notice = Ui::text("关闭窗口后，Sunshine 和隧道继续运行。", "small");
         notice->setWordWrap(true);
         body->addWidget(notice);
@@ -1256,7 +1247,7 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setOrganizationName("MiniStream");
     app.setApplicationName("MiniStreamHost");
-    app.setApplicationVersion("2.3.3");
+    app.setApplicationVersion("2.3.4");
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();

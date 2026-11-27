@@ -1,365 +1,239 @@
-import QtQuick 2.9
+import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Layouts 1.3
-
-import MslinkTunnel 1.0
+import QtQuick.Layouts
 import ComputerModel 1.0
-
 import ComputerManager 1.0
-import StreamingPreferences 1.0
-import SystemProperties 1.0
-import SdlGamepadKeyNavigation 1.0
+import MslinkTunnel 1.0
 
 CenteredGridView {
-    property ComputerModel computerModel : createModel()
-
     id: pcGrid
+    property ComputerModel computerModel: createModel()
+    objectName: "我的设备"
     focus: true
     activeFocusOnTab: true
-    topMargin: 20
+    topMargin: 14
     bottomMargin: 5
-    cellWidth: Math.max(240, Math.floor(width / Math.max(1, Math.floor(width / 320)))); cellHeight: 280;
-    objectName: qsTr("Computers")
+    cellWidth: Math.max(240, Math.floor(width / Math.max(1, Math.floor(width / 320))))
+    cellHeight: 224
+    model: computerModel
+    Theme { id: theme }
 
-    Component.onCompleted: {
-        // Don't show any highlighted item until interacting with them.
-        // We do this here instead of onActivated to avoid losing the user's
-        // selection when backing out of a different page of the app.
-        currentIndex = -1
+    Component.onCompleted: currentIndex = -1
+    StackView.onActivated: ComputerManager.computerAddCompleted.connect(addComplete)
+    StackView.onDeactivating: ComputerManager.computerAddCompleted.disconnect(addComplete)
+
+    function createModel() {
+        const created = Qt.createQmlObject('import ComputerModel 1.0; ComputerModel {}', pcGrid)
+        created.initialize(ComputerManager)
+        created.pairingCompleted.connect(function(error) {
+            pairing.close()
+            if (error) showError(error)
+        })
+        return created
     }
 
-    // Note: Any initialization done here that is critical for streaming must
-    // also be done in CliStartStreamSegue.qml, since this code does not run
-    // for command-line initiated streams.
-    StackView.onActivated: {
-        // Setup signals on CM
-        ComputerManager.computerAddCompleted.connect(addComplete)
+    function addComplete(success, blocked) {
+        if (!success) showError(blocked ? "无法连接此地址。请检查网络、防火墙与 Sunshine 服务。"
+                                        : "无法连接此地址。请确认主机在线且地址正确。")
+    }
 
-        // Highlight the first item if a gamepad is connected
-        if (currentIndex === -1 && SdlGamepadKeyNavigation.getConnectedGamepads() > 0) {
-            currentIndex = 0
+    function showError(message) {
+        deviceError.text = message
+        deviceError.open()
+    }
+
+    function openDevice(id, action) {
+        const device = computerModel.deviceInfo(id)
+        if (device.index === undefined) return
+        if (MslinkTunnel.hasDeviceRoute(device.endpoint) &&
+                (device.endpoint !== MslinkTunnel.localServiceEndpoint || !MslinkTunnel.tunnelUp)) {
+            window.openSavedDevice(device.endpoint, device.name, action)
+            return
         }
-    }
-
-    StackView.onDeactivating: {
-        ComputerManager.computerAddCompleted.disconnect(addComplete)
-    }
-
-    function pairingComplete(error)
-    {
-        // Close the PIN dialog
-        pairDialog.close()
-
-        // Display a failed dialog if we got an error
-        if (error !== undefined) {
-            errorDialog.text = error
-            errorDialog.helpText = ""
-            errorDialog.open()
+        if (!device.online || !device.supported) {
+            showError(device.online ? "这台设备的串流服务版本无法连接。" : "设备离线。请确认主机和 Sunshine 服务已启动。")
+            return
         }
-    }
-
-    function addComplete(success, detectedPortBlocking)
-    {
-        if (!success) {
-            errorDialog.text = qsTr("Unable to connect to the specified PC.")
-
-            if (detectedPortBlocking) {
-                errorDialog.text += "\n\n" + qsTr("This PC's Internet connection is blocking Moonlight. Streaming over the Internet may not work while connected to this network.")
-            }
-            else {
-                errorDialog.helpText = qsTr("Click the Help button for possible solutions.")
-            }
-
-            errorDialog.open()
+        if (!device.paired) {
+            const pin = computerModel.generatePinString()
+            pairing.text = "在「" + device.name + "」的 Sunshine 管理页面输入 PIN " + pin + "。"
+            pairing.open()
+            computerModel.pairComputer(device.index, pin)
+            return
         }
+        if (action === "test") {
+            if (device.busy) { showError("被控端正在使用。请先结束远程应用，再检测连通性。"); return }
+            testConfirm.deviceId = id
+            testConfirm.deviceName = device.name
+            testConfirm.open()
+            return
+        }
+        const component = Qt.createComponent("AppView.qml")
+        stackView.push(component.createObject(stackView, {"computerIndex": device.index, "objectName": device.name}))
     }
 
-    function createModel()
-    {
-        var model = Qt.createQmlObject('import ComputerModel 1.0; ComputerModel {}', parent, '')
-        model.initialize(ComputerManager)
-        model.pairingCompleted.connect(pairingComplete)
-        model.connectionTestCompleted.connect(testConnectionDialog.connectionTestComplete)
-        return model
+    function startTest(id, name) {
+        const device = computerModel.deviceInfo(id)
+        if (device.index === undefined) return
+        const session = computerModel.createDiagnosticSession(device.index)
+        if (!session) {
+            showError("无法启动检测。请确认设备在线、空闲，且被控端应用列表中有 Desktop 或桌面。刚配对时请等待应用列表刷新。")
+            return
+        }
+        const component = Qt.createComponent("StreamSegue.qml")
+        stackView.push(component.createObject(stackView, {"session": session, "appName": name,
+                                                            "diagnostic": true, "stageText": "正在启动连通性检测…"}))
     }
 
     Column {
         anchors.centerIn: parent
         spacing: 12
         visible: pcGrid.count === 0
-        Label { anchors.horizontalCenter: parent.horizontalCenter; text: "还没有设备"; font.pixelSize: 20 }
-        BrandButton { anchors.horizontalCenter: parent.horizontalCenter; accent: true; label: "导入被控端链接"; onClicked: window.importLink() }
+        Label { anchors.horizontalCenter: parent.horizontalCenter; text: "还没有设备"; color: theme.text; font.pixelSize: 21 }
+        BrandButton { anchors.horizontalCenter: parent.horizontalCenter; accent: true; label: "添加设备"; onClicked: window.importLink() }
     }
-
-    header: Item {
-        Theme { id: headerTheme }
-        width: pcGrid.width; height: pcGrid.height < 400 ? 106 : 138
-        Column { x: 16; y: 16; width: parent.width-32; spacing: 8
-            Text { text: "我的电脑"; color: headerTheme.text; font.pixelSize: pcGrid.width < 600 ? 24 : 30; font.bold: true }
-            Text { width: parent.width; elide: Text.ElideRight; text: "选择一台设备，继续你的桌面与游戏。"; color: headerTheme.textSecondary; font.pixelSize: 13 }
-            Text { width: parent.width; elide: Text.ElideRight; text: MslinkTunnel.tunnelUp ? "隧道已认证 · 主机在线与配对状态见设备卡片" : "尚未建立隧道 · 局域网主机也可单独添加"; color: MslinkTunnel.tunnelUp ? headerTheme.success : headerTheme.primary; font.pixelSize: 11 }
-        }
-    }
-    model: computerModel
 
     delegate: NavigableItemDelegate {
-        width: pcGrid.cellWidth - 16; height: 250;
-        Theme { id: cardTheme }
-        padding: 20
-        background: Rectangle { radius: 16; color: parent.hovered ? cardTheme.surfaceHover : cardTheme.surface; border.width: 1; border.color: parent.activeFocus ? cardTheme.primary : cardTheme.border }
+        id: card
+        width: pcGrid.cellWidth - 16
+        height: 204
         grid: pcGrid
-
-        property alias pcContextMenu : pcContextMenuLoader.item
-
-        Rectangle { id: deviceTile; x: 20; y: 22; width: 60; height: 60; radius: 16; color: cardTheme.surfaceAlt; border.color: cardTheme.border; border.width: 1
-            Image { anchors.centerIn: parent; width: 44; height: 44; source: "qrc:/res/brand.svg" }
+        padding: 16
+        readonly property bool saved: MslinkTunnel.hasDeviceRoute(model.endpoint)
+        readonly property bool selectedRoute: saved && MslinkTunnel.localServiceEndpoint === model.endpoint && MslinkTunnel.tunnelUp
+        readonly property bool available: saved ? selectedRoute && model.online : model.online
+        Accessible.name: model.name + "，" + stateLabel.text
+        background: Rectangle {
+            radius: 14
+            color: card.hovered ? theme.surfaceHover : theme.surface
+            border.color: card.activeFocus ? theme.primary : theme.border
         }
-        Rectangle { anchors.right: parent.right; anchors.rightMargin: 18; y: 24; width: statusText.implicitWidth + 20; height: 28; radius: 14; color: Qt.rgba((model.online ? cardTheme.success : cardTheme.textTertiary).r, (model.online ? cardTheme.success : cardTheme.textTertiary).g, (model.online ? cardTheme.success : cardTheme.textTertiary).b, 0.1); border.color: model.online ? cardTheme.success : cardTheme.border
-            Text { id: statusText; anchors.centerIn: parent; color: model.online ? cardTheme.success : cardTheme.textTertiary; font.pixelSize: 11; text: model.statusUnknown ? "检查中" : !model.online ? "离线" : model.paired ? "在线 · 已配对" : "在线 · 待配对" }
-        }
-        Text { x: 20; y: 108; width: parent.width - 40; text: model.name || "未命名电脑"; color: cardTheme.text; font.pixelSize: 23; font.bold: true; elide: Text.ElideRight }
-        Text { x: 20; y: 148; width: parent.width - 40; text: model.online ? (model.paired ? "点击查看应用与桌面" : "点击开始安全配对") : "请确认被控端在线与连接路径可用"; color: cardTheme.textSecondary; font.pixelSize: 11; wrapMode: Text.Wrap }
-        Rectangle { x: 20; y: 190; width: parent.width - 40; height: 1; color: cardTheme.border }
-        Text { x: 20; y: 210; text: model.online ? "进入电脑  →" : "等待设备上线"; color: model.online ? cardTheme.primary : cardTheme.textTertiary; font.pixelSize: 12 }
-        Text { anchors.right: parent.right; anchors.rightMargin: 20; y: 209; text: "⋯"; color: cardTheme.textSecondary; font.pixelSize: 18 }
-        Loader {
-            id: pcContextMenuLoader
-            asynchronous: true
-            sourceComponent: NavigableMenu {
-                id: pcContextMenu
-                initiator: pcContextMenuLoader.parent
-                MenuItem {
-                    text: qsTr("PC Status: %1").arg(model.online ? qsTr("Online") : qsTr("Offline"))
-                    font.bold: true
-                    enabled: false
-                }
-                NavigableMenuItem {
-                    text: qsTr("View All Apps")
-                    onTriggered: {
-                        var component = Qt.createComponent("AppView.qml")
-                        var appView = component.createObject(stackView, {"computerIndex": index, "objectName": model.name, "showHiddenGames": true})
-                        stackView.push(appView)
-                    }
-                    visible: model.online && model.paired
-                }
-                NavigableMenuItem {
-                    text: qsTr("Wake PC")
-                    onTriggered: computerModel.wakeComputer(index)
-                    visible: !model.online && model.wakeable
-                }
-                NavigableMenuItem {
-                    text: qsTr("Test Network")
-                    onTriggered: {
-                        computerModel.testConnectionForComputer(index)
-                        testConnectionDialog.open()
-                    }
-                }
 
-                NavigableMenuItem {
-                    text: qsTr("Rename PC")
-                    onTriggered: {
-                        renamePcDialog.pcIndex = index
-                        renamePcDialog.originalName = model.name
-                        renamePcDialog.open()
-                    }
+        Image { x: 18; y: 16; width: 42; height: 42; source: "qrc:/res/brand.svg" }
+        Text {
+            id: stateLabel
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            y: 26
+            color: card.available ? theme.success : theme.textSecondary
+            text: card.available ? (model.paired ? (card.selectedRoute ? "已连接" : "在线") : "待配对")
+                                : card.saved ? "未连接" : model.statusUnknown ? "检查中" : "离线"
+            font.pixelSize: 12
+        }
+        Text {
+            x: 18; y: 76; width: parent.width - 36
+            text: model.name || "未命名设备"
+            textFormat: Text.PlainText
+            color: theme.text
+            font.pixelSize: 23
+            font.bold: true
+            elide: Text.ElideRight
+        }
+        Text {
+            x: 18; y: 112; width: parent.width - 36
+            text: card.available && model.paired ? "桌面与应用" : card.saved ? "已保存连接配置" : "局域网设备"
+            color: theme.textSecondary
+            font.pixelSize: 12
+        }
+        RowLayout {
+            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+            anchors.margins: 16
+            BrandButton {
+                label: "连接"
+                accent: card.available
+                enabled: card.saved || model.online
+                onClicked: pcGrid.openDevice(model.deviceId, "connect")
+            }
+            Item { Layout.fillWidth: true }
+            BrandButton {
+                label: "更多  ···"
+                Accessible.name: "设备操作"
+                onClicked: deviceMenu.open()
+            }
+        }
+        NavigableMenu {
+            id: deviceMenu
+            initiator: card
+            x: Math.max(0, card.width - width - 16)
+            y: card.height - 48
+            width: 172
+            palette.text: theme.text
+            palette.buttonText: theme.text
+            palette.highlight: theme.surfaceHover
+            palette.highlightedText: theme.text
+            background: Rectangle { radius: 10; color: theme.surfaceAlt; border.color: theme.border }
+            NavigableMenuItem { text: "连接"; enabled: card.saved || model.online; onTriggered: pcGrid.openDevice(model.deviceId, "connect") }
+            NavigableMenuItem {
+                text: "修改名称"
+                onTriggered: {
+                    renameDevice.deviceId = model.deviceId
+                    nameField.text = model.name
+                    renameDevice.open()
                 }
-                NavigableMenuItem {
-                    text: qsTr("Delete PC")
-                    onTriggered: {
-                        deletePcDialog.pcIndex = index
-                        deletePcDialog.pcName = model.name
-                        deletePcDialog.open()
-                    }
-                }
-                NavigableMenuItem {
-                    text: qsTr("View Details")
-                    onTriggered: {
-                        showPcDetailsDialog.pcDetails = model.details
-                        showPcDetailsDialog.open()
-                    }
+            }
+            NavigableMenuItem { text: "检测连通性"; enabled: card.saved || model.online; onTriggered: pcGrid.openDevice(model.deviceId, "test") }
+            NavigableMenuItem { text: "唤醒设备"; visible: !card.saved && !model.online && model.wakeable; onTriggered: computerModel.wakeComputer(index) }
+            MenuSeparator {}
+            NavigableMenuItem {
+                text: "移除设备"
+                onTriggered: {
+                    removeDevice.deviceId = model.deviceId
+                    removeDevice.text = "移除「" + model.name + "」及其在本机保存的连接配置？"
+                    removeDevice.open()
                 }
             }
         }
-
-        onClicked: {
-            if (model.online) {
-                if (!model.serverSupported) {
-                    errorDialog.text = qsTr("The version of GeForce Experience on %1 is not supported by this build of Moonlight. You must update Moonlight to stream from %1.").arg(model.name)
-                    errorDialog.helpText = ""
-                    errorDialog.open()
-                }
-                else if (model.paired) {
-                    // go to game view
-                    var component = Qt.createComponent("AppView.qml")
-                    var appView = component.createObject(stackView, {"computerIndex": index, "objectName": model.name})
-                    stackView.push(appView)
-                }
-                else {
-                    var pin = computerModel.generatePinString()
-
-                    // Kick off pairing in the background
-                    computerModel.pairComputer(index, pin)
-
-                    // Display the pairing dialog
-                    pairDialog.pin = pin
-                    pairDialog.open()
-                }
-            } else if (!model.online) {
-                // Using open() here because it may be activated by keyboard
-                pcContextMenu.open()
-            }
-        }
-
-        onPressAndHold: {
-            // popup() ensures the menu appears under the mouse cursor
-            if (pcContextMenu.popup) {
-                pcContextMenu.popup()
-            }
-            else {
-                // Qt 5.9 doesn't have popup()
-                pcContextMenu.open()
-            }
-        }
+        onClicked: if (saved || model.online) pcGrid.openDevice(model.deviceId, "connect"); else deviceMenu.open()
+        onPressAndHold: deviceMenu.open()
+        Keys.onMenuPressed: deviceMenu.open()
 
         MouseArea {
             anchors.fill: parent
-            acceptedButtons: Qt.RightButton;
-            onClicked: {
-                parent.pressAndHold()
-            }
-        }
-
-        Keys.onMenuPressed: {
-            // We must use open() here so the menu is positioned on
-            // the ItemDelegate and not where the mouse cursor is
-            pcContextMenu.open()
-        }
-
-        Keys.onDeletePressed: {
-            deletePcDialog.pcIndex = index
-            deletePcDialog.pcName = model.name
-            deletePcDialog.open()
-        }
-    }
-
-    ErrorMessageDialog {
-        id: errorDialog
-
-        // Using Setup-Guide here instead of Troubleshooting because it's likely that users
-        // will arrive here by forgetting to enable GameStream or not forwarding ports.
-        helpUrl: "https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide"
-    }
-
-    NavigableMessageDialog {
-        id: pairDialog
-        closePolicy: Popup.CloseOnEscape
-
-        // don't allow edits to the rest of the window while open
-        property string pin : "0000"
-        text:qsTr("Please enter %1 on your host PC. This dialog will close when pairing is completed.").arg(pin)+"\n\n"+
-             qsTr("If your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.")
-        standardButtons: Dialog.Cancel
-        onRejected: {
-            // FIXME: We should interrupt pairing here
+            acceptedButtons: Qt.RightButton
+            onClicked: deviceMenu.popup()
         }
     }
 
     NavigableMessageDialog {
-        id: deletePcDialog
-        // don't allow edits to the rest of the window while open
-        property int pcIndex : -1
-        property string pcName : ""
-        text: qsTr("Are you sure you want to remove '%1'?").arg(pcName)
+        id: deviceError
+        title: "设备连接"
+        standardButtons: Dialog.Ok
+    }
+    NavigableMessageDialog {
+        id: pairing
+        title: "设备配对"
+        standardButtons: Dialog.Ok
+    }
+    NavigableMessageDialog {
+        id: removeDevice
+        title: "移除设备"
+        property string deviceId
         standardButtons: Dialog.Yes | Dialog.No
-
-        onAccepted: {
-            computerModel.deleteComputer(pcIndex)
-        }
+        onAccepted: computerModel.removeDevice(deviceId)
     }
-
-    NavigableMessageDialog {
-        id: testConnectionDialog
-        closePolicy: Popup.CloseOnEscape
-        standardButtons: Dialog.Ok
-
-        onAboutToShow: {
-            testConnectionDialog.text = qsTr("Moonlight is testing your network connection to determine if any required ports are blocked.") + "\n\n" + qsTr("This may take a few seconds…")
-            showSpinner = true
-        }
-
-        function connectionTestComplete(result, blockedPorts)
-        {
-            if (result === -1) {
-                text = qsTr("The network test could not be performed because none of Moonlight's connection testing servers were reachable from this PC. Check your Internet connection or try again later.")
-                imageSrc = "qrc:/res/baseline-warning-24px.svg"
-            }
-            else if (result === 0) {
-                text = qsTr("This network does not appear to be blocking Moonlight. If you still have trouble connecting, check your PC's firewall settings.") + "\n\n" + qsTr("If you are trying to stream over the Internet, install the Moonlight Internet Hosting Tool on your gaming PC and run the included Internet Streaming Tester to check your gaming PC's Internet connection.")
-                imageSrc = "qrc:/res/baseline-check_circle_outline-24px.svg"
-            }
-            else {
-                text = qsTr("Your PC's current network connection seems to be blocking Moonlight. Streaming over the Internet may not work while connected to this network.") + "\n\n" + qsTr("The following network ports were blocked:") + "\n"
-                text += blockedPorts
-                imageSrc = "qrc:/res/baseline-error_outline-24px.svg"
-            }
-
-            // Stop showing the spinner and show the image instead
-            showSpinner = false
-        }
-    }
-
     NavigableDialog {
-        id: renamePcDialog
-        property string label: qsTr("Enter the new name for this PC:")
-        property string originalName
-        property int pcIndex : -1;
-
+        id: renameDevice
+        title: "修改名称"
+        property string deviceId
         standardButtons: Dialog.Ok | Dialog.Cancel
-
-        onOpened: {
-            // Force keyboard focus on the textbox so keyboard navigation works
-            editText.forceActiveFocus()
-        }
-
-        onClosed: {
-            editText.clear()
-        }
-
-        onAccepted: {
-            if (editText.text) {
-                computerModel.renameComputer(pcIndex, editText.text)
-            }
-        }
-
-        ColumnLayout {
-            Label {
-                text: renamePcDialog.label
-                font.bold: true
-            }
-
-            TextField {
-                id: editText
-                placeholderText: renamePcDialog.originalName
-                Layout.fillWidth: true
-                focus: true
-
-                Keys.onReturnPressed: {
-                    renamePcDialog.accept()
-                }
-
-                Keys.onEnterPressed: {
-                    renamePcDialog.accept()
-                }
-            }
+        onOpened: { nameField.forceActiveFocus(); nameField.selectAll() }
+        onAccepted: computerModel.renameDevice(deviceId, nameField.text)
+        TextField {
+            id: nameField
+            width: 260
+            maximumLength: 64
+            Accessible.name: "设备名称"
+            onAccepted: renameDevice.accept()
         }
     }
-
     NavigableMessageDialog {
-        id: showPcDetailsDialog
-        property string pcDetails : "";
-        text: showPcDetailsDialog.pcDetails
-        imageSrc: "qrc:/res/baseline-help_outline-24px.svg"
-        standardButtons: Dialog.Ok
+        id: testConfirm
+        title: "检测连通性"
+        property string deviceId
+        property string deviceName
+        text: "将短暂启动「" + deviceName + "」的桌面串流，测量约 12 秒的实际画面与音频，结束后生成远程游戏评分和报告。"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: pcGrid.startTest(deviceId, deviceName)
     }
 
     ScrollBar.vertical: ScrollBar {}

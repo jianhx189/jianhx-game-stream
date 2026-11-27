@@ -1,6 +1,10 @@
 #pragma once
 
 #include <QSemaphore>
+#include <QJsonObject>
+#include <QMutex>
+#include <QVariantMap>
+#include <atomic>
 #include <QQuickWindow>
 
 #include <Limelight.h>
@@ -104,6 +108,10 @@ public:
     Q_INVOKABLE bool initialize(QQuickWindow* qtWindow);
     Q_INVOKABLE void start();
     Q_INVOKABLE void interrupt();
+    Q_INVOKABLE void disconnectForSwitch();
+    Q_INVOKABLE QVariantMap diagnosticReport();
+    void enableDiagnostic() { m_Diagnostic = true; }
+    void observeDiagnosticVideo(const QJsonObject& sample);
     Q_PROPERTY(QStringList launchWarnings MEMBER m_LaunchWarnings NOTIFY launchWarningsChanged);
 
     // ------------------------------------------------------------------
@@ -167,6 +175,15 @@ signals:
 
 private:
     void exec();
+
+    bool m_Diagnostic = false;
+    bool m_DiagnosticCompleted = false;
+    bool m_PreserveHostApp = false;
+    std::atomic<bool> m_DiagnosticSampling{false};
+    std::atomic<unsigned> m_AudioPackets{0}, m_AudioConcealed{0}, m_AudioSubmitted{0};
+    QMutex m_DiagnosticMutex;
+    QList<QJsonObject> m_DiagnosticVideo;
+
 
     bool startConnectionAsync();
 

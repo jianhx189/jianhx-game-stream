@@ -19,11 +19,14 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QNetworkProxy>
 #include <QNetworkRequest>
 #include <QSslConfiguration>
 #include <QSslSocket>
 #include <QTimer>
 #include <QUrl>
+#include <QUuid>
+#include <memory>
 
 #include <atomic>
 #include <thread>
@@ -78,6 +81,8 @@ public:
     // 关键：必须在 pairingManager.pair() **之前**在后台线程起来。
     // Sunshine 的 pair?phrase=getservercert 会一直挂着等管理员输入 PIN，
     // 所以「先 pair 再 approve」在同一条线程里会直接卡死；必须并行。
+    ~SunshineAutoApprover() { stop(); }
+
     void start()
     {
         m_Thread = std::thread([this]() {
@@ -151,8 +156,11 @@ public:
                 for (const QJsonValue& value : doc.object().value(QStringLiteral("pairings")).toArray()) {
                     const QString id = value.toObject().value(QStringLiteral("id")).toString();
                     if (!id.isEmpty()) {
+                        if (!pairingId.isEmpty()) {
+                            if (error) *error = QStringLiteral("被控端有多个待确认请求，请使用手动 PIN。");
+                            return false;
+                        }
                         pairingId = id;
-                        break;
                     }
                 }
                 if (!pairingId.isEmpty()) {
@@ -774,120 +782,104 @@ class PendingPairingTask : public QObject, public QRunnable
     Q_OBJECT
 
 public:
-    PendingPairingTask(ComputerManager* computerManager, NvComputer* computer, QString pin)
-        : m_ComputerManager(computerManager),
-          m_Computer(computer),
-          m_Pin(pin)
+    PendingPairingTask(ComputerManager* manager, NvComputer* computer, QString pin,
+                       QString endpoint = {}, QString ticket = {}, QByteArray fingerprint = {})
+        : m_Manager(manager), m_Computer(computer), m_Pin(std::move(pin)),
+          m_Endpoint(std::move(endpoint)), m_Ticket(std::move(ticket)), m_Fingerprint(std::move(fingerprint))
     {
-        connect(this, &PendingPairingTask::pairingCompleted,
-                computerManager, &ComputerManager::pairingCompleted);
+        connect(this, &PendingPairingTask::pairingCompleted, manager, &ComputerManager::pairingCompleted);
+        connect(this, &PendingPairingTask::invitationFinished, manager, &ComputerManager::invitationPairingFinished);
+        if (m_Ticket.isEmpty()) {
+            auto* tunnel = MslinkTunnel::get();
+            const auto host = pairingHostAddress(computer);
+            if (tunnel->autoPairReady() && host == tunnel->localServiceEndpoint()) {
+                m_Legacy = std::make_unique<SunshineAutoApprover>(host, tunnel->sunshineUser(),
+                                                                 tunnel->sunshinePassword(), m_Pin, QStringLiteral("MiniStream"));
+            }
+        }
     }
 
 signals:
     void pairingCompleted(NvComputer* computer, QString error);
+    void invitationFinished(QString id, QString error);
 
 private:
-    void run()
+    bool requestApproval(const QString& marker)
     {
-        NvPairingManager pairingManager(m_Computer);
+        QSslSocket socket;
+        socket.setProxy(QNetworkProxy::NoProxy);
+        socket.setPeerVerifyMode(QSslSocket::VerifyNone);
+        socket.setProtocol(QSsl::TlsV1_2OrLater);
+        socket.connectToHostEncrypted(m_Endpoint, 47991);
+        if (!socket.waitForEncrypted(3500) ||
+            socket.peerCertificate().digest(QCryptographicHash::Sha256).toHex() != m_Fingerprint) return false;
+        const QJsonObject request{{"ticket", m_Ticket}, {"marker", marker}, {"pin", m_Pin}};
+        socket.write(QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n');
+        if (!socket.waitForBytesWritten(2500)) return false;
+        return (socket.canReadLine() || socket.waitForReadyRead(2500)) && socket.readLine(8) == "OK\n";
+    }
 
-        // ---- MiniStream：自动配对（失败则退回原来的手动输 PIN 流程）----
-        //
-        // Sunshine 的 pair?phrase=getservercert 会一直挂住等管理员输 PIN，
-        // 所以 approve 必须在**另一个线程**里跟 pair() 并行跑：
-        //   pair() 发起 -> Sunshine 登记 pending -> 后台线程 GET /api/pin 拿到 id
-        //   -> POST approve(同一个 PIN) -> pair() 的请求随即返回，继续走完协议。
-        QString autoPairError;
-        bool autoPairAttempted = false;
-        SunshineAutoApprover* approver = nullptr;
+    void finish(const QString& error)
+    {
+        if (m_Ticket.isEmpty()) emit pairingCompleted(m_Computer, error);
+        else emit invitationFinished(m_Computer->uuid, error);
+    }
 
-        MslinkTunnel* tunnel = MslinkTunnel::get();
-        if (tunnel == nullptr) {
-            qInfo() << "MiniStream: auto pairing skipped (no MslinkTunnel singleton)";
-        }
-        else if (!tunnel->autoPairReady()) {
-            // 这条日志很重要：没有它，autopair 只会在「配置缺密码」时静默退回手动 PIN，
-            // 让人误以为是代码没跑。
-            qInfo() << "MiniStream: auto pairing skipped - mslink.ini 里没有 sunshine_pass"
-                    << "(自动配对账号/密码没填)";
-        }
-        else {
-            // 目标地址优先用 Moonlight 实际连接的那个地址：
-            //   隧道模式 = 隧道在本机监听的地址（如 127.0.0.2），47990 也走同一条隧道；
-            //   直连模式 = 被控端自己的地址。
-            QString host = pairingHostAddress(m_Computer);
-            if (host.isEmpty()) {
-                host = tunnel->autoPairHost();
-            }
-
-            if (host.isEmpty()) {
-                qInfo() << "MiniStream: auto pairing skipped (no host address resolved)";
-            }
-            else {
-                autoPairAttempted = true;
-                qInfo() << "MiniStream: auto pairing via" << host
-                        << "user" << tunnel->sunshineUser()
-                        << "tunnelActive" << MslinkBridge::active();
-                approver = new SunshineAutoApprover(host, tunnel->sunshineUser(),
-                                                    tunnel->sunshinePassword(), m_Pin,
-                                                    QStringLiteral("MiniStream"));
-                approver->start();
+    void run() override
+    {
+        QString marker = QStringLiteral("roth");
+        if (!m_Ticket.isEmpty()) {
+            marker = QStringLiteral("MiniStream-") + QUuid::createUuid().toString(QUuid::Id128);
+            if (!requestApproval(marker)) {
+                finish(QStringLiteral("自动配对授权无效或已过期。请在被控端重新生成邀请，或在设备菜单连接并使用 PIN。"));
+                return;
             }
         }
-
+        if (m_Legacy) m_Legacy->start();
         try {
-           NvPairingManager::PairState result = pairingManager.pair(m_Computer->appVersion, m_Pin, m_Computer->serverCert);
-
-           if (approver != nullptr) {
-               approver->stop();
-               autoPairError = approver->error();
-               qInfo() << "MiniStream: auto pairing finished, ok =" << approver->succeeded()
-                       << "error =" << autoPairError;
-               delete approver;
-               approver = nullptr;
-           }
-
-           switch (result)
-           {
-           case NvPairingManager::PairState::PIN_WRONG:
-               // 自动配对失败时给出具体原因（密码错 / 端口不通 / 无 pending），
-               // 比笼统的「PIN 不对」对用户有用得多。
-               if (autoPairAttempted && !autoPairError.isEmpty()) {
-                   emit pairingCompleted(m_Computer, autoPairError);
-               }
-               else {
-                   emit pairingCompleted(m_Computer, tr("The PIN from the PC didn't match. Please try again."));
-               }
-               break;
-           case NvPairingManager::PairState::FAILED:
-               if (m_Computer->currentGameId != 0) {
-                   emit pairingCompleted(m_Computer, tr("You cannot pair while a previous session is still running on the host PC. Quit any running games or reboot the host PC, then try pairing again."));
-               }
-               else {
-                   emit pairingCompleted(m_Computer, tr("Pairing failed. Please try again."));
-               }
-               break;
-           case NvPairingManager::PairState::ALREADY_IN_PROGRESS:
-               emit pairingCompleted(m_Computer, tr("Another pairing attempt is already in progress."));
-               break;
-           case NvPairingManager::PairState::PAIRED:
-               // Persist the newly pinned server certificate for this host
-               m_ComputerManager->saveHost(m_Computer);
-
-               emit pairingCompleted(m_Computer, nullptr);
-               break;
-           }
+            NvPairingManager pairingManager(m_Computer);
+            QSslCertificate certificate;
+            const auto result = pairingManager.pair(m_Computer->appVersion, m_Pin, certificate, marker, m_Fingerprint);
+            if (m_Legacy) m_Legacy->stop();
+            if (result == NvPairingManager::PAIRED) {
+                {
+                    QWriteLocker lock(&m_Computer->lock);
+                    m_Computer->serverCert = certificate;
+                    m_Computer->pairState = NvComputer::PS_PAIRED;
+                }
+                m_Manager->saveHost(m_Computer);
+                emit m_Manager->computerStateChanged(m_Computer);
+                finish({});
+            } else {
+                const auto legacyError = m_Legacy ? m_Legacy->error() : QString();
+                finish(legacyError.isEmpty() ? QStringLiteral("配对未完成。请确认被控端空闲，然后重试。") : legacyError);
+            }
         } catch (const GfeHttpResponseException& e) {
-            emit pairingCompleted(m_Computer, tr("GeForce Experience returned error: %1").arg(e.toQString()));
+            finish(e.toQString());
         } catch (const QtNetworkReplyException& e) {
-            emit pairingCompleted(m_Computer, e.toQString());
+            finish(e.toQString());
         }
     }
 
-    ComputerManager* m_ComputerManager;
+    ComputerManager* m_Manager;
     NvComputer* m_Computer;
-    QString m_Pin;
+    QString m_Pin, m_Endpoint, m_Ticket;
+    QByteArray m_Fingerprint;
+    std::unique_ptr<SunshineAutoApprover> m_Legacy;
 };
+
+void ComputerManager::pairInvitedHost(const QString& id, const QString& endpoint,
+                                      const QString& ticket, const QString& fingerprint)
+{
+    QReadLocker lock(&m_Lock);
+    auto* computer = m_KnownHosts.value(id);
+    if (!computer || ticket.isEmpty() || computer->manualAddress.address() != endpoint) {
+        emit invitationPairingFinished(id, QStringLiteral("找不到邀请对应的设备。"));
+        return;
+    }
+    QThreadPool::globalInstance()->start(new PendingPairingTask(this, computer, generatePinString(),
+                                                               endpoint, ticket, fingerprint.toLatin1()));
+}
 
 void ComputerManager::pairHost(NvComputer* computer, QString pin)
 {
@@ -991,15 +983,18 @@ class PendingAddTask : public QObject, public QRunnable
     Q_OBJECT
 
 public:
-    PendingAddTask(ComputerManager* computerManager, NvAddress address)
+    PendingAddTask(ComputerManager* computerManager, NvAddress address, bool invited = false, QString expected = {})
         : m_ComputerManager(computerManager),
           m_Address(address),
+          m_Invited(invited),
+          m_ExpectedId(std::move(expected)),
           m_AboutToQuit(false)
     {
         connect(this, &PendingAddTask::computerAddCompleted,
                 computerManager, &ComputerManager::computerAddCompleted);
         connect(this, &PendingAddTask::computerStateChanged,
                 computerManager, &ComputerManager::handleComputerStateChanged);
+        connect(this, &PendingAddTask::invitedHostReady, computerManager, &ComputerManager::invitedHostReady);
         connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit,
                 this, &PendingAddTask::handleAboutToQuit);
     }
@@ -1008,6 +1003,7 @@ signals:
     void computerAddCompleted(QVariant success, QVariant detectedPortBlocking);
 
     void computerStateChanged(NvComputer* computer);
+    void invitedHostReady(QString endpoint, QString id, bool paired, QString error);
 
 private:
     void handleAboutToQuit()
@@ -1045,6 +1041,10 @@ private:
             }
             return serverInfo;
         } catch (...) {
+            if (m_Invited) {
+                emit invitedHostReady(m_Address.address(), {}, false, QStringLiteral("无法读取被控端信息，请检查 Sunshine 服务。"));
+                return {};
+            }
             unsigned int portTestResult;
 
             if (m_ComputerManager->m_Prefs->detectNetworkBlocking) {
@@ -1077,6 +1077,12 @@ private:
 
         // Create initial newComputer using HTTP serverinfo with no pinned cert
         NvComputer* newComputer = new NvComputer(http, serverInfo);
+        if (m_Invited && (newComputer->uuid.isEmpty() ||
+                          (!m_ExpectedId.isEmpty() && m_ExpectedId != newComputer->uuid))) {
+            delete newComputer;
+            emit invitedHostReady(m_Address.address(), {}, false, QStringLiteral("此地址返回了另一台设备，请为新设备重新生成邀请。"));
+            return;
+        }
         http.setTrueUid(!newComputer->isNvidiaServerSoftware);
 
         // Check if we have a record of this host UUID to pull the pinned cert
@@ -1085,7 +1091,9 @@ private:
             QReadLocker lock(&m_ComputerManager->m_Lock);
             existingComputer = m_ComputerManager->m_KnownHosts.value(newComputer->uuid);
             if (existingComputer != nullptr) {
-                http.setServerCert(existingComputer->serverCert);
+                QReadLocker hostLock(&existingComputer->lock);
+                newComputer->serverCert = existingComputer->serverCert;
+                http.setServerCert(newComputer->serverCert);
             }
         }
 
@@ -1094,16 +1102,25 @@ private:
             Q_ASSERT(http.httpsPort() != 0);
             serverInfo = fetchServerInfo(http);
             if (serverInfo.isEmpty()) {
+                delete newComputer;
                 return;
             }
 
             // Update the polled computer with the HTTPS information
             NvComputer httpsComputer(http, serverInfo);
+            if (httpsComputer.uuid != newComputer->uuid) {
+                if (m_Invited) emit invitedHostReady(m_Address.address(), {}, false, QStringLiteral("设备标识不一致。"));
+                else emit computerAddCompleted(false, false);
+                delete newComputer;
+                return;
+            }
             newComputer->update(httpsComputer);
         }
 
         // Update addresses for a manually-added host
         newComputer->manualAddress = m_Address;
+        const QString deviceId = newComputer->uuid;
+        const bool paired = newComputer->pairState == NvComputer::PS_PAIRED && !newComputer->serverCert.isNull();
 
         QHostAddress hostAddress(m_Address.address());
         bool addressIsSiteLocalV4 =
@@ -1139,7 +1156,7 @@ private:
                 m_ComputerManager->m_Lock.unlock();
 
                 // Let the caller know it succeeded
-                emit computerAddCompleted(true, false);
+                if (!m_Invited) emit computerAddCompleted(true, false);
 
                 // Tell our client if something changed
                 if (changed) {
@@ -1171,34 +1188,29 @@ private:
                 }
 
                 // Let the caller know it succeeded
-                emit computerAddCompleted(true, false);
+                if (!m_Invited) emit computerAddCompleted(true, false);
 
                 // Tell our client about this new PC
                 emit computerStateChanged(newComputer);
             }
         }
+        if (m_Invited) emit invitedHostReady(m_Address.address(), deviceId, paired, {});
     }
 
     ComputerManager* m_ComputerManager;
     NvAddress m_Address;
+    bool m_Invited;
+    QString m_ExpectedId;
     bool m_AboutToQuit;
 };
 
+void ComputerManager::addInvitedHost(const QString& endpoint, const QString& expectedId)
+{
+    QThreadPool::globalInstance()->start(new PendingAddTask(this, NvAddress(endpoint, 47989), true, expectedId));
+}
+
 void ComputerManager::addNewHost(NvAddress address, bool mdns, QString name, NvAddress mdnsIpv6Address)
 {
-    // MiniStream: 同一个地址重复添加会堆出一排一模一样的磁贴。
-    // 「一键连接」每次启动都会自动补一台 127.0.0.1，所以这里必须先查重：
-    // 已经存在相同 manualAddress 就直接返回，不再新建。
-    {
-        QReadLocker locker(&m_Lock);
-        for (NvComputer* c : m_KnownHosts.values()) {
-            if (c && c->manualAddress == address) {
-                emit computerAddCompleted(false, true);
-                return;
-            }
-        }
-    }
-
     // Punt to a worker thread to avoid stalling the
     // UI while waiting for serverinfo query to complete
     PendingAddTask* addTask = new PendingAddTask(this, address);

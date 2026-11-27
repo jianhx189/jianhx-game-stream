@@ -1,0 +1,47 @@
+{
+  "version": "2.3.4",
+  "tag": "v2.3.4-test.1",
+  "channel": "prerelease",
+  "files": [
+    {
+      "name": "MiniStream-2.3.4-Source.zip",
+      "size": 3168624,
+      "sha256": "e64dadc6ef5f0a6301c22068ea68e38da9e0b4f43b8d0f27ef0edc0daf357946"
+    },
+    {
+      "name": "MiniStream-Client-Setup.exe",
+      "size": 49464037,
+      "sha256": "7707df666442884426f6cbd2de147e9309ebc7f408ba92d8f219b0c093bdfec8"
+    },
+    {
+      "name": "MiniStream-Host-Setup.exe",
+      "size": 65260333,
+      "sha256": "921829654d49aec810826dfb2accfff13dc2f6087016b28201cf0c04141e2c18"
+    }
+  ],
+  "sources": {
+    "moonlight_commit": "dc92b6d2f361064d3e9e53ce5de92f611db77220",
+    "windows_dependencies": "https://github.com/moonlight-stream/moonlight-qt-deps/releases/tag/v19",
+    "qt": "6.9.3",
+    "sunshine_tag": "v2026.914.233613",
+    "sunshine_commit": "63d35f702ee9e362e43263742981836ec0710384",
+    "sunshine_source": "https://github.com/LizardByte/Sunshine/archive/63d35f702ee9e362e43263742981836ec0710384.tar.gz",
+    "submodules": [
+      " 8d9fefd7b810f2541f78cc7a8ccbd185bc84c7a5 app/SDL_GameControllerDB",
+      " 04053843c90c4268583f2496b997d54d59f03957 moonlight-common-c/moonlight-common-c",
+      " aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1 moonlight-common-c/moonlight-common-c/enet",
+      " b1e3c22ca0cdc0bb83e3cd6ed1a2fc77869ed99a moonlight-common-c/moonlight-common-c/nanors",
+      " 920c097ffa742e2968290f15d4dde6693aec02e5 qmdnsengine/qmdnsengine"
+    ]
+  },
+  "verification": [
+    "installers and SHA-256",
+    "mslink CTest 7/7",
+    "two simulated device routes and confirmation",
+    "version comparison",
+    "pairing authorization with certificate pin and replay rejection"
+  ],
+  "pending": [
+    "first pairing and scored audio/video with two physical Windows machines over LAN and FRP"
+  ]
+}

@@ -124,6 +124,9 @@ public:
     Q_INVOKABLE void stopPollingAsync();
 
     Q_INVOKABLE void addNewHostManually(QString address);
+    Q_INVOKABLE void addInvitedHost(const QString& endpoint, const QString& expectedId);
+    Q_INVOKABLE void pairInvitedHost(const QString& id, const QString& endpoint,
+                                     const QString& ticket, const QString& fingerprint);
 
     void addNewHost(NvAddress address, bool mdns, QString name = QString(), NvAddress mdnsIpv6Address = NvAddress());
 
@@ -148,6 +151,8 @@ signals:
     void pairingCompleted(NvComputer* computer, QString error);
 
     void computerAddCompleted(QVariant success, QVariant detectedPortBlocking);
+    void invitedHostReady(QString endpoint, QString id, bool paired, QString error);
+    void invitationPairingFinished(QString id, QString error);
 
     void quitAppCompleted(QVariant error);
 

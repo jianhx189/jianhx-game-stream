@@ -23,5 +23,10 @@ inline QVariantMap decodeInvitation(const QString &url)
         const int port = data.value(field).toInt();
         if (port < 1 || port > 65535) return {};
     }
-    return data.toVariantMap();
+    auto result = data.toVariantMap();
+    static const QRegularExpression ticketFormat(QStringLiteral(R"(\A[a-f0-9]{64}\z)"));
+    const bool hasTicket = result.contains("pair") || result.contains("cert");
+    if (hasTicket && (!ticketFormat.match(result.value("pair").toString()).hasMatch() ||
+                      !ticketFormat.match(result.value("cert").toString()).hasMatch())) return {};
+    return result;
 }

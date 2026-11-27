@@ -2153,6 +2153,7 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 #ifdef DISPLAY_BITRATE
         report["video_mbps"] = m_BwTracker.GetAverageMbps();
 #endif
+        Session::get()->observeDiagnosticVideo(report);
         mslink::publish_media_metrics(QJsonDocument(report).toJson(QJsonDocument::Compact).toStdString());
 
         // Accumulate these values into the global stats

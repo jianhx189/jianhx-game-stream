@@ -1277,14 +1277,15 @@ private:
     {
         // Only quit the running app if our session terminated gracefully
         bool shouldQuit =
-                !m_Session->m_UnexpectedTermination &&
-                m_Session->m_Preferences->quitAppAfter;
+                !m_Session->m_PreserveHostApp &&
+                ((m_Session->m_Diagnostic && m_Session->m_AsyncConnectionSuccess) ||
+                 (!m_Session->m_UnexpectedTermination && m_Session->m_Preferences->quitAppAfter));
 
         // Notify the UI
-        if (shouldQuit) {
+        if (shouldQuit && !m_Session->m_Diagnostic) {
             emit m_Session->quitStarting();
         }
-        else {
+        else if (!shouldQuit) {
             emit m_Session->sessionFinished(m_Session->m_PortTestResults);
         }
 
@@ -1870,6 +1871,57 @@ void Session::start()
     thread->start();
 }
 
+void Session::disconnectForSwitch()
+{
+    m_PreserveHostApp = true;
+    interrupt();
+}
+
+void Session::observeDiagnosticVideo(const QJsonObject& sample)
+{
+    if (!m_DiagnosticSampling.load()) return;
+    QMutexLocker lock(&m_DiagnosticMutex);
+    if (m_DiagnosticVideo.size() < 16) m_DiagnosticVideo.append(sample);
+}
+
+QVariantMap Session::diagnosticReport()
+{
+    QMutexLocker lock(&m_DiagnosticMutex);
+    QVariantMap report{{"completed", m_DiagnosticCompleted}, {"targetFps", m_StreamConfig.fps},
+                       {"audioPackets", m_AudioPackets.load()}, {"audioConcealed", m_AudioConcealed.load()},
+                       {"audioSubmitted", m_AudioSubmitted.load()}, {"videoSamples", m_DiagnosticVideo.size()}};
+    const auto average = [this, &report](const char* key) {
+        double total = 0;
+        int count = 0;
+        for (const auto& sample : m_DiagnosticVideo) {
+            const auto value = sample.value(QString::fromLatin1(key));
+            if (value.isDouble()) { total += value.toDouble(); ++count; }
+        }
+        if (count) report.insert(QString::fromLatin1(key), total / count);
+    };
+    for (const char* key : {"fps", "received_fps", "network_frame_drop_percent", "stream_rtt_ms",
+                            "decode_ms", "queue_ms", "video_mbps"}) average(key);
+    if (!m_DiagnosticVideo.isEmpty()) {
+        const auto last = m_DiagnosticVideo.constLast();
+        report.insert("width", last.value("width").toInt());
+        report.insert("height", last.value("height").toInt());
+    }
+    const auto packets = m_AudioPackets.load();
+    const auto submitted = m_AudioSubmitted.load();
+    const auto concealed = m_AudioConcealed.load();
+    const double fps = report.value("fps").toDouble();
+    if (m_DiagnosticCompleted && m_DiagnosticVideo.size() >= 5 && packets && submitted && fps > 0 &&
+        m_StreamConfig.fps > 0 && report.contains("stream_rtt_ms") && report.contains("network_frame_drop_percent")) {
+        const auto clamp = [](double value) { return qBound(0.0, value, 1.0); };
+        const double video = 35 * clamp(fps / m_StreamConfig.fps);
+        const double loss = 30 * clamp(1 - report.value("network_frame_drop_percent").toDouble() / 10);
+        const double latency = 20 * clamp(1 - qMax(0.0, report.value("stream_rtt_ms").toDouble() - 20) / 130);
+        const double audio = 15 * clamp(double(submitted) / (packets + concealed));
+        report.insert("score", qRound(video + loss + latency + audio));
+    }
+    return report;
+}
+
 void Session::interrupt()
 {
     // Stop any connection in progress
@@ -1885,7 +1937,7 @@ void Session::interrupt()
 void Session::exec()
 {
     // If the connection failed, clean up and abort the connection.
-    if (!m_AsyncConnectionSuccess) {
+    if (!m_AsyncConnectionSuccess || m_PreserveHostApp) {
         delete m_InputHandler;
         m_InputHandler = nullptr;
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -2071,12 +2123,22 @@ void Session::exec()
     StreamMenuTab menuTab(m_Window, m_Preferences->streamingMenuEnabled && m_Preferences->showMenuTab);
 #endif
     SDL_Event event;
+    const auto diagnosticStart = SDL_GetTicks() + 2000;
+    const auto diagnosticEnd = diagnosticStart + 12000;
+    auto nextQtPump = SDL_GetTicks();
     for (;;) {
-        // MiniStream：浮层菜单打开期间要把 Qt 事件循环转起来，
-        // 否则 QML 的菜单窗口既不会重绘，也收不到鼠标点击。
-        // （菜单关闭时这里是空操作，不影响串流性能）
-        if (m_StreamMenuOpen) {
-            QCoreApplication::processEvents();
+        // Dispatch private links while a session is running so the user can approve a switch.
+        const auto now = SDL_GetTicks();
+        if (m_StreamMenuOpen || SDL_TICKS_PASSED(now, nextQtPump)) {
+            nextQtPump = now + 100;
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 2);
+        }
+        if (m_Diagnostic) {
+            if (SDL_TICKS_PASSED(now, diagnosticEnd)) {
+                m_DiagnosticCompleted = true;
+                goto DispatchDeferredCleanup;
+            }
+            if (SDL_TICKS_PASSED(now, diagnosticStart)) m_DiagnosticSampling.store(true);
         }
 
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
@@ -2091,7 +2153,7 @@ void Session::exec()
         // and other problems.
         //
         // MiniStream：菜单打开时把等待时间压到 8ms，让上面的 Qt 事件循环保持转动。
-        if (!SDL_WaitEventTimeout(&event, m_StreamMenuOpen ? 8 : 1000)) {
+        if (!SDL_WaitEventTimeout(&event, m_StreamMenuOpen ? 8 : 150)) {
 
             continue;
         }
@@ -2455,6 +2517,7 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+    m_DiagnosticSampling.store(false);
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 

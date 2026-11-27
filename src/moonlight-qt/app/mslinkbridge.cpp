@@ -1,6 +1,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 // =============================================================================
 //  mslinkbridge.cpp —— 2 端口复用通道的客户端集成
@@ -14,6 +15,8 @@
 #include <QFileInfo>
 #include <QDateTime>
 #include <QHash>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <QLoggingCategory>
 #include <QStringList>
 #include <QTextStream>
@@ -372,7 +375,7 @@ bool startFromIni(const QString& iniPath, QString* err) {
     const QString userTcpPorts = kv.value("tcp_ports");
     const bool defaultPorts = userTcpPorts.isEmpty();
     const QString tcpPorts = defaultPorts
-            ? QStringLiteral("47989,47984,48010,47990")
+            ? QStringLiteral("47989,47984,48010,47990,47991")
             : userTcpPorts;
 
     if (startClientImpl(server, tcpPort, udpPort, password, listen,
@@ -669,10 +672,106 @@ QString MslinkTunnel::autoPairHost() const {
     return QString();
 }
 
-QString MslinkTunnel::connectToServer(const QString& server, int tcpPort,
-                                      int udpPort, const QString& password) {
+namespace {
+QString routeKey(const QString& endpoint) {
+    return QStringLiteral("deviceRoutes/") + endpoint;
+}
+}
+
+bool MslinkTunnel::hasDeviceRoute(const QString& endpoint) const {
+    return QSettings().contains(routeKey(endpoint)) ||
+           (configured() && endpoint == m_listen);
+}
+
+bool MslinkTunnel::matchesInvitation(const QVariantMap& invitation) const {
+    return configured() && m_server == invitation.value("ip").toString() &&
+           m_tcpPort == invitation.value("tcp").toInt() &&
+           m_udpPort == invitation.value("udp").toInt() &&
+           m_password == invitation.value("key").toString();
+}
+
+QString MslinkTunnel::connectInvitation(const QVariantMap& invitation) {
+    const auto address = invitation.value("ip").toString();
+    const int tcp = invitation.value("tcp").toInt(), udp = invitation.value("udp").toInt();
+    const auto password = invitation.value("key").toString();
+    QSettings settings;
+    settings.beginGroup("deviceRoutes");
+    QString endpoint;
+    for (const auto& key : settings.childKeys()) {
+        const auto route = settings.value(key).toMap();
+        if (route.value("ip") == address && route.value("tcp").toInt() == tcp &&
+            route.value("udp").toInt() == udp) {
+            endpoint = key;
+            break;
+        }
+    }
+    if (endpoint.isEmpty() && configured() && m_server == address && m_tcpPort == tcp && m_udpPort == udp)
+        endpoint = m_listen;
+    if (endpoint.isEmpty()) {
+        for (int i = 2; i <= 65534; ++i) {
+            const auto candidate = QStringLiteral("127.1.%1.%2").arg(i / 256).arg(i % 256);
+            if (candidate != m_listen && !settings.contains(candidate)) {
+                endpoint = candidate;
+                break;
+            }
+        }
+    }
+    if (endpoint.isEmpty()) return QStringLiteral("设备连接配置已满。请移除不再使用的设备。");
+    return startRoute(address, tcp, udp, password, endpoint, false);
+}
+
+QString MslinkTunnel::connectDevice(const QString& endpoint) {
+    const auto route = QSettings().value(routeKey(endpoint)).toMap();
+    if (route.isEmpty() && endpoint == m_listen && configured())
+        return startRoute(m_server, m_tcpPort, m_udpPort, m_password, m_listen, false);
+    QString error;
+    QString password;
+    if (!MslinkCredentials::decodeSecret(route.value("secret").toString(), &password, &error) || password.isEmpty()) return QStringLiteral("无法读取此设备的连接口令，请重新导入邀请。");
+    return startRoute(route.value("ip").toString(), route.value("tcp").toInt(),
+                      route.value("udp").toInt(), password, endpoint, false);
+}
+
+QString MslinkTunnel::expectedDevice() const {
+    return QSettings().value(routeKey(m_listen)).toMap().value("id").toString();
+}
+
+QString MslinkTunnel::rememberDevice(const QString& deviceId) {
+    QString cipher, error;
+    if (!MslinkCredentials::encodeSecret(m_password, &cipher, &error)) return error;
+    QSettings settings;
+    settings.setValue(routeKey(m_listen), QVariantMap{{"ip", m_server}, {"tcp", m_tcpPort},
+                      {"udp", m_udpPort}, {"secret", cipher}, {"id", deviceId}});
+    settings.sync();
+    if (settings.status() != QSettings::NoError)
+        return QStringLiteral("无法保存此设备的连接配置。");
+    if (!persistConfig()) return m_lastError;
+    return {};
+}
+
+void MslinkTunnel::forgetDevice(const QString& endpoint) {
+    QSettings().remove(routeKey(endpoint));
+    if (endpoint == m_listen && configured()) {
+        disconnectTunnel();
+        if (QFile::exists(iniPath()) && !QFile::remove(iniPath())) {
+            m_lastError = QStringLiteral("无法移除旧的自动连接配置。");
+            emit stateChanged();
+        }
+        m_server.clear();
+        m_password.clear();
+        m_sunshinePassword.clear();
+        m_tcpPort = m_udpPort = 0;
+        emit configChanged();
+    }
+}
+
+QString MslinkTunnel::connectToServer(const QString& server, int tcpPort, int udpPort,
+                                      const QString& password) {
+    return startRoute(server, tcpPort, udpPort, password, m_listen, true);
+}
+
+QString MslinkTunnel::startRoute(const QString& server, int tcpPort, int udpPort,
+                                  const QString& password, const QString& endpoint, bool saveNow) {
     m_lastError.clear();
-    emit stateChanged();
 
     if (server.trimmed().isEmpty()) {
         m_lastError = QStringLiteral("请填写服务器地址");
@@ -697,17 +796,26 @@ QString MslinkTunnel::connectToServer(const QString& server, int tcpPort,
 
     // P1-1: 统一配置生成函数。隧道模式下本地监听 127.0.0.1，
     // TCP 端口始终包含 47989,47984,48010,47990（自动配对需要）。
-    const QString tcpPorts = QStringLiteral("47989,47984,48010,47990");
+    const QString tcpPorts = QStringLiteral("47989,47984,48010,47990,47991");
     const QString udpPorts = QStringLiteral("47998,47999,48000");
 
     QString err;
     if (!MslinkBridge::startClientImpl(server.trimmed(), tcpPort, udpPort, password,
-                                       QStringLiteral("127.0.0.1"), tcpPorts, udpPorts, &err)) {
+                                       endpoint, tcpPorts, udpPorts, &err)) {
         m_lastError = err.isEmpty() ? QStringLiteral("隧道启动失败") : err;
         emit stateChanged();
         return m_lastError;
     }
 
+    const bool sameRoute = server == m_server && endpoint == m_listen &&
+                           tcpPort == m_tcpPort && udpPort == m_udpPort;
+    if (!sameRoute) {
+        m_sunshinePassword.clear();
+        m_sunshineUser = QStringLiteral("admin");
+    }
+    m_listen = endpoint;
+    m_historyCache.clear();
+    m_historyCacheMs = 0;
     m_server = server.trimmed();
     m_tcpPort = tcpPort;
     m_udpPort = udpPort;
@@ -715,7 +823,7 @@ QString MslinkTunnel::connectToServer(const QString& server, int tcpPort,
     // 先把新配置落盘（DPAPI 加密 + QSaveFile 原子写）。
     // 保存失败只影响「下次启动还能不能自动连」，连接本身已经起来了，
     // 所以不改返回值，只把原因留在 lastError 里让界面显示。
-    const bool saved = persistConfig();
+    const bool saved = !saveNow || persistConfig();
     m_wasRunning = false;
     // 注意：这里只代表「本机监听已就绪」，远端是否认证由状态定时器判定
     m_connecting = MslinkBridge::tunnelUp() ? false : true;
@@ -792,4 +900,8 @@ QString MslinkTunnel::exportDiagnostics() {
     const QString directory=QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)+"/MiniStream";QDir().mkpath(directory);
     const QString path=directory+"/diagnostics-"+QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss")+".json";
     QSaveFile file(path);if(!file.open(QIODevice::WriteOnly))return QStringLiteral("诊断保存失败");file.write(QJsonDocument(data).toJson());return file.commit()?path:QStringLiteral("诊断保存失败");
+}
+
+void MslinkTunnel::copyReport(const QString& report) {
+    QGuiApplication::clipboard()->setText(report);
 }

@@ -90,6 +90,7 @@ public:
     Q_INVOKABLE QString formatBytes(qint64 bytes) const;
     Q_INVOKABLE QString formatRate(qint64 bytesPerSecond) const;
     Q_INVOKABLE QString exportDiagnostics();
+    Q_INVOKABLE void copyReport(const QString& report);
     QString server() const     { return m_server; }
     int     tcpPort() const    { return m_tcpPort; }
     int     udpPort() const    { return m_udpPort; }
@@ -116,6 +117,14 @@ public:
     // 否则返回空串，调用方用被控端自己的地址。
     QString autoPairHost() const;
 
+    Q_INVOKABLE bool hasDeviceRoute(const QString& endpoint) const;
+    Q_INVOKABLE bool matchesInvitation(const QVariantMap& invitation) const;
+    Q_INVOKABLE QString connectInvitation(const QVariantMap& invitation);
+    Q_INVOKABLE QString connectDevice(const QString& endpoint);
+    Q_INVOKABLE QString expectedDevice() const;
+    Q_INVOKABLE QString rememberDevice(const QString& deviceId);
+    Q_INVOKABLE void forgetDevice(const QString& endpoint);
+
     // QML 调用：连接。返回空字符串表示「本机已开始尝试连接」，**不代表远端已通**；
     // 远端是否连通看 tunnelUp 属性（连接失败/超时会把原因写进 lastError）。
     Q_INVOKABLE QString connectToServer(const QString& server, int tcpPort,
@@ -141,6 +150,8 @@ private:
     // 用 DPAPI 加密后经 QSaveFile 原子写回 ini。失败返回 false，并把原因写进
     // m_lastError（QML 的 lastError 属性）——此时磁盘上的文件保持原样。
     bool persistConfig();
+    QString startRoute(const QString& address, int tcpPort, int udpPort, const QString& password,
+                       const QString& endpoint, bool saveNow);
     QString iniPath() const;
 
     QString m_server;

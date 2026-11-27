@@ -15,6 +15,7 @@ Item {
                                            qsTr("Starting %1...").arg(appName)
     property bool isResume : false
     property bool quitAfter : false
+    property bool diagnostic: false
 
     function stageStarting(stage)
     {
@@ -87,7 +88,10 @@ Item {
             // the Qt UI is visible again to prevent losing
             // focus on the dialog which would impact gamepad
             // users.
-            if (streamSegueErrorDialog.text) {
+            if (diagnostic) {
+                window.showDiagnostic(appName, session.diagnosticReport(), streamSegueErrorDialog.text)
+                streamSegueErrorDialog.text = ""
+            } else if (streamSegueErrorDialog.text) {
                 streamSegueErrorDialog.quitAfter = quitAfter
                 streamSegueErrorDialog.open()
             }
@@ -98,6 +102,7 @@ Item {
     {
         // MiniStream：串流彻底结束后解除浮层菜单与会话的关联
         StreamMenu.detachSession()
+        window.releaseStream()
 
         // Garbage collect the Session object since it's pretty heavyweight
         // and keeps other libraries (like SDL_TTF) around until it is deleted.
@@ -129,6 +134,10 @@ Item {
         // MiniStream：把本次串流会话交给浮层菜单，之后 F12 / Ctrl+Alt+Shift+X
         // 才能在串流中呼出菜单；串流结束 / 断开时菜单会自动收起。
         StreamMenu.attachSession(session)
+        window.activeStream = session
+        const device = stackView.get(stackView.depth - 2)
+        window.activeDeviceName = diagnostic ? appName : (device && device.objectName ? device.objectName : "")
+
 
         // Ensure the SystemProperties async thread is finished,
         // since it may currently be using the SDL video subsystem

@@ -20,7 +20,65 @@ import StreamMenu 1.0
 // =============================================================================
 ApplicationWindow {
     function importLink() { mslinkSetupDialog.beginImport() }
-    function openInvitation(data) { mslinkSetupDialog.openInvitation(data) }
+    function openInvitation(data) {
+        if (!activeStream) {
+            mslinkSetupDialog.openInvitation(data, false)
+            return
+        }
+        if (MslinkTunnel.matchesInvitation(data)) return
+        pendingInvitation = data
+        pendingSwitchApproved = false
+        switchStream.text = "正在串流的设备「" + (activeDeviceName || connectedDeviceName() || MslinkTunnel.server) +
+                            "」将断开。要连接邀请中的设备吗？"
+        activeStream.setMenuOpen(true)
+        window.show()
+        window.raise()
+        window.requestActivate()
+        switchStream.open()
+    }
+    function releaseStream() {
+        activeStream = null
+        activeDeviceName = ""
+        if (switchStream.visible) switchStream.close()
+        if (pendingInvitation) {
+            const data = pendingInvitation
+            const confirmed = pendingSwitchApproved
+            pendingInvitation = null
+            pendingSwitchApproved = false
+            Qt.callLater(function() { mslinkSetupDialog.openInvitation(data, confirmed) })
+        }
+    }
+    function showDiagnostic(name, report, error) {
+        const metric = (key, suffix) => typeof report[key] === "number" ? report[key].toFixed(1) + suffix : "—"
+        diagnosticResult.resultText = "设备  " + name + "\n" +
+            (typeof report.score === "number" ? "远程游戏评分  " + report.score + " / 100"
+              : report.completed ? "媒体样本不足，未生成评分" : "检测提前结束，未生成评分") + "\n\n" +
+            "画面  " + (report.width > 0 ? report.width + " × " + report.height + "  " : "") +
+            metric("fps", " FPS") + " / 目标 " + (report.targetFps || "—") + " FPS\n" +
+            "视频接收  " + metric("received_fps", " FPS") + "  ·  " + metric("video_mbps", " Mbps") + "\n" +
+            "网络丢帧  " + metric("network_frame_drop_percent", "%") + "\n" +
+            "媒体 RTT  " + metric("stream_rtt_ms", " ms") + "\n" +
+            "解码  " + metric("decode_ms", " ms") + "  ·  画面排队  " + metric("queue_ms", " ms") + "\n" +
+            "音频包  " + (report.audioPackets || 0) + "  ·  成功提交 " + (report.audioSubmitted || 0) +
+            "  ·  缺包补偿 " + (report.audioConcealed || 0) + "\n\n" +
+            "评分按帧率、网络丢帧、媒体 RTT 和音频提交率计算。采样针对本次串流设置。" +
+            (error ? "\n\n" + error : "")
+        diagnosticResult.open()
+    }
+    function openSavedDevice(endpoint, name, action) { mslinkSetupDialog.openSaved(endpoint, name, action) }
+    function connectedDeviceName() {
+        const page = stackView.get(0)
+        return page instanceof PcView ? page.computerModel.nameForEndpoint(MslinkTunnel.localServiceEndpoint) : ""
+    }
+    function showConnectedDevice(id, action) {
+        window.showWorkspacePage("devices")
+        stackView.currentItem.openDevice(id, action)
+    }
+    property var activeStream: null
+    property string activeDeviceName: ""
+    property var pendingInvitation: null
+    property bool pendingSwitchApproved: false
+
     property string releaseVersion: ""
     property string releaseUrl: ""
     property string clientVersion: Qt.application.version
@@ -42,9 +100,6 @@ ApplicationWindow {
     // pages except the initial view. This is required when doing
     // a retranslate() because AppView breaks for some reason.
     property bool clearOnBack: false
-
-    // 重新连接隧道的临时提示
-    property string tunnelActionMessage: ""
 
     id: window
     title: "MiniStream · Workspace | Powered by jianhx2026"
@@ -121,24 +176,6 @@ ApplicationWindow {
 
     // ---- 隧道状态（工具栏用） ----
     readonly property bool tunnelRunning: MslinkTunnel.running
-    readonly property bool tunnelConnected: MslinkTunnel.tunnelUp
-    readonly property bool tunnelConnecting: MslinkTunnel.connecting
-    readonly property color tunnelColor: tunnelConnected ? theme.success
-                                        : (tunnelRunning || tunnelConnecting) ? theme.warning
-                                        : theme.danger
-    readonly property string tunnelLabel: {
-        if (tunnelConnected) {
-            return "隧道已连接"
-        }
-        if (tunnelConnecting) {
-            return "隧道连接中…"
-        }
-        if (tunnelRunning) {
-            return "隧道已断开"
-        }
-        return "隧道未连接"
-    }
-
     // This function runs prior to creation of the initial StackView item
     function doEarlyInit() {
         // 深色底：与 Theme.qml 的 canvas 保持一致
@@ -214,39 +251,7 @@ ApplicationWindow {
         }
     }
 
-    function showAddPcDialog() {
-        addPcDialog.open()
-    }
-
-    // 重新连接 mslink 隧道（保持主机列表不变）
-    function reconnectTunnel() {
-        if (!MslinkTunnel.configured) {
-            tunnelActionMessage = "请先导入被控端的连接链接"
-            tunnelMessageTimer.restart()
-            window.importLink()
-            return
-        }
-
-        var err = MslinkTunnel.connectToServer(MslinkTunnel.server,
-                                                MslinkTunnel.tcpPort,
-                                                MslinkTunnel.udpPort,
-                                                MslinkTunnel.password)
-        if (err !== "") {
-            tunnelActionMessage = err
-            mslinkSetupDialog.step = "status"
-            mslinkSetupDialog.open()
-        }
-        else {
-            tunnelActionMessage = "正在重新连接隧道…"
-        }
-        tunnelMessageTimer.restart()
-    }
-
-    Timer {
-        id: tunnelMessageTimer
-        interval: 4000
-        onTriggered: window.tunnelActionMessage = ""
-    }
+    function openDirectAddress() { addPcDialog.open() }
 
     readonly property bool compact: width < 980
     readonly property bool shortWindow: height < 620
@@ -269,25 +274,27 @@ ApplicationWindow {
             Text { visible: !window.compact; text: "CONTROL / 主控工作台"; color: theme.primary; font.pixelSize: 9; font.letterSpacing: 1.6; Layout.topMargin: 16; Layout.bottomMargin: 16 }
             BrandButton { label: window.compact ? "" : "我的设备"; iconSource: "qrc:/res/devices.svg"; ToolTip.text: "我的设备"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "devices" && stackView.depth === 1; onClicked: window.showWorkspacePage("devices") }
             BrandButton { label: window.compact ? "" : "体验监测"; iconSource: "qrc:/res/activity.svg"; ToolTip.text: "体验监测"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: window.workspacePage === "experience"; onClicked: window.showWorkspacePage("experience") }
-            BrandButton {
+            RowLayout {
                 visible: window.releaseVersion !== ""
-                label: window.compact ? "" : "更新 " + window.releaseVersion
-                iconSource: "qrc:/res/activity.svg"
-                ToolTip.text: "发现正式版 " + window.releaseVersion
-                ToolTip.visible: hovered
                 Layout.fillWidth: true
-                accent: true
-                onClicked: Qt.openUrlExternally(window.releaseUrl)
+                BrandButton {
+                    label: window.compact ? "" : "更新 " + window.releaseVersion
+                    iconSource: "qrc:/res/activity.svg"
+                    ToolTip.text: "发现正式版 " + window.releaseVersion
+                    ToolTip.visible: hovered
+                    Layout.fillWidth: true
+                    accent: true
+                    onClicked: Qt.openUrlExternally(window.releaseUrl)
+                }
+                BrandButton {
+                    visible: !window.compact
+                    label: "×"
+                    Accessible.name: "忽略此版本"
+                    onClicked: releaseChecker.dismiss(window.releaseVersion)
+                }
             }
             BrandButton { label: window.compact ? "" : "串流偏好"; iconSource: "qrc:/res/sliders.svg"; ToolTip.text: "串流偏好"; ToolTip.visible: hovered && window.compact; Layout.fillWidth: true; accent: stackView.currentItem instanceof ClientPreferences; onClicked: window.openPreferences() }
             Item { Layout.fillHeight: true }
-            Rectangle { visible: !window.compact; Layout.fillWidth: true; height: 66; radius: 10; color: theme.surface; border.color: theme.borderSoft
-                Column { anchors.fill: parent; anchors.margins: 11; spacing: 4
-                    Text { text: "连接方式"; color: theme.textTertiary; font.pixelSize: 9 }
-                    Text { text: window.liveMetrics.transport === "udp" ? "UDP 实时通道" : window.liveMetrics.transport === "tcp_fallback" ? "TCP 兼容通道" : "等待连接"; color: window.tunnelConnected ? theme.success : theme.textSecondary; font.pixelSize: 11 }
-                    Text { text: "1 TCP + 1 UDP"; color: theme.textTertiary; font.pixelSize: 9 }
-                }
-            }
             Rectangle { Layout.fillWidth: true; height: 1; color: theme.borderSoft }
             BrandButton { label: window.compact ? "" : "使用教程"; iconSource: "qrc:/res/help.svg"; Layout.fillWidth: true; onClicked: Qt.openUrlExternally("https://ministream.jianhx.com/tutorial.html") }
             Text { visible: !window.compact; text: "MiniStream " + window.clientVersion + " · 主控端"; color: theme.textTertiary; font.pixelSize: 10 }
@@ -528,103 +535,17 @@ ApplicationWindow {
 
             Item { Layout.fillWidth: true }
 
-            // ---- 重新连接提示 ----
-            Text {
-                visible: window.tunnelActionMessage !== ""
-                text: window.tunnelActionMessage
-                color: theme.textSecondary
-                font.pixelSize: 11
-                font.family: theme.fontFamily
-                elide: Text.ElideRight
-                Layout.maximumWidth: window.compact ? 80 : 260
-                Layout.alignment: Qt.AlignVCenter
-            }
-
-            // ---- 隧道状态 ----
-            Rectangle {
-                id: tunnelChip
-                Layout.alignment: Qt.AlignVCenter
-                height: 32
-                implicitWidth: tunnelChipRow.implicitWidth + 24
-                radius: 16
-                color: theme.surface
-                border.width: 1
-                border.color: tunnelChipMouse.containsMouse ? theme.borderStrong : theme.border
-
-                Row {
-                    id: tunnelChipRow
-                    anchors.centerIn: parent
-                    spacing: 7
-
-                    Rectangle {
-                        width: 8
-                        height: 8
-                        radius: 4
-                        color: window.tunnelColor
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: window.width < 800 ? (window.tunnelConnected ? "已连接" : "未连接") : window.tunnelLabel
-                        color: theme.textSecondary
-                        font.pixelSize: 12
-                        font.family: theme.fontFamily
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    id: tunnelChipMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: { mslinkSetupDialog.step = "status"; mslinkSetupDialog.open() }
-                }
-
-                ToolTip.visible: tunnelChipMouse.containsMouse
-                ToolTip.delay: 500
-                ToolTip.text: MslinkTunnel.running ? MslinkTunnel.statusText
-                                                   : "点击查看隧道连接状态。"
-            }
-
-            BrandButton { label: "导入链接"; accent: !window.tunnelConnected; onClicked: window.importLink() }
             BrandButton {
-                id: reconnectButton
-                visible: !window.compact
-                label: "重新连接"
-                iconSource: "qrc:/res/refresh.svg"
-                fontSize: 12
-                Layout.alignment: Qt.AlignVCenter
-                onClicked: reconnectTunnel()
-                ToolTip.delay: 800
-                ToolTip.timeout: 4000
-                ToolTip.visible: hovered
-                ToolTip.text: "重新连接 mslink 隧道（主机列表保持不变）"
-            }
-
-            BrandButton {
-                id: addPcButton
-                visible: stackView.currentItem instanceof PcView
-                label: window.width > 1080 ? "添加主机" : ""
+                visible: stackView.currentItem instanceof PcView && stackView.currentItem.count > 0
+                label: "添加设备"
                 iconSource: "qrc:/res/plus.svg"
-                fontSize: 12
-                Layout.alignment: Qt.AlignVCenter
-                onClicked: addPcDialog.open()
-
-                Shortcut {
-                    id: newPcShortcut
-                    sequence: StandardKey.New
-                    onActivated: window.importLink()
-                }
-
-                ToolTip.delay: 800
-                ToolTip.timeout: 3000
-                ToolTip.visible: hovered
-                ToolTip.text: "手动添加局域网电脑"
-
-                Keys.onDownPressed: {
-                    stackView.currentItem.forceActiveFocus(Qt.TabFocus)
-                }
+                accent: true
+                onClicked: window.importLink()
+            }
+            Shortcut {
+                enabled: window.workspacePage === "devices" && toolBar.visible
+                sequence: StandardKey.New
+                onActivated: window.importLink()
             }
 
         }
@@ -699,7 +620,7 @@ ApplicationWindow {
 
     NavigableDialog {
         id: addPcDialog
-        property string label: "输入被控端 IP 地址（走隧道时填 127.0.0.1）："
+        property string label: "输入被控端的局域网地址"
 
         standardButtons: Dialog.Ok | Dialog.Cancel
 
@@ -737,6 +658,47 @@ ApplicationWindow {
                     addPcDialog.accept()
                 }
             }
+        }
+    }
+
+    NavigableMessageDialog {
+        id: switchStream
+        title: "切换串流设备"
+        standardButtons: Dialog.Yes | Dialog.No
+        onAccepted: {
+            window.pendingSwitchApproved = true
+            if (window.activeStream) window.activeStream.disconnectForSwitch()
+        }
+        onRejected: {
+            window.pendingInvitation = null
+            window.pendingSwitchApproved = false
+            if (window.activeStream) {
+                window.visible = false
+                window.activeStream.setMenuOpen(false)
+            }
+        }
+    }
+    NavigableDialog {
+        id: diagnosticResult
+        title: "连通性检测报告"
+        property string resultText
+        standardButtons: Dialog.Ok
+        ScrollView {
+            width: Math.min(window.width - 130, 440)
+            height: Math.min(window.height - 180, 300)
+            TextArea {
+                text: diagnosticResult.resultText
+                textFormat: TextEdit.PlainText
+                wrapMode: TextEdit.Wrap
+                readOnly: true
+                selectByMouse: true
+                Accessible.name: "检测报告"
+            }
+        }
+        footer: DialogButtonBox {
+            Button { text: "复制报告"; DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                     onClicked: MslinkTunnel.copyReport(diagnosticResult.resultText) }
+            Button { text: "关闭"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
         }
     }
 

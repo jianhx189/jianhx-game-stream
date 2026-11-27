@@ -8,11 +8,19 @@ Dialog {
     id: dialog
     property bool autoConnect: true
     property var candidate: null
-    property bool added: false
+    property string savedEndpoint: ""
+    property string oldName: ""
+    property string newName: ""
+    property string action: ""
     property string problem: ""
     property string step: "import"
+    property string pairingId: ""
+    property bool startupDiscovery: autoConnect
+    readonly property bool busy: ["connecting", "discovering", "pairing"].includes(step)
+
     modal: true
-    title: step === "switch" ? "切换被控端" : step === "status" ? "连接状态" : "导入连接链接"
+    closePolicy: busy ? Popup.NoAutoClose : Popup.CloseOnEscape
+    title: step === "import" ? "添加设备" : step === "switch" ? "切换设备" : "连接设备"
     width: Math.min(480, parent.width - 32)
     anchors.centerIn: parent
     padding: 20
@@ -25,88 +33,174 @@ Dialog {
     palette.base: theme.canvas
 
     function beginImport() {
+        if (busy) return
+        resetSelection()
         step = "import"
-        problem = ""
-        candidate = null
         link.clear()
         open()
         link.forceActiveFocus()
     }
-    function openInvitation(data) {
+    function resetSelection() {
+        candidate = null
+        savedEndpoint = ""
+        oldName = ""
+        newName = ""
+        action = ""
+        problem = ""
+    }
+    function openInvitation(data, confirmed) {
+        if (busy) return
+        resetSelection()
+        startupDiscovery = false
         candidate = data
         link.clear()
-        problem = ""
-        const same = MslinkTunnel.server === data.ip && MslinkTunnel.tcpPort === data.tcp &&
-                     MslinkTunnel.udpPort === data.udp && MslinkTunnel.password === data.key
+        chooseRoute(MslinkTunnel.matchesInvitation(data), confirmed)
+    }
+    function openSaved(endpoint, name, nextAction) {
+        if (busy) return
+        resetSelection()
+        startupDiscovery = false
+        savedEndpoint = endpoint
+        newName = name
+        action = nextAction
+        chooseRoute(MslinkTunnel.localServiceEndpoint === endpoint, false)
+    }
+    function chooseRoute(same, confirmed) {
         open()
-        if (same && (MslinkTunnel.tunnelUp || MslinkTunnel.connecting)) {
-            step = "status"
-        } else if (!same && MslinkTunnel.running) {
+        if (same && MslinkTunnel.tunnelUp) {
+            discover()
+        } else if (!confirmed && !same && MslinkTunnel.tunnelUp) {
+            oldName = window.connectedDeviceName() || MslinkTunnel.server
             step = "switch"
         } else {
-            connectCandidate()
+            connectSelected()
         }
     }
     function submit() {
         const parsed = MslinkTunnel.parseInvitation(link.text)
         if (!parsed.ip) {
-            problem = "链接无效。请在被控端复制完整连接链接，再粘贴到这里。"
+            problem = "链接无效。请从被控端复制完整邀请。"
             return
         }
-        openInvitation(parsed)
+        openInvitation(parsed, false)
     }
-    function connectCandidate() {
-        step = "status"
-        problem = ""
-        if (!candidate) {
-            window.reconnectTunnel()
+    function connectSelected() {
+        problem = candidate ? MslinkTunnel.connectInvitation(candidate) : MslinkTunnel.connectDevice(savedEndpoint)
+        if (problem) {
+            step = "failed"
             return
         }
-        const data = candidate
-        if (MslinkTunnel.server !== data.ip || MslinkTunnel.password !== data.key ||
-            MslinkTunnel.tcpPort !== data.tcp || MslinkTunnel.udpPort !== data.udp) {
-            MslinkTunnel.setSunshineCredentials("", "")
-        }
-        added = false
-        problem = MslinkTunnel.connectToServer(data.ip, data.tcp, data.udp, data.key)
+        step = "connecting"
+        advance()
     }
-    function discoverHost() {
-        if (MslinkTunnel.tunnelUp && !added) {
-            added = true
-            ComputerManager.addNewHostManually(MslinkTunnel.localServiceEndpoint)
+    function discover() {
+        step = "discovering"
+        ComputerManager.addInvitedHost(MslinkTunnel.localServiceEndpoint, MslinkTunnel.expectedDevice())
+    }
+    function advance() {
+        if (step !== "connecting") return
+        if (MslinkTunnel.tunnelUp) discover()
+        else if (!MslinkTunnel.connecting && MslinkTunnel.lastError) {
+            problem = MslinkTunnel.lastError
+            MslinkTunnel.disconnectTunnel()
+            step = "failed"
+        }
+    }
+    function finish(id) {
+        const next = action
+        step = "done"
+        close()
+        if (next) Qt.callLater(window.showConnectedDevice, id, next)
+    }
+
+    Connections {
+        target: MslinkTunnel
+        function onStateChanged() {
+            dialog.advance()
+            if (dialog.startupDiscovery && MslinkTunnel.tunnelUp && !dialog.visible) {
+                dialog.startupDiscovery = false
+                ComputerManager.addInvitedHost(MslinkTunnel.localServiceEndpoint, MslinkTunnel.expectedDevice())
+            }
         }
     }
     Connections {
-        target: MslinkTunnel
-        function onStateChanged() { dialog.discoverHost() }
+        target: ComputerManager
+        function onInvitedHostReady(endpoint, id, paired, error) {
+            if (endpoint !== MslinkTunnel.localServiceEndpoint) return
+            if (dialog.step !== "discovering") {
+                if (id && !MslinkTunnel.expectedDevice()) MslinkTunnel.rememberDevice(id)
+                return
+            }
+            if (error) {
+                MslinkTunnel.disconnectTunnel()
+                dialog.problem = error
+                dialog.step = "failed"
+                return
+            }
+            const saveError = MslinkTunnel.rememberDevice(id)
+            if (saveError) dialog.problem = saveError
+            if (paired) {
+                if (!saveError || dialog.action) dialog.finish(id)
+                else dialog.step = "saved"
+            } else if (dialog.candidate && dialog.candidate.pair) {
+                dialog.step = "pairing"
+                dialog.pairingId = id
+                ComputerManager.pairInvitedHost(id, endpoint, dialog.candidate.pair, dialog.candidate.cert)
+            } else if (dialog.action) {
+                dialog.finish(id)
+            } else {
+                dialog.step = "manual"
+            }
+        }
+        function onInvitationPairingFinished(id, error) {
+            if (dialog.step !== "pairing" || id !== dialog.pairingId) return
+            if (error) {
+                dialog.problem = error
+                dialog.step = "manual"
+            } else if (dialog.problem) {
+                dialog.step = "saved"
+            } else {
+                dialog.finish(id)
+            }
+        }
     }
     Component.onCompleted: {
-        if (!autoConnect) return
-        if (!MslinkTunnel.configured) beginImport()
-        else if (MslinkTunnel.tunnelUp) discoverHost()
-        else if (!MslinkTunnel.running) window.reconnectTunnel()
+        if (autoConnect && MslinkTunnel.tunnelUp) {
+            startupDiscovery = false
+            ComputerManager.addInvitedHost(MslinkTunnel.localServiceEndpoint, MslinkTunnel.expectedDevice())
+        }
     }
-    enter: Transition {
-        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 155; easing.type: Easing.OutCubic }
-        NumberAnimation { property: "scale"; from: 0.985; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    onClosed: {
+        link.clear()
+        resetSelection()
+        step = "import"
     }
-    exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: 115 } }
-    onClosed: { link.clear(); candidate = null; problem = "" }
+
     contentItem: ColumnLayout {
         spacing: 14
         Label {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
-            text: dialog.step === "import" ? "在被控端的「连接设置」复制链接，然后粘贴到这里。" :
-                  dialog.step === "switch" ? "已有隧道正在运行。切换到新链接将断开当前隧道。" :
-                  MslinkTunnel.tunnelUp ? "隧道已认证。在设备列表中选择电脑，首次配对时按提示输入 PIN。" :
-                  MslinkTunnel.connecting ? "正在连接被控端…" : "尚未连接，请确认被控端在线。"
+            textFormat: Text.PlainText
+            text: {
+                switch (dialog.step) {
+                case "import": return "从被控端复制邀请链接，然后粘贴到这里。"
+                case "switch": return "设备「" + dialog.oldName + "」当前已连接。要断开它并连接" +
+                                      (dialog.newName ? "「" + dialog.newName + "」" : "邀请中的设备") + "吗？"
+                case "connecting": return "正在连接被控端…"
+                case "discovering": return "正在识别设备…"
+                case "pairing": return "正在完成首次配对…"
+                case "manual": return "设备已添加。打开设备菜单选择「连接」可完成 PIN 配对。"
+                case "saved": return "设备已连接。"
+                default: return "连接未完成。"
+                }
+            }
         }
         TextField {
             id: link
             Layout.fillWidth: true
             visible: dialog.step === "import"
-            placeholderText: "粘贴完整连接链接"
+            placeholderText: "粘贴完整邀请链接"
             placeholderTextColor: theme.textTertiary
             color: theme.text
             Accessible.name: "被控端邀请链接"
@@ -120,21 +214,34 @@ Dialog {
             onTextEdited: dialog.problem = ""
             onAccepted: if (text.trim()) dialog.submit()
         }
-        BusyIndicator { visible: dialog.step === "status" && MslinkTunnel.connecting; running: visible; Layout.alignment: Qt.AlignHCenter }
+        BusyIndicator { visible: dialog.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
         Label {
-            Layout.fillWidth: true; wrapMode: Text.Wrap; color: theme.danger
-            text: dialog.problem || (dialog.step === "status" ? MslinkTunnel.lastError : "")
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
+            color: theme.danger
+            text: dialog.problem
             visible: text.length > 0
         }
         RowLayout {
-            Layout.alignment: Qt.AlignRight
-            BrandButton { label: dialog.step === "status" && MslinkTunnel.tunnelUp ? "查看设备" : "关闭"; onClicked: dialog.close() }
+            Layout.fillWidth: true
+            visible: !dialog.busy
             BrandButton {
-                visible: dialog.step !== "status" || (!MslinkTunnel.connecting && !MslinkTunnel.tunnelUp)
-                label: dialog.step === "import" ? "导入并连接" : dialog.step === "switch" ? "确认切换" : "重新连接"
+                visible: dialog.step === "import"
+                label: "手动添加地址"
+                onClicked: { dialog.close(); window.openDirectAddress() }
+            }
+            Item { Layout.fillWidth: true }
+            BrandButton {
+                label: dialog.step === "switch" ? "继续当前连接" : "关闭"
+                onClicked: dialog.close()
+            }
+            BrandButton {
+                visible: ["import", "switch", "failed"].includes(dialog.step)
+                label: dialog.step === "import" ? "导入并连接" : dialog.step === "switch" ? "断开并连接" : "重试"
                 enabled: dialog.step !== "import" || link.text.trim().length > 0
                 accent: true
-                onClicked: dialog.step === "import" ? dialog.submit() : dialog.connectCandidate()
+                onClicked: dialog.step === "import" ? dialog.submit() : dialog.connectSelected()
             }
         }
     }

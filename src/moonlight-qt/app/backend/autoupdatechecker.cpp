@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QVersionNumber>
 
 namespace {
@@ -37,12 +38,21 @@ QString AutoUpdateChecker::newerClientRelease(const QJsonObject &release, const 
     return {};
 }
 
+void AutoUpdateChecker::dismiss(const QString &version)
+{
+    const auto offered = parseVersion(version);
+    if (offered.isNull() || offered <= parseVersion(QCoreApplication::applicationVersion())) return;
+    QSettings().setValue(QStringLiteral("updates/dismissedClientVersion"), offered.toString());
+    emit noUpdateAvailable();
+}
+
 void AutoUpdateChecker::start()
 {
     if (checking) return;
     QNetworkRequest request(QUrl(QStringLiteral("https://api.github.com/repos/jianhx189/jianhx-game-stream/releases/latest")));
     request.setRawHeader("User-Agent", ("MiniStream/" + QCoreApplication::applicationVersion()).toUtf8());
     request.setRawHeader("Accept", "application/vnd.github+json");
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
     request.setTransferTimeout(10000);
     checking = true;
     auto *reply = network.get(request);
@@ -53,7 +63,8 @@ void AutoUpdateChecker::start()
         const auto doc = QJsonDocument::fromJson(reply->readAll());
         if (!doc.isObject()) return;
         const auto tag = newerClientRelease(doc.object(), QCoreApplication::applicationVersion());
-        if (tag.isEmpty()) emit noUpdateAvailable();
+        const auto dismissed = parseVersion(QSettings().value(QStringLiteral("updates/dismissedClientVersion")).toString());
+        if (tag.isEmpty() || (!dismissed.isNull() && parseVersion(tag) <= dismissed)) emit noUpdateAvailable();
         else emit updateAvailable(tag.mid(1), repo + "/releases/tag/" + tag);
     });
 }

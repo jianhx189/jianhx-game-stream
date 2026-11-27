@@ -7,6 +7,7 @@ class AutoUpdateChecker : public QObject {
 public:
     explicit AutoUpdateChecker(QObject *parent = nullptr);
     Q_INVOKABLE void start();
+    Q_INVOKABLE void dismiss(const QString& version);
     static QString newerClientRelease(const QJsonObject &release, const QString &installed);
 signals:
     void noUpdateAvailable();
